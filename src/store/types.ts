@@ -1,38 +1,25 @@
+import type { CommanderState as DomainCommanderState } from '../domain/commander';
+import type { DockedMarketSession, MarketCommodity } from '../domain/market';
+import type { MissionMessage } from '../domain/missions';
+
 export interface UniverseState {
   currentSystem: string;
   nearbySystems: string[];
   stardate: number;
+  economy: number;
+  marketFluctuation: number;
 }
 
-export interface CommanderState {
-  name: string;
-  credits: number;
-  fuel: number;
-  cargoCapacity: number;
-}
-
-export interface MarketItem {
-  id: string;
-  name: string;
-  price: number;
-  stock: number;
-}
+export type CommanderState = DomainCommanderState;
 
 export interface MarketState {
-  items: MarketItem[];
+  session: DockedMarketSession;
+  items: MarketCommodity[];
   selectedCommodityId?: string;
 }
 
-export interface Mission {
-  id: string;
-  title: string;
-  destination: string;
-  reward: number;
-  status: 'available' | 'active' | 'completed';
-}
-
 export interface MissionsState {
-  list: Mission[];
+  missionLog: MissionMessage[];
 }
 
 export interface UiState {
