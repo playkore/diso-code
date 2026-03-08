@@ -7,9 +7,9 @@ export function SystemDataScreen() {
     <section className="screen">
       <h2>Data on System</h2>
       <p>
-        {universe.currentSystem} is a high-tech democracy with stable trade lanes and stardate{' '}
-        {universe.stardate}.
+        {universe.currentSystem} economy index {universe.economy} with market fluctuation byte {universe.marketFluctuation}.
       </p>
+      <p>Stardate {universe.stardate}.</p>
     </section>
   );
 }

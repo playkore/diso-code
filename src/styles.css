@@ -46,6 +46,16 @@ header p {
   text-transform: capitalize;
 }
 
+.mission-notice {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.2rem;
+  border: 1px solid #4a70db;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(38, 72, 163, 0.25);
+}
+
 .screen {
   padding: 0.9rem;
   border-radius: 0.75rem;
@@ -88,11 +98,15 @@ header p {
 }
 
 .chip-list li {
-  padding: 0.45rem;
+  padding: 0.35rem;
   text-align: center;
   border-radius: 999px;
   border: 1px solid #3258be;
   background: #15254f;
+}
+
+.chip-list button {
+  width: 100%;
 }
 
 .button-group {
@@ -112,6 +126,16 @@ button {
 .muted,
 .status {
   color: #adc0ff;
+}
+
+.save-preview {
+  max-height: 13rem;
+  overflow: auto;
+  font-size: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid #304489;
+  border-radius: 0.5rem;
+  background: rgba(19, 30, 66, 0.8);
 }
 
 .tab-nav {

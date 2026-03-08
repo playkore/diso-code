@@ -15,6 +15,14 @@ export interface MarketCommodity extends Commodity {
   quantity: number;
 }
 
+export interface DockedMarketSession {
+  systemName: string;
+  economy: number;
+  fluctuation: number;
+  baseline: MarketCommodity[];
+  localQuantities: Record<string, number>;
+}
+
 export const COMMODITIES: Commodity[] = [
   { key: 'food', name: 'Food', basePrice: 0x13, gradient: -0x02, baseQuantity: 0x06, mask: 0x01, unit: 't' },
   { key: 'textiles', name: 'Textiles', basePrice: 0x14, gradient: -0x01, baseQuantity: 0x0a, mask: 0x03, unit: 't' },
@@ -67,4 +75,45 @@ export function cargoSpaceRequired(unit: CommodityUnit, amount: number): number 
   }
 
   return Math.max(0, Math.trunc(amount));
+}
+
+export function createDockedMarketSession(
+  systemName: string,
+  economy: number,
+  fluctuation: number
+): DockedMarketSession {
+  const baseline = generateMarket(economy, fluctuation);
+  const localQuantities = Object.fromEntries(baseline.map((item) => [item.key, item.quantity]));
+
+  return {
+    systemName,
+    economy,
+    fluctuation,
+    baseline,
+    localQuantities
+  };
+}
+
+export function getSessionMarketItems(session: DockedMarketSession): MarketCommodity[] {
+  return session.baseline.map((item) => ({
+    ...item,
+    quantity: session.localQuantities[item.key] ?? item.quantity
+  }));
+}
+
+export function applyLocalMarketTrade(
+  session: DockedMarketSession,
+  commodityKey: string,
+  deltaQuantity: number
+): DockedMarketSession {
+  const current = session.localQuantities[commodityKey] ?? 0;
+  const next = Math.max(0, current + deltaQuantity);
+
+  return {
+    ...session,
+    localQuantities: {
+      ...session.localQuantities,
+      [commodityKey]: next
+    }
+  };
 }

@@ -14,12 +14,23 @@ const navItems: Array<{ tab: AppTab; label: string; to: string }> = [
 export function AppShell() {
   const activeTab = useGameStore((state) => state.ui.activeTab);
   const setActiveTab = useGameStore((state) => state.setActiveTab);
+  const universe = useGameStore((state) => state.universe);
+  const missionLog = useGameStore((state) => state.missions.missionLog);
+  const latestMessage = missionLog[0];
 
   return (
     <div className="app-shell">
       <header>
         <h1>DISO Commander Console</h1>
-        <p>Active tab: {activeTab}</p>
+        <p>
+          Active tab: {activeTab} · Docked at {universe.currentSystem}
+        </p>
+        {latestMessage ? (
+          <div className="mission-notice" role="status" aria-live="polite">
+            <strong>{latestMessage.title}</strong>
+            <span>{latestMessage.body}</span>
+          </div>
+        ) : null}
       </header>
 
       <main>
