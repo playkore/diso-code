@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getSystemChartCoordinates } from '../domain/localSystemCatalog';
+import { getSystemByName, getSystemDistance, getVisibleSystems } from '../domain/galaxyCatalog';
 import { useGameStore } from '../store/useGameStore';
 
 interface StarPoint {
@@ -10,14 +10,15 @@ interface StarPoint {
   inRange: boolean;
 }
 
-const JUMP_RANGE = 72;
+const MAP_SCALE = 4;
+const JUMP_RANGE = (7 / 0.4) * MAP_SCALE;
 
 function getRelativePoint(currentSystem: string, targetSystem: string): StarPoint {
-  const current = getSystemChartCoordinates(currentSystem);
-  const target = getSystemChartCoordinates(targetSystem);
-  const dx = target.x - current.x;
-  const dy = target.y - current.y;
-  const distance = Math.hypot(dx, dy);
+  const current = getSystemByName(currentSystem)?.data;
+  const target = getSystemByName(targetSystem)?.data;
+  const dx = ((target?.x ?? 0) - (current?.x ?? 0)) * MAP_SCALE;
+  const dy = ((((target?.y ?? 0) - (current?.y ?? 0)) / 2)) * MAP_SCALE;
+  const distance = getSystemDistance(currentSystem, targetSystem) * (MAP_SCALE / 0.4);
 
   return {
     name: targetSystem,
@@ -38,21 +39,9 @@ export function StarMapScreen() {
   }, [universe.currentSystem]);
 
   const starPoints = useMemo<StarPoint[]>(
-    () => [
-      getRelativePoint(universe.currentSystem, universe.currentSystem),
-      ...universe.nearbySystems
-        .filter((name) => name !== universe.currentSystem)
-        .map((name) => getRelativePoint(universe.currentSystem, name))
-    ],
-    [universe.currentSystem, universe.nearbySystems]
+    () => getVisibleSystems(universe.currentSystem).map((system) => getRelativePoint(universe.currentSystem, system.data.name)),
+    [universe.currentSystem]
   );
-
-  const economyBySystem: Record<string, number> = {
-    Leesti: 4,
-    Diso: 2,
-    Zaonce: 7,
-    Reorte: 5
-  };
 
   const selectedPoint = starPoints.find((star) => star.name === selectedSystem) ?? null;
 
@@ -88,14 +77,13 @@ export function StarMapScreen() {
           <p>
             Selected destination: <strong>{selectedSystem}</strong>
           </p>
-          {!selectedPoint.inRange ? <p className="status">This system is outside jump range.</p> : null}
           <button
             type="button"
             disabled={!selectedPoint.inRange}
             onClick={() =>
               dockAtSystem(
                 selectedSystem,
-                economyBySystem[selectedSystem] ?? 5,
+                getSystemByName(selectedSystem)?.data.economy ?? universe.economy,
                 (universe.stardate + selectedSystem.length) & 0xff
               )
             }

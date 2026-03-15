@@ -32,7 +32,7 @@ describe('universe generation', () => {
     const systems = generateGalaxy(0);
     expect(systems).toHaveLength(256);
     expect(systems[0].seed).toEqual({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 });
-    expect(systems[1].seed).toEqual({ w0: 0x6845, w1: 0x6f28, w2: 0xe5e8 });
+    expect(systems[1].seed).toEqual({ w0: 0xcd80, w1: 0x98b8, w2: 0x7a1d });
   });
 
   it('applies galaxy transform per galaxy index', () => {
@@ -42,23 +42,23 @@ describe('universe generation', () => {
 });
 
 describe('system names and data', () => {
-  it('builds expected name for Lave seed', () => {
-    expect(generateSystemName({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 })).toBe('LAVE');
+  it('builds expected name for the canonical base seed', () => {
+    expect(generateSystemName({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 })).toBe('TIBEDIED');
   });
 
-  it('builds deterministic derived values for Lave', () => {
+  it('builds deterministic derived values for the canonical base system', () => {
     const data = generateSystemData({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 });
 
     expect(data).toMatchObject({
-      name: 'Lave',
+      name: 'Tibedied',
       x: 0x02,
       y: 0x5a,
-      economy: 5,
+      economy: 2,
       government: 1,
-      techLevel: 4,
-      population: 23,
-      productivity: 5520,
-      radius: 41114,
+      techLevel: 8,
+      population: 36,
+      productivity: 11520,
+      radius: 4698,
       species: 'Human Colonials'
     });
   });
@@ -71,7 +71,7 @@ describe('market generation', () => {
     expect(market[0]).toMatchObject({ key: 'food', quantity: 16, price: 36 });
     expect(market[5]).toMatchObject({ key: 'luxuries', quantity: 14, price: 944 });
     expect(market[13]).toMatchObject({ key: 'gold', quantity: 7, price: 368 });
-    expect(market[16]).toMatchObject({ key: 'alienItems', quantity: 0, price: 448 });
+    expect(market[16]).toMatchObject({ key: 'alienItems', quantity: 53, price: 512 });
   });
 
   it('only uses hold space for tonne cargo', () => {

@@ -18,6 +18,7 @@ import {
   getMissionMessagesForDocking,
   type MissionExternalEvent
 } from '../domain/missions';
+import { getNearbySystemNames, getSystemByName } from '../domain/galaxyCatalog';
 import type { AppTab, CommanderState, MarketState, MissionsState, UiMessage, UiState, UniverseState } from './types';
 
 interface SaveState {
@@ -86,16 +87,17 @@ function getCheapestCommodity(session: DockedMarketSession) {
 
 export const useGameStore = create<GameStore>((set, get) => {
   const initialCommander = createDefaultCommander();
+  const initialSystem = getSystemByName(initialCommander.currentSystem);
   return {
     universe: {
-      currentSystem: 'Lave',
-      nearbySystems: ['Leesti', 'Diso', 'Zaonce', 'Reorte'],
+      currentSystem: initialCommander.currentSystem,
+      nearbySystems: getNearbySystemNames(initialCommander.currentSystem),
       stardate: 3124,
-      economy: 5,
+      economy: initialSystem?.data.economy ?? 5,
       marketFluctuation: 0
     },
     commander: initialCommander,
-    market: createMarketState('Lave', 5, 0),
+    market: createMarketState(initialCommander.currentSystem, initialSystem?.data.economy ?? 5, 0),
     missions: updateMissionLog(initialCommander),
     ui: {
       activeTab: 'market',
@@ -103,12 +105,14 @@ export const useGameStore = create<GameStore>((set, get) => {
       activityLog: []
     },
     setActiveTab: (tab) => set((state) => ({ ui: { ...state.ui, activeTab: tab } })),
-    dockAtSystem: (systemName, economy, fluctuation) =>
+    dockAtSystem: (systemName, _economy, fluctuation) =>
       set((state) => {
         const nextCommander = { ...state.commander, currentSystem: systemName };
         const progress = applyDockingMissionState({ tp: nextCommander.missionTP, variant: nextCommander.missionVariant });
         nextCommander.missionTP = progress.tp;
-        const nextMarket = createMarketState(systemName, economy, fluctuation);
+        const nextSystem = getSystemByName(systemName);
+        const nextEconomy = nextSystem?.data.economy ?? state.universe.economy;
+        const nextMarket = createMarketState(systemName, nextEconomy, fluctuation);
         const cheapest = getCheapestCommodity(nextMarket.session);
         const arrivalMessage = createUiMessage(
           'info',
@@ -120,7 +124,8 @@ export const useGameStore = create<GameStore>((set, get) => {
           universe: {
             ...state.universe,
             currentSystem: systemName,
-            economy,
+            nearbySystems: getNearbySystemNames(systemName),
+            economy: nextEconomy,
             marketFluctuation: fluctuation,
             stardate: state.universe.stardate + 1
           },
@@ -284,7 +289,9 @@ export const useGameStore = create<GameStore>((set, get) => {
           },
           universe: {
             ...current.universe,
-            currentSystem: commander.currentSystem
+            currentSystem: commander.currentSystem,
+            nearbySystems: getNearbySystemNames(commander.currentSystem),
+            economy: getSystemByName(commander.currentSystem)?.data.economy ?? current.universe.economy
           },
           missions: {
             missionLog: getMissionMessagesForDocking(missionProgress)
