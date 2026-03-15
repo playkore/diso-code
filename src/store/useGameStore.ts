@@ -2,9 +2,7 @@ import { create } from 'zustand';
 import { createDefaultCommander, cargoUsedTonnes } from '../domain/commander';
 import {
   decodeCommanderBinary256,
-  encodeCommanderBinary256,
-  loadCommanderJson,
-  serializeCommanderJson
+  encodeCommanderBinary256
 } from '../domain/commanderPersistence';
 import {
   applyLocalMarketTrade,
@@ -23,11 +21,16 @@ import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJum
 import type { AppTab, CommanderState, MarketState, MissionsState, UiMessage, UiState, UniverseState } from './types';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
+import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/gamePersistence';
 
 interface SaveState {
+  savedAt: string;
   json: string;
   binary: Uint8Array;
+  snapshot: GameSnapshot;
 }
+
+const SAVE_SLOT_STORAGE_KEY = 'diso-code:slot-1';
 
 interface GameStore {
   universe: UniverseState;
@@ -108,14 +111,93 @@ function createInitialGameState(commander: CommanderState) {
   };
 }
 
+function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market'>): GameSnapshot {
+  return {
+    commander: state.commander,
+    universe: state.universe,
+    marketSession: state.market.session
+  };
+}
+
+function restoreSnapshot(snapshot: GameSnapshot) {
+  const missionProgress = applyDockingMissionState({
+    tp: snapshot.commander.missionTP,
+    variant: snapshot.commander.missionVariant
+  });
+  const commander = {
+    ...snapshot.commander,
+    missionTP: missionProgress.tp
+  };
+
+  return {
+    commander,
+    universe: {
+      ...snapshot.universe,
+      currentSystem: commander.currentSystem,
+      nearbySystems: getNearbySystemNames(commander.currentSystem)
+    },
+    market: refreshItems(snapshot.marketSession),
+    missions: {
+      missionLog: getMissionMessagesForDocking(missionProgress)
+    }
+  };
+}
+
+function persistSaveState(saveState: SaveState | undefined) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+
+  if (!saveState) {
+    window.localStorage.removeItem(SAVE_SLOT_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(
+    SAVE_SLOT_STORAGE_KEY,
+    JSON.stringify({
+      savedAt: saveState.savedAt,
+      json: saveState.json,
+      binary: Array.from(saveState.binary)
+    })
+  );
+}
+
+function loadPersistedSaveState(): SaveState | undefined {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return undefined;
+  }
+
+  const raw = window.localStorage.getItem(SAVE_SLOT_STORAGE_KEY);
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { savedAt: string; json: string; binary: number[] };
+    const gameSave = loadGameJson(parsed.json);
+    return {
+      savedAt: gameSave.savedAt,
+      json: parsed.json,
+      binary: Uint8Array.from(parsed.binary),
+      snapshot: gameSave.snapshot
+    };
+  } catch {
+    window.localStorage.removeItem(SAVE_SLOT_STORAGE_KEY);
+    return undefined;
+  }
+}
+
 export const useGameStore = create<GameStore>((set, get) => {
   const initialCommander = createDefaultCommander();
   const initialState = createInitialGameState(initialCommander);
+  const persistedSaveState = loadPersistedSaveState();
   return {
     universe: initialState.universe,
     commander: initialState.commander,
     market: initialState.market,
     missions: initialState.missions,
+    saveState: persistedSaveState,
     ui: {
       activeTab: 'market',
       compactMode: true,
@@ -355,12 +437,21 @@ export const useGameStore = create<GameStore>((set, get) => {
         };
       }),
     quickSave: () => {
-      const commander = get().commander;
-      const json = serializeCommanderJson(commander);
-      const binary = encodeCommanderBinary256(commander);
-      set((state) => ({
-        saveState: { json, binary },
-        ui: withUiMessage(state.ui, createUiMessage('info', 'Quick save complete', 'Commander data stored in both JSON and binary format.'))
+      const state = get();
+      const snapshot = createSnapshot(state);
+      const savedAt = new Date().toISOString();
+      const json = serializeGameJson(snapshot, savedAt);
+      const binary = encodeCommanderBinary256(snapshot.commander);
+      const saveState = { savedAt, json, binary, snapshot };
+
+      persistSaveState(saveState);
+
+      set((current) => ({
+        saveState,
+        ui: withUiMessage(
+          current.ui,
+          createUiMessage('info', 'Slot 1 saved', `Saved ${snapshot.commander.name} at ${snapshot.commander.currentSystem}.`)
+        )
       }));
     },
     loadFromSave: () => {
@@ -368,41 +459,21 @@ export const useGameStore = create<GameStore>((set, get) => {
       if (!state.saveState) {
         return;
       }
+      const commanderFromBinary = decodeCommanderBinary256(state.saveState.binary);
+      const restoredState = restoreSnapshot(state.saveState.snapshot);
 
-      const commanderFromJson = loadCommanderJson(state.saveState.json);
-      const commanderFromBin = decodeCommanderBinary256(state.saveState.binary);
-      const commander = commanderFromJson.name ? commanderFromJson : commanderFromBin;
-
-      set((current) => {
-        const missionProgress = applyDockingMissionState({
-          tp: commander.missionTP,
-          variant: commander.missionVariant
-        });
-
-        return {
-          commander: {
-            ...commander,
-            missionTP: missionProgress.tp
-          },
-          universe: {
-            ...current.universe,
-            currentSystem: commander.currentSystem,
-            nearbySystems: getNearbySystemNames(commander.currentSystem),
-            economy: getSystemByName(commander.currentSystem)?.data.economy ?? current.universe.economy
-          },
-          missions: {
-            missionLog: getMissionMessagesForDocking(missionProgress)
-          },
-          ui: withUiMessage(
-            current.ui,
-            createUiMessage(
-              'info',
-              'Save loaded',
-              `Commander restored at ${commander.currentSystem} with ${formatCredits(commander.cash)}.`
-            )
+      set((current) => ({
+        ...restoredState,
+        saveState: state.saveState,
+        ui: withUiMessage(
+          current.ui,
+          createUiMessage(
+            'info',
+            'Slot 1 loaded',
+            `Commander restored at ${commanderFromBinary.currentSystem} with ${formatCredits(commanderFromBinary.cash)}.`
           )
-        };
-      });
+        )
+      }));
     },
     startNewGame: () => {
       const freshCommander = createDefaultCommander();
@@ -411,8 +482,8 @@ export const useGameStore = create<GameStore>((set, get) => {
       set((state) => ({
         ...freshState,
         ui: withUiMessage(
-          { ...state.ui, activeTab: 'save-load' },
-          createUiMessage('info', 'New game started', 'Commander reset to a fresh Lave start.')
+          { ...state.ui, activeTab: 'market' },
+          createUiMessage('info', 'New game started', 'Fresh commander created. Save when you want to overwrite Slot 1.')
         )
       }));
     }

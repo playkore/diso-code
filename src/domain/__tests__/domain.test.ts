@@ -23,6 +23,7 @@ import {
   loadCommanderJson,
   serializeCommanderJson
 } from '../commanderPersistence';
+import { loadGameJson, serializeGameJson } from '../gamePersistence';
 
 describe('universe generation', () => {
   it('keeps canonical base seed', () => {
@@ -124,6 +125,29 @@ describe('missions and commander persistence', () => {
 
     expect(fromJson.cash).toBe(2222);
     expect(fromBinary.missionTP).toBe(7);
+  });
+
+  it('round-trips a full game snapshot through save slot JSON', () => {
+    const commander = createDefaultCommander();
+    const json = serializeGameJson(
+      {
+        commander,
+        universe: {
+          currentSystem: 'Lave',
+          nearbySystems: ['Leesti'],
+          stardate: 3124,
+          economy: 5,
+          marketFluctuation: 0
+        },
+        marketSession: createDockedMarketSession('Lave', 5, 0)
+      },
+      '2026-03-15T00:00:00.000Z'
+    );
+    const save = loadGameJson(json);
+
+    expect(save.snapshot.commander.currentSystem).toBe('Lave');
+    expect(save.snapshot.universe.stardate).toBe(3124);
+    expect(save.savedAt).toBe('2026-03-15T00:00:00.000Z');
   });
 
   it('uses tenths-of-a-light-year fuel costs', () => {

@@ -201,6 +201,19 @@ main {
   gap: 0.5rem;
 }
 
+.save-panels {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.save-panel {
+  padding: 0.75rem;
+  border: 1px solid #304489;
+  border-radius: 0.75rem;
+  background: rgba(19, 30, 66, 0.8);
+}
+
 .fuel-actions {
   margin-top: 1rem;
   display: grid;
@@ -341,6 +354,10 @@ button:disabled {
 
   .segment-control {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .save-panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
