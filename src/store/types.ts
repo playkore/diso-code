@@ -18,6 +18,13 @@ export interface MarketState {
   selectedCommodityId?: string;
 }
 
+export interface UiMessage {
+  id: string;
+  tone: 'info' | 'success' | 'error';
+  title: string;
+  body: string;
+}
+
 export interface MissionsState {
   missionLog: MissionMessage[];
 }
@@ -25,6 +32,8 @@ export interface MissionsState {
 export interface UiState {
   activeTab: AppTab;
   compactMode: boolean;
+  latestEvent?: UiMessage;
+  activityLog: UiMessage[];
 }
 
 export type AppTab =

@@ -1,6 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
+import { StatusFeed } from './StatusFeed';
 
 const navItems: Array<{ tab: AppTab; label: string; to: string }> = [
   { tab: 'market', label: 'Market', to: '/' },
@@ -16,8 +18,11 @@ export function AppShell() {
   const activeTab = useGameStore((state) => state.ui.activeTab);
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const universe = useGameStore((state) => state.universe);
+  const commander = useGameStore((state) => state.commander);
+  const ui = useGameStore((state) => state.ui);
   const missionLog = useGameStore((state) => state.missions.missionLog);
   const latestMessage = missionLog[0];
+  const cargoUsed = cargoUsedTonnes(commander.cargo);
 
   return (
     <div className="app-shell">
@@ -26,12 +31,29 @@ export function AppShell() {
         <p>
           Active tab: {activeTab} · Docked at {universe.currentSystem}
         </p>
+        <dl className="hud-grid" aria-label="Commander status">
+          <div>
+            <dt>Credits</dt>
+            <dd>{commander.cash} cr</dd>
+          </div>
+          <div>
+            <dt>Cargo</dt>
+            <dd>
+              {cargoUsed} / {commander.cargoCapacity} t
+            </dd>
+          </div>
+          <div>
+            <dt>System</dt>
+            <dd>{universe.currentSystem}</dd>
+          </div>
+        </dl>
         {latestMessage ? (
           <div className="mission-notice" role="status" aria-live="polite">
             <strong>{latestMessage.title}</strong>
             <span>{latestMessage.body}</span>
           </div>
         ) : null}
+        <StatusFeed latestEvent={ui.latestEvent} activityLog={ui.activityLog} />
       </header>
 
       <main>

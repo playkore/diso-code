@@ -1,0 +1,77 @@
+Prioritized UX Backlog
+
+Quick Wins
+- Persistent commander HUD
+  Show credits, cargo used / capacity, and current system in the header on every screen.
+  Why: removes constant context switching and makes trade outcomes obvious.
+
+- Market row improvements
+  Add player-owned quantity next to each commodity.
+  Add projected cash after buy/sell for the current click.
+  Why: selling and evaluating trades becomes much easier.
+
+- Action feedback
+  Add a small transaction log or toast such as "Bought 1 Narcotics for 496 cr".
+  Show errors inline: "Not enough credits", "Cargo hold full", "Nothing to sell".
+  Why: the game currently updates state silently.
+
+- Better trade controls
+  Add "Buy Max", "Sell All", and maybe "+5/-5".
+  Why: repeated single-click trading is friction in the main loop.
+
+- Travel confirmation
+  On docking, show a short arrival summary such as "Docked at Zaonce", "Market updated", "Best local price: Food 20 cr".
+  Why: makes movement feel consequential.
+
+Medium Lifts
+- Unify Galaxy and Star Map
+  Make the map clickable and let travel happen there.
+  If both screens remain, give them distinct roles:
+  Galaxy: strategic route/trade planning
+  Star Map: visual local navigation
+  Why: the visual map suggests interaction, but the actual action is elsewhere.
+
+- Trade intelligence on travel screen
+  For each destination, show a small summary:
+  Best sale for current cargo
+  Best buy opportunity
+  Distance / fuel cost if relevant later
+  Why: helps players make meaningful travel decisions instead of guessing.
+
+- Consolidated trading loop
+  Create one screen or mode that combines:
+  current cash/cargo
+  local market
+  nearby destinations
+  profit hints for carried goods
+  Why: the current loop is spread across too many tabs.
+
+- Mission clarity
+  Show mission reward, objective, and progress explicitly.
+  Separate flavor briefing from actionable task.
+  Why: missions currently read as lore, not as gameplay drivers.
+
+Bigger Design Changes
+- Introduce a real turn-result feel
+  Add arrival events, market deltas, mission popups, or short animated transitions.
+  Why: the mechanics work, but the emotional feedback is thin.
+
+- Add player goals and early guidance
+  First-session prompts such as:
+  "Try buying cheap goods in Lave"
+  "Zaonce pays well for narcotics"
+  Why: the game has a profitable loop, but the UX does not teach it.
+
+- Build progression visibility
+  Add milestones: net worth, profitable routes discovered, missions completed, rank growth.
+  Why: players need medium-term goals beyond watching credits change.
+
+Recommended Order
+1. Persistent HUD
+2. Market row improvements
+3. Transaction feedback
+4. Buy Max / Sell All
+5. Make Star Map or Galaxy the single clear travel UI
+6. Add destination trade hints
+7. Improve mission clarity
+8. Add stronger arrival/progression feedback

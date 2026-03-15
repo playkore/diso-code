@@ -46,6 +46,34 @@ header p {
   text-transform: capitalize;
 }
 
+.hud-grid {
+  margin: 0.75rem 0 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.hud-grid div {
+  padding: 0.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid #304489;
+  background: rgba(19, 30, 66, 0.8);
+}
+
+.hud-grid dt {
+  margin: 0 0 0.25rem;
+  color: #93abff;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.hud-grid dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
 .mission-notice {
   margin-top: 0.6rem;
   display: grid;
@@ -54,6 +82,48 @@ header p {
   border-radius: 0.5rem;
   padding: 0.5rem;
   background: rgba(38, 72, 163, 0.25);
+}
+
+.status-feed {
+  margin-top: 0.6rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.status-banner,
+.status-log__entry {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.55rem 0.6rem;
+  border-radius: 0.6rem;
+  border: 1px solid #304489;
+  background: rgba(19, 30, 66, 0.8);
+}
+
+.status-banner.is-success,
+.status-log__entry.is-success {
+  border-color: #3fb58d;
+  background: rgba(24, 78, 62, 0.35);
+}
+
+.status-banner.is-error,
+.status-log__entry.is-error {
+  border-color: #d36b7d;
+  background: rgba(110, 34, 52, 0.35);
+}
+
+.status-banner.is-info,
+.status-log__entry.is-info {
+  border-color: #4a70db;
+  background: rgba(38, 72, 163, 0.25);
+}
+
+.status-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
 }
 
 .screen {
@@ -80,6 +150,25 @@ header p {
   border: 1px solid #304489;
   border-radius: 0.6rem;
   background: rgba(19, 30, 66, 0.8);
+}
+
+.market-row {
+  gap: 0.45rem;
+}
+
+.market-row__headline,
+.market-row__meta,
+.market-row__projection {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.market-row__meta,
+.market-row__projection {
+  color: #adc0ff;
+  font-size: 0.9rem;
 }
 
 .detail-grid {
@@ -121,6 +210,10 @@ button {
   color: #f4f8ff;
   background: #1f3c89;
   border: 1px solid #4a70db;
+}
+
+button:disabled {
+  opacity: 0.45;
 }
 
 .muted,
@@ -171,6 +264,12 @@ button {
 
   .tab-nav {
     grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .hud-grid {
+    grid-template-columns: 1fr;
   }
 }
 

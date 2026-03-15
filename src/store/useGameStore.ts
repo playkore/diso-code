@@ -18,7 +18,7 @@ import {
   getMissionMessagesForDocking,
   type MissionExternalEvent
 } from '../domain/missions';
-import type { AppTab, CommanderState, MarketState, MissionsState, UiState, UniverseState } from './types';
+import type { AppTab, CommanderState, MarketState, MissionsState, UiMessage, UiState, UniverseState } from './types';
 
 interface SaveState {
   json: string;
@@ -63,6 +63,27 @@ function refreshItems(session: DockedMarketSession): MarketState {
   };
 }
 
+function createUiMessage(tone: UiMessage['tone'], title: string, body: string): UiMessage {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    tone,
+    title,
+    body
+  };
+}
+
+function withUiMessage(ui: UiState, message: UiMessage): UiState {
+  return {
+    ...ui,
+    latestEvent: message,
+    activityLog: [message, ...ui.activityLog].slice(0, 4)
+  };
+}
+
+function getCheapestCommodity(session: DockedMarketSession) {
+  return getSessionMarketItems(session).reduce((lowest, item) => (item.price < lowest.price ? item : lowest));
+}
+
 export const useGameStore = create<GameStore>((set, get) => {
   const initialCommander = createDefaultCommander();
   return {
@@ -78,7 +99,8 @@ export const useGameStore = create<GameStore>((set, get) => {
     missions: updateMissionLog(initialCommander),
     ui: {
       activeTab: 'market',
-      compactMode: true
+      compactMode: true,
+      activityLog: []
     },
     setActiveTab: (tab) => set((state) => ({ ui: { ...state.ui, activeTab: tab } })),
     dockAtSystem: (systemName, economy, fluctuation) =>
@@ -86,6 +108,13 @@ export const useGameStore = create<GameStore>((set, get) => {
         const nextCommander = { ...state.commander, currentSystem: systemName };
         const progress = applyDockingMissionState({ tp: nextCommander.missionTP, variant: nextCommander.missionVariant });
         nextCommander.missionTP = progress.tp;
+        const nextMarket = createMarketState(systemName, economy, fluctuation);
+        const cheapest = getCheapestCommodity(nextMarket.session);
+        const arrivalMessage = createUiMessage(
+          'info',
+          `Docked at ${systemName}`,
+          `Market updated. Cheapest local price: ${cheapest.name} at ${cheapest.price} cr.`
+        );
 
         return {
           universe: {
@@ -96,10 +125,11 @@ export const useGameStore = create<GameStore>((set, get) => {
             stardate: state.universe.stardate + 1
           },
           commander: nextCommander,
-          market: createMarketState(systemName, economy, fluctuation),
+          market: nextMarket,
           missions: {
             missionLog: getMissionMessagesForDocking(progress)
-          }
+          },
+          ui: withUiMessage(state.ui, arrivalMessage)
         };
       }),
     buyCommodity: (commodityKey, amount) =>
@@ -112,31 +142,59 @@ export const useGameStore = create<GameStore>((set, get) => {
         const available = state.market.session.localQuantities[commodityKey] ?? 0;
         const units = Math.min(Math.max(0, Math.trunc(amount)), available);
         if (units <= 0) {
-          return state;
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage('error', `Cannot buy ${item.name}`, 'The station has no stock left in this session.')
+            )
+          };
         }
 
         const cargoUsed = cargoUsedTonnes(state.commander.cargo);
         if (item.unit === 't' && cargoUsed + units > state.commander.cargoCapacity) {
-          return state;
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage(
+                'error',
+                `Cargo full for ${item.name}`,
+                `Only ${state.commander.cargoCapacity - cargoUsed} t of free space remains.`
+              )
+            )
+          };
         }
 
         const spent = units * item.price;
         if (spent > state.commander.cash) {
-          return state;
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage(
+                'error',
+                `Not enough credits for ${item.name}`,
+                `You need ${spent} cr but only have ${state.commander.cash} cr.`
+              )
+            )
+          };
         }
 
         const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, -units);
+        const nextCash = state.commander.cash - spent;
 
         return {
           commander: {
             ...state.commander,
-            cash: state.commander.cash - spent,
+            cash: nextCash,
             cargo: {
               ...state.commander.cargo,
               [commodityKey]: (state.commander.cargo[commodityKey] ?? 0) + units
             }
           },
-          market: refreshItems(nextSession)
+          market: refreshItems(nextSession),
+          ui: withUiMessage(
+            state.ui,
+            createUiMessage('success', `Bought ${units} ${item.name}`, `Spent ${spent} cr. Balance now ${nextCash} cr.`)
+          )
         };
       }),
     sellCommodity: (commodityKey, amount) =>
@@ -149,21 +207,32 @@ export const useGameStore = create<GameStore>((set, get) => {
         const owned = state.commander.cargo[commodityKey] ?? 0;
         const units = Math.min(Math.max(0, Math.trunc(amount)), owned);
         if (units <= 0) {
-          return state;
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage('error', `Cannot sell ${item.name}`, 'You do not have any units of this commodity.')
+            )
+          };
         }
 
         const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, units);
+        const earnings = units * item.price;
+        const nextCash = state.commander.cash + earnings;
 
         return {
           commander: {
             ...state.commander,
-            cash: state.commander.cash + units * item.price,
+            cash: nextCash,
             cargo: {
               ...state.commander.cargo,
               [commodityKey]: owned - units
             }
           },
-          market: refreshItems(nextSession)
+          market: refreshItems(nextSession),
+          ui: withUiMessage(
+            state.ui,
+            createUiMessage('success', `Sold ${units} ${item.name}`, `Earned ${earnings} cr. Balance now ${nextCash} cr.`)
+          )
         };
       }),
     triggerMissionExternalEvent: (event) =>
@@ -187,7 +256,10 @@ export const useGameStore = create<GameStore>((set, get) => {
       const commander = get().commander;
       const json = serializeCommanderJson(commander);
       const binary = encodeCommanderBinary256(commander);
-      set({ saveState: { json, binary } });
+      set((state) => ({
+        saveState: { json, binary },
+        ui: withUiMessage(state.ui, createUiMessage('info', 'Quick save complete', 'Commander data stored in both JSON and binary format.'))
+      }));
     },
     loadFromSave: () => {
       const state = get();
@@ -216,7 +288,11 @@ export const useGameStore = create<GameStore>((set, get) => {
           },
           missions: {
             missionLog: getMissionMessagesForDocking(missionProgress)
-          }
+          },
+          ui: withUiMessage(
+            current.ui,
+            createUiMessage('info', 'Save loaded', `Commander restored at ${commander.currentSystem} with ${commander.cash} cr.`)
+          )
         };
       });
     }
