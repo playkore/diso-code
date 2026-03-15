@@ -194,6 +194,13 @@ main {
   gap: 0.35rem;
 }
 
+.save-actions,
+.dialog-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
 button {
   padding: 0.45rem 0.35rem;
   border-radius: 0.5rem;
@@ -204,6 +211,11 @@ button {
 
 button:disabled {
   opacity: 0.45;
+}
+
+.button-danger {
+  background: linear-gradient(180deg, #7f2840, #5c1830);
+  border-color: #d36b7d;
 }
 
 .muted,
@@ -219,6 +231,51 @@ button:disabled {
   border: 1px solid #304489;
   border-radius: 0.5rem;
   background: rgba(19, 30, 66, 0.8);
+}
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(4, 7, 18, 0.72);
+  backdrop-filter: blur(10px);
+  z-index: 20;
+}
+
+.dialog-panel {
+  width: min(100%, 24rem);
+  padding: 1rem;
+  border-radius: 1rem;
+  border: 1px solid #3a4f98;
+  background:
+    radial-gradient(circle at top, rgba(66, 95, 186, 0.28), transparent 45%),
+    rgba(8, 13, 28, 0.96);
+  box-shadow: 0 1.2rem 3rem rgba(0, 0, 0, 0.45);
+}
+
+.dialog-kicker {
+  margin: 0 0 0.25rem;
+  color: #93abff;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dialog-panel h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+}
+
+.dialog-panel p {
+  margin: 0;
+  color: #d7e3ff;
+}
+
+.dialog-actions {
+  margin-top: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .tab-nav {

@@ -40,6 +40,7 @@ interface GameStore {
   triggerMissionExternalEvent: (event: MissionExternalEvent) => void;
   quickSave: () => void;
   loadFromSave: () => void;
+  startNewGame: () => void;
 }
 
 function createMarketState(systemName: string, economy: number, fluctuation: number): MarketState {
@@ -85,20 +86,32 @@ function getCheapestCommodity(session: DockedMarketSession) {
   return getSessionMarketItems(session).reduce((lowest, item) => (item.price < lowest.price ? item : lowest));
 }
 
-export const useGameStore = create<GameStore>((set, get) => {
-  const initialCommander = createDefaultCommander();
-  const initialSystem = getSystemByName(initialCommander.currentSystem);
+function createInitialGameState(commander: CommanderState) {
+  const system = getSystemByName(commander.currentSystem);
+  const economy = system?.data.economy ?? 5;
+
   return {
     universe: {
-      currentSystem: initialCommander.currentSystem,
-      nearbySystems: getNearbySystemNames(initialCommander.currentSystem),
+      currentSystem: commander.currentSystem,
+      nearbySystems: getNearbySystemNames(commander.currentSystem),
       stardate: 3124,
-      economy: initialSystem?.data.economy ?? 5,
+      economy,
       marketFluctuation: 0
     },
-    commander: initialCommander,
-    market: createMarketState(initialCommander.currentSystem, initialSystem?.data.economy ?? 5, 0),
-    missions: updateMissionLog(initialCommander),
+    commander,
+    market: createMarketState(commander.currentSystem, economy, 0),
+    missions: updateMissionLog(commander)
+  };
+}
+
+export const useGameStore = create<GameStore>((set, get) => {
+  const initialCommander = createDefaultCommander();
+  const initialState = createInitialGameState(initialCommander);
+  return {
+    universe: initialState.universe,
+    commander: initialState.commander,
+    market: initialState.market,
+    missions: initialState.missions,
     ui: {
       activeTab: 'market',
       compactMode: true,
@@ -302,6 +315,18 @@ export const useGameStore = create<GameStore>((set, get) => {
           )
         };
       });
+    },
+    startNewGame: () => {
+      const freshCommander = createDefaultCommander();
+      const freshState = createInitialGameState(freshCommander);
+
+      set((state) => ({
+        ...freshState,
+        ui: withUiMessage(
+          { ...state.ui, activeTab: 'save-load' },
+          createUiMessage('info', 'New game started', 'Commander reset to a fresh Lave start.')
+        )
+      }));
     }
   };
 });
