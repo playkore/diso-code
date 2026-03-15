@@ -62,20 +62,13 @@ export function MarketScreen() {
           return (
             <li key={item.key} className="card-row market-row">
               <div className="market-row__headline">
-                <strong>{item.name}</strong>
-                <span>{item.price} cr</span>
-              </div>
-              <div className="market-row__meta">
-                <span>
-                  Market: {item.quantity} {item.unit}
-                </span>
-                <span>
-                  You own: {owned} {item.unit}
-                </span>
-              </div>
-              <div className="market-row__projection">
-                <span>{canBuyOne ? `After buy 1: ${commander.cash - item.price} cr` : 'After buy 1: unavailable'}</span>
-                <span>After sell 1: {commander.cash + item.price} cr</span>
+                <div className="market-row__summary">
+                  <strong>{item.name}</strong>
+                  <span>
+                    {item.quantity} {item.unit} market · {owned} {item.unit} owned
+                  </span>
+                </div>
+                <span className="market-row__price">{item.price} cr</span>
               </div>
               <div className="button-group">
                 <button type="button" onClick={() => buyCommodity(item.key, 1)} disabled={!canBuyOne}>

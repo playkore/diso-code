@@ -3,14 +3,14 @@ import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
 
-const navItems: Array<{ tab: AppTab; label: string; to: string }> = [
-  { tab: 'market', label: 'Market', to: '/' },
-  { tab: 'inventory', label: 'Inventory', to: '/inventory' },
-  { tab: 'galaxy', label: 'Galaxy', to: '/galaxy' },
-  { tab: 'system-data', label: 'System', to: '/system-data' },
-  { tab: 'star-map', label: 'Star Map', to: '/star-map' },
-  { tab: 'missions', label: 'Missions', to: '/missions' },
-  { tab: 'save-load', label: 'Save/Load', to: '/save-load' }
+const navItems: Array<{ tab: AppTab; label: string; to: string; icon: string }> = [
+  { tab: 'market', label: 'Market', to: '/', icon: '$' },
+  { tab: 'inventory', label: 'Inventory', to: '/inventory', icon: '[]' },
+  { tab: 'galaxy', label: 'Galaxy', to: '/galaxy', icon: 'O' },
+  { tab: 'system-data', label: 'System', to: '/system-data', icon: 'i' },
+  { tab: 'star-map', label: 'Star Map', to: '/star-map', icon: '*' },
+  { tab: 'missions', label: 'Missions', to: '/missions', icon: '!' },
+  { tab: 'save-load', label: 'Save/Load', to: '/save-load', icon: '=' }
 ];
 
 export function AppShell() {
@@ -60,8 +60,13 @@ export function AppShell() {
             to={item.to}
             className={({ isActive }) => `tab-link ${isActive ? 'is-active' : ''}`}
             onClick={() => setActiveTab(item.tab)}
+            aria-label={item.label}
+            title={item.label}
           >
-            {item.label}
+            <span className="tab-link__icon" aria-hidden="true">
+              {item.icon}
+            </span>
+            <span className="sr-only">{item.label}</span>
           </NavLink>
         ))}
       </nav>
