@@ -6,28 +6,19 @@ interface StatusFeedProps {
 }
 
 export function StatusFeed({ latestEvent, activityLog }: StatusFeedProps) {
-  if (!latestEvent && activityLog.length === 0) {
+  if (!latestEvent) {
     return null;
   }
 
+  const hiddenCount = Math.max(0, activityLog.length - 1);
+
   return (
     <section className="status-feed" aria-live="polite">
-      {latestEvent ? (
-        <div className={`status-banner is-${latestEvent.tone}`} role="status">
-          <strong>{latestEvent.title}</strong>
-          <span>{latestEvent.body}</span>
-        </div>
-      ) : null}
-      {activityLog.length > 0 ? (
-        <ul className="status-log">
-          {activityLog.map((entry) => (
-            <li key={entry.id} className={`status-log__entry is-${entry.tone}`}>
-              <strong>{entry.title}</strong>
-              <span>{entry.body}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <div className={`status-banner is-${latestEvent.tone}`} role="status">
+        <strong>{latestEvent.title}</strong>
+        <span>{latestEvent.body}</span>
+        {hiddenCount > 0 ? <small>{hiddenCount} more recent update{hiddenCount > 1 ? 's' : ''}</small> : null}
+      </div>
     </section>
   );
 }
