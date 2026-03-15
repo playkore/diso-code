@@ -1,5 +1,6 @@
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
+import { formatCredits } from '../utils/money';
 
 export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
@@ -12,7 +13,7 @@ export function InventoryScreen() {
         <dt>Commander</dt>
         <dd>{commander.name}</dd>
         <dt>Credits</dt>
-        <dd>{commander.cash} cr</dd>
+        <dd>{formatCredits(commander.cash)}</dd>
         <dt>Fuel</dt>
         <dd>{commander.fuel.toFixed(1)} LY</dd>
         <dt>Legal</dt>

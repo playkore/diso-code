@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
+import { formatCredits } from '../utils/money';
 
 const MARKET_CATEGORIES = [
   {
@@ -68,7 +69,7 @@ export function MarketScreen() {
                     {item.quantity} {item.unit} market · {owned} {item.unit} owned
                   </span>
                 </div>
-                <span className="market-row__price">{item.price} cr</span>
+                <span className="market-row__price">{formatCredits(item.price)}</span>
               </div>
               <div className="button-group">
                 <button type="button" onClick={() => buyCommodity(item.key, 1)} disabled={!canBuyOne}>

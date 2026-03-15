@@ -20,6 +20,7 @@ import {
 } from '../domain/missions';
 import { getNearbySystemNames, getSystemByName } from '../domain/galaxyCatalog';
 import type { AppTab, CommanderState, MarketState, MissionsState, UiMessage, UiState, UniverseState } from './types';
+import { formatCredits } from '../utils/money';
 
 interface SaveState {
   json: string;
@@ -130,7 +131,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         const arrivalMessage = createUiMessage(
           'info',
           `Docked at ${systemName}`,
-          `Market updated. Cheapest local price: ${cheapest.name} at ${cheapest.price} cr.`
+          `Market updated. Cheapest local price: ${cheapest.name} at ${formatCredits(cheapest.price)}.`
         );
 
         return {
@@ -190,7 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => {
               createUiMessage(
                 'error',
                 `Not enough credits for ${item.name}`,
-                `You need ${spent} cr but only have ${state.commander.cash} cr.`
+                `You need ${formatCredits(spent)} but only have ${formatCredits(state.commander.cash)}.`
               )
             )
           };
@@ -211,7 +212,11 @@ export const useGameStore = create<GameStore>((set, get) => {
           market: refreshItems(nextSession),
           ui: withUiMessage(
             state.ui,
-            createUiMessage('success', `Bought ${units} ${item.name}`, `Spent ${spent} cr. Balance now ${nextCash} cr.`)
+            createUiMessage(
+              'success',
+              `Bought ${units} ${item.name}`,
+              `Spent ${formatCredits(spent)}. Balance now ${formatCredits(nextCash)}.`
+            )
           )
         };
       }),
@@ -249,7 +254,11 @@ export const useGameStore = create<GameStore>((set, get) => {
           market: refreshItems(nextSession),
           ui: withUiMessage(
             state.ui,
-            createUiMessage('success', `Sold ${units} ${item.name}`, `Earned ${earnings} cr. Balance now ${nextCash} cr.`)
+            createUiMessage(
+              'success',
+              `Sold ${units} ${item.name}`,
+              `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`
+            )
           )
         };
       }),
@@ -311,7 +320,11 @@ export const useGameStore = create<GameStore>((set, get) => {
           },
           ui: withUiMessage(
             current.ui,
-            createUiMessage('info', 'Save loaded', `Commander restored at ${commander.currentSystem} with ${commander.cash} cr.`)
+            createUiMessage(
+              'info',
+              'Save loaded',
+              `Commander restored at ${commander.currentSystem} with ${formatCredits(commander.cash)}.`
+            )
           )
         };
       });

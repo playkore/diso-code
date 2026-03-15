@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
+import { formatCredits } from '../utils/money';
 
 function NavIcon({ children }: { children: ReactNode }) {
   return (
@@ -103,7 +104,7 @@ export function AppShell() {
         <dl className="hud-grid" aria-label="Commander status">
           <div>
             <dt>Credits</dt>
-            <dd>{commander.cash} cr</dd>
+            <dd>{formatCredits(commander.cash)}</dd>
           </div>
           <div>
             <dt>Cargo</dt>
