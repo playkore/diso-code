@@ -150,6 +150,42 @@ describe('missions and commander persistence', () => {
     expect(save.savedAt).toBe('2026-03-15T00:00:00.000Z');
   });
 
+  it('keeps independent save payloads for different slot snapshots', () => {
+    const first = serializeGameJson(
+      {
+        commander: createDefaultCommander(),
+        universe: {
+          currentSystem: 'Lave',
+          nearbySystems: ['Leesti'],
+          stardate: 3124,
+          economy: 5,
+          marketFluctuation: 0
+        },
+        marketSession: createDockedMarketSession('Lave', 5, 0)
+      },
+      '2026-03-15T00:00:00.000Z'
+    );
+    const secondCommander = createDefaultCommander();
+    secondCommander.currentSystem = 'Diso';
+    const second = serializeGameJson(
+      {
+        commander: secondCommander,
+        universe: {
+          currentSystem: 'Diso',
+          nearbySystems: ['Lave'],
+          stardate: 3125,
+          economy: 0,
+          marketFluctuation: 4
+        },
+        marketSession: createDockedMarketSession('Diso', 0, 4)
+      },
+      '2026-03-16T00:00:00.000Z'
+    );
+
+    expect(loadGameJson(first).snapshot.commander.currentSystem).toBe('Lave');
+    expect(loadGameJson(second).snapshot.commander.currentSystem).toBe('Diso');
+  });
+
   it('uses tenths-of-a-light-year fuel costs', () => {
     expect(getJumpFuelCost(4.04)).toBe(4);
     expect(getJumpFuelUnits(4.04)).toBe(40);

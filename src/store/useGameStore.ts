@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { createDefaultCommander, cargoUsedTonnes } from '../domain/commander';
 import {
-  decodeCommanderBinary256,
   encodeCommanderBinary256
 } from '../domain/commanderPersistence';
 import {
@@ -30,7 +29,10 @@ interface SaveState {
   snapshot: GameSnapshot;
 }
 
-const SAVE_SLOT_STORAGE_KEY = 'diso-code:slot-1';
+type SaveSlotId = 1 | 2 | 3;
+
+const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
+const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
 
 interface GameStore {
   universe: UniverseState;
@@ -38,15 +40,15 @@ interface GameStore {
   market: MarketState;
   missions: MissionsState;
   ui: UiState;
-  saveState?: SaveState;
+  saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
   dockAtSystem: (systemName: string) => void;
   buyFuel: (units: number) => void;
   buyCommodity: (commodityKey: string, amount: number) => void;
   sellCommodity: (commodityKey: string, amount: number) => void;
   triggerMissionExternalEvent: (event: MissionExternalEvent) => void;
-  quickSave: () => void;
-  loadFromSave: () => void;
+  saveToSlot: (slotId: SaveSlotId) => void;
+  loadFromSlot: (slotId: SaveSlotId) => void;
   startNewGame: () => void;
 }
 
@@ -143,61 +145,78 @@ function restoreSnapshot(snapshot: GameSnapshot) {
   };
 }
 
-function persistSaveState(saveState: SaveState | undefined) {
+function persistSaveStates(saveStates: Partial<Record<SaveSlotId, SaveState>>) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }
 
-  if (!saveState) {
-    window.localStorage.removeItem(SAVE_SLOT_STORAGE_KEY);
-    return;
-  }
+  const payload = Object.fromEntries(
+    SAVE_SLOT_IDS.flatMap((slotId) => {
+      const saveState = saveStates[slotId];
+      if (!saveState) {
+        return [];
+      }
 
-  window.localStorage.setItem(
-    SAVE_SLOT_STORAGE_KEY,
-    JSON.stringify({
-      savedAt: saveState.savedAt,
-      json: saveState.json,
-      binary: Array.from(saveState.binary)
+      return [[
+        String(slotId),
+        {
+          savedAt: saveState.savedAt,
+          json: saveState.json,
+          binary: Array.from(saveState.binary)
+        }
+      ]];
     })
   );
+
+  window.localStorage.setItem(SAVE_SLOT_STORAGE_KEY, JSON.stringify(payload));
 }
 
-function loadPersistedSaveState(): SaveState | undefined {
+function loadPersistedSaveStates(): Partial<Record<SaveSlotId, SaveState>> {
   if (typeof window === 'undefined' || !window.localStorage) {
-    return undefined;
+    return {};
   }
 
   const raw = window.localStorage.getItem(SAVE_SLOT_STORAGE_KEY);
   if (!raw) {
-    return undefined;
+    return {};
   }
 
   try {
-    const parsed = JSON.parse(raw) as { savedAt: string; json: string; binary: number[] };
-    const gameSave = loadGameJson(parsed.json);
-    return {
-      savedAt: gameSave.savedAt,
-      json: parsed.json,
-      binary: Uint8Array.from(parsed.binary),
-      snapshot: gameSave.snapshot
-    };
+    const parsed = JSON.parse(raw) as Record<string, { savedAt: string; json: string; binary: number[] }>;
+    const saveStates: Partial<Record<SaveSlotId, SaveState>> = {};
+
+    for (const slotId of SAVE_SLOT_IDS) {
+      const slot = parsed[String(slotId)];
+      if (!slot) {
+        continue;
+      }
+
+      const gameSave = loadGameJson(slot.json);
+      saveStates[slotId] = {
+        savedAt: gameSave.savedAt,
+        json: slot.json,
+        binary: Uint8Array.from(slot.binary),
+        snapshot: gameSave.snapshot
+      };
+    }
+
+    return saveStates;
   } catch {
     window.localStorage.removeItem(SAVE_SLOT_STORAGE_KEY);
-    return undefined;
+    return {};
   }
 }
 
 export const useGameStore = create<GameStore>((set, get) => {
   const initialCommander = createDefaultCommander();
   const initialState = createInitialGameState(initialCommander);
-  const persistedSaveState = loadPersistedSaveState();
+  const persistedSaveStates = loadPersistedSaveStates();
   return {
     universe: initialState.universe,
     commander: initialState.commander,
     market: initialState.market,
     missions: initialState.missions,
-    saveState: persistedSaveState,
+    saveStates: persistedSaveStates,
     ui: {
       activeTab: 'market',
       compactMode: true,
@@ -436,41 +455,45 @@ export const useGameStore = create<GameStore>((set, get) => {
           }
         };
       }),
-    quickSave: () => {
+    saveToSlot: (slotId) => {
       const state = get();
       const snapshot = createSnapshot(state);
       const savedAt = new Date().toISOString();
       const json = serializeGameJson(snapshot, savedAt);
       const binary = encodeCommanderBinary256(snapshot.commander);
       const saveState = { savedAt, json, binary, snapshot };
+      const nextSaveStates = {
+        ...state.saveStates,
+        [slotId]: saveState
+      };
 
-      persistSaveState(saveState);
+      persistSaveStates(nextSaveStates);
 
       set((current) => ({
-        saveState,
+        saveStates: nextSaveStates,
         ui: withUiMessage(
           current.ui,
-          createUiMessage('info', 'Slot 1 saved', `Saved ${snapshot.commander.name} at ${snapshot.commander.currentSystem}.`)
+          createUiMessage('info', `Slot ${slotId} saved`, `Saved ${snapshot.commander.name} at ${snapshot.commander.currentSystem}.`)
         )
       }));
     },
-    loadFromSave: () => {
+    loadFromSlot: (slotId) => {
       const state = get();
-      if (!state.saveState) {
+      const saveState = state.saveStates[slotId];
+      if (!saveState) {
         return;
       }
-      const commanderFromBinary = decodeCommanderBinary256(state.saveState.binary);
-      const restoredState = restoreSnapshot(state.saveState.snapshot);
+      const restoredState = restoreSnapshot(saveState.snapshot);
 
       set((current) => ({
         ...restoredState,
-        saveState: state.saveState,
+        saveStates: state.saveStates,
         ui: withUiMessage(
           current.ui,
           createUiMessage(
             'info',
-            'Slot 1 loaded',
-            `Commander restored at ${commanderFromBinary.currentSystem} with ${formatCredits(commanderFromBinary.cash)}.`
+            `Slot ${slotId} loaded`,
+            `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`
           )
         )
       }));
