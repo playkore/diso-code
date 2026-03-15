@@ -61,13 +61,13 @@ To generate galaxy *n* (1–8), the seed triplet is transformed by a per-galaxy 
 
 ### System-to-system seed advance within a galaxy
 
-Within a galaxy, advancing from one system seed triplet to the next is described as moving along a **Tribonacci** sequence (each term is sum of previous 3), with 16-bit wraparound. Twisting once updates:
+Within a galaxy, advancing from one system seed triplet to the next is described as moving along a **Tribonacci** sequence (each term is sum of previous 3), with 16-bit wraparound. There is no separate pseudo-random call for star positions: chart coordinates are read directly from the current seed state, while the pseudo-randomness comes from repeatedly twisting the seeds. Twisting once updates:
 
 - `s0' = s1`  
 - `s1' = s2`  
 - `s2' = s0 + s1 + s2` (mod 65536) citeturn8view0  
 
-A new system in the 256 sequence is derived by twisting the current seeds **four times** before extracting the next system’s seeds. citeturn8view0  
+A new system in the 256 sequence is derived by twisting the current seeds **four times** before extracting the next system’s seeds. In the canonical generator, `makesystem` reads a system’s position from the current seeds as `x = s1_hi`, `y = s0_hi`; on the long-range chart, `y` is then vertically compressed for display (`chartY = y >> 1`). citeturn8view0turn5view0  
 
 ### System name generation
 
@@ -92,10 +92,9 @@ The “Data on System” screen presents a consistent set of attributes: distanc
 
 Key extraction rules for the classic generator (expressed in 8-bit terms) include:
 
-- **Coordinates:** `x = s1_lo`, `y = s0_lo` (represented on charts as a 0–255 grid). citeturn5view0  
+- **Coordinates:** `x = s1_hi`, `y = s0_hi`. These are the raw 0–255 system coordinates derived directly from the seed bytes, not a separately generated random pair. The chart renderer then squashes the vertical axis for display, so the plotted long-range-chart `y` is `y >> 1`. citeturn5view0turn8view0  
 - **Government:** `(s1_hi >> 3) & 7`. citeturn5view2  
-- **Economy:** `(s0_hi >> 8?)` (implemented as `(s0_hi >> 8)` is nonsensical; in the documented generator it is `(s0_hi >> 8)`? The extracted expression is `economy = (s0_hi >> 8) ???`; the documented derivation is `economy = (s0_hi >> 8)` is not correct; instead, the published rule is `economy = (s0_hi >> 8)`?  
-  The reliable, shown rule is: `economy = s0_hi & 7`, then, if government ≤ 1 (anarchy/feudal), set bit 1 of economy so the system cannot be “Rich” (economy bit-twiddle). citeturn5view2  
+- **Economy:** `economy = s0_hi & 7`, then, if government ≤ 1 (anarchy/feudal), set bit 1 of economy so the system cannot be “Rich” (economy bit-twiddle). citeturn5view2  
 - **Tech level:** derived from economy and government with a small base and sign adjustments (exact formula is documented in the generator deep dive). citeturn5view2  
 - **Population:** depends on tech level, economy, and government, represented as a decimal “billions” figure. citeturn5view2turn35view2  
 - **Productivity:** computed as `((economy ^ 7) + 3) * (government + 4) * population * 8` (as documented), displayed in “M CR.” citeturn5view0turn35view2  
