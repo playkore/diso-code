@@ -170,6 +170,40 @@ button {
   }
 
   .tab-nav {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
+}
+
+.star-map {
+  margin-top: 0.75rem;
+  border: 1px solid #304489;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  background: radial-gradient(circle at center, rgba(41, 66, 140, 0.35), rgba(7, 12, 25, 0.92));
+}
+
+.star-map svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.star-map__range {
+  fill: none;
+  stroke: rgba(120, 149, 247, 0.5);
+  stroke-width: 0.8;
+  stroke-dasharray: 3 2;
+}
+
+.star-map__star {
+  fill: #8fb0ff;
+}
+
+.star-map__star.is-current {
+  fill: #ffd25f;
+}
+
+.star-map__label {
+  fill: #d7e3ff;
+  font-size: 5.5px;
 }

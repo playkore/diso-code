@@ -7,6 +7,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string }> = [
   { tab: 'inventory', label: 'Inventory', to: '/inventory' },
   { tab: 'galaxy', label: 'Galaxy', to: '/galaxy' },
   { tab: 'system-data', label: 'System', to: '/system-data' },
+  { tab: 'star-map', label: 'Star Map', to: '/star-map' },
   { tab: 'missions', label: 'Missions', to: '/missions' },
   { tab: 'save-load', label: 'Save/Load', to: '/save-load' }
 ];

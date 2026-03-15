@@ -32,5 +32,6 @@ export type AppTab =
   | 'inventory'
   | 'galaxy'
   | 'system-data'
+  | 'star-map'
   | 'missions'
   | 'save-load';
