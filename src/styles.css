@@ -300,11 +300,23 @@ button:disabled {
   height: auto;
 }
 
+.star-map__point {
+  cursor: default;
+}
+
+.star-map__point:not(.is-current) {
+  cursor: pointer;
+}
+
 .star-map__range {
   fill: none;
   stroke: rgba(120, 149, 247, 0.5);
   stroke-width: 0.8;
   stroke-dasharray: 3 2;
+}
+
+.star-map__target {
+  fill: transparent;
 }
 
 .star-map__star {
@@ -315,7 +327,19 @@ button:disabled {
   fill: #ffd25f;
 }
 
+.star-map__point.is-selected .star-map__target {
+  fill: rgba(120, 149, 247, 0.18);
+  stroke: #8fb0ff;
+  stroke-width: 0.9;
+}
+
 .star-map__label {
   fill: #d7e3ff;
   font-size: 5.5px;
+}
+
+.star-map__actions {
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.45rem;
 }

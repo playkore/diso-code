@@ -39,7 +39,6 @@ export interface UiState {
 export type AppTab =
   | 'market'
   | 'inventory'
-  | 'galaxy'
   | 'system-data'
   | 'star-map'
   | 'missions'

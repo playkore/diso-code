@@ -1,6 +1,5 @@
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
-import { GalaxyScreen } from './screens/GalaxyScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
 import { MarketScreen } from './screens/MarketScreen';
 import { MissionsScreen } from './screens/MissionsScreen';
@@ -15,7 +14,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <MarketScreen /> },
       { path: 'inventory', element: <InventoryScreen /> },
-      { path: 'galaxy', element: <GalaxyScreen /> },
+      { path: 'galaxy', element: <Navigate to="/star-map" replace /> },
       { path: 'system-data', element: <SystemDataScreen /> },
       { path: 'star-map', element: <StarMapScreen /> },
       { path: 'missions', element: <MissionsScreen /> },

@@ -39,18 +39,6 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     )
   },
   {
-    tab: 'galaxy',
-    label: 'Galaxy',
-    to: '/galaxy',
-    icon: (
-      <NavIcon>
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M4.5 12a7.5 4.2 0 1 0 15 0a7.5 4.2 0 1 0-15 0" />
-        <path d="M12 4.5a4.2 7.5 0 1 0 0 15a4.2 7.5 0 1 0 0-15" />
-      </NavIcon>
-    )
-  },
-  {
     tab: 'system-data',
     label: 'System',
     to: '/system-data',
