@@ -16,6 +16,7 @@ import {
   TP_MISSION_FLAGS
 } from '../missions';
 import { createDefaultCommander } from '../commander';
+import { getJumpFuelCost, getJumpFuelUnits, getRefuelCost } from '../fuel';
 import {
   decodeCommanderBinary256,
   encodeCommanderBinary256,
@@ -123,5 +124,11 @@ describe('missions and commander persistence', () => {
 
     expect(fromJson.cash).toBe(2222);
     expect(fromBinary.missionTP).toBe(7);
+  });
+
+  it('uses tenths-of-a-light-year fuel costs', () => {
+    expect(getJumpFuelCost(4.04)).toBe(4);
+    expect(getJumpFuelUnits(4.04)).toBe(40);
+    expect(getRefuelCost(10)).toBe(20);
   });
 });
