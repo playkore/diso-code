@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getSystemChartCoordinates } from '../domain/localSystemCatalog';
 import { useGameStore } from '../store/useGameStore';
 
 interface StarPoint {
@@ -9,19 +10,11 @@ interface StarPoint {
   inRange: boolean;
 }
 
-const MAP_COORDINATES: Record<string, { x: number; y: number }> = {
-  Lave: { x: 0, y: 0 },
-  Diso: { x: -20, y: 10 },
-  Leesti: { x: 45, y: -35 },
-  Zaonce: { x: -55, y: -40 },
-  Reorte: { x: 60, y: 12 }
-};
-
 const JUMP_RANGE = 72;
 
 function getRelativePoint(currentSystem: string, targetSystem: string): StarPoint {
-  const current = MAP_COORDINATES[currentSystem] ?? { x: 0, y: 0 };
-  const target = MAP_COORDINATES[targetSystem] ?? { x: 0, y: 0 };
+  const current = getSystemChartCoordinates(currentSystem);
+  const target = getSystemChartCoordinates(targetSystem);
   const dx = target.x - current.x;
   const dy = target.y - current.y;
   const distance = Math.hypot(dx, dy);
