@@ -1,16 +1,103 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
 
-const navItems: Array<{ tab: AppTab; label: string; to: string; icon: string }> = [
-  { tab: 'market', label: 'Market', to: '/', icon: '$' },
-  { tab: 'inventory', label: 'Inventory', to: '/inventory', icon: '[]' },
-  { tab: 'galaxy', label: 'Galaxy', to: '/galaxy', icon: 'O' },
-  { tab: 'system-data', label: 'System', to: '/system-data', icon: 'i' },
-  { tab: 'star-map', label: 'Star Map', to: '/star-map', icon: '*' },
-  { tab: 'missions', label: 'Missions', to: '/missions', icon: '!' },
-  { tab: 'save-load', label: 'Save/Load', to: '/save-load', icon: '=' }
+function NavIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg className="tab-link__icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+      {children}
+    </svg>
+  );
+}
+
+const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode }> = [
+  {
+    tab: 'market',
+    label: 'Market',
+    to: '/',
+    icon: (
+      <NavIcon>
+        <path d="M5 9.5h14l-1.2 7.5H6.2z" />
+        <path d="M8 9.5V7.8a4 4 0 0 1 8 0v1.7" />
+        <path d="M9 13.5h6" />
+      </NavIcon>
+    )
+  },
+  {
+    tab: 'inventory',
+    label: 'Inventory',
+    to: '/inventory',
+    icon: (
+      <NavIcon>
+        <rect x="7" y="4.5" width="10" height="15" rx="1.5" />
+        <path d="M10 8h4" />
+        <path d="M10 12h4" />
+        <path d="M10 16h2.5" />
+      </NavIcon>
+    )
+  },
+  {
+    tab: 'galaxy',
+    label: 'Galaxy',
+    to: '/galaxy',
+    icon: (
+      <NavIcon>
+        <circle cx="12" cy="12" r="2.5" />
+        <path d="M4.5 12a7.5 4.2 0 1 0 15 0a7.5 4.2 0 1 0-15 0" />
+        <path d="M12 4.5a4.2 7.5 0 1 0 0 15a4.2 7.5 0 1 0 0-15" />
+      </NavIcon>
+    )
+  },
+  {
+    tab: 'system-data',
+    label: 'System',
+    to: '/system-data',
+    icon: (
+      <NavIcon>
+        <circle cx="12" cy="12" r="7.5" />
+        <path d="M12 10v5" />
+        <circle cx="12" cy="7.5" r="0.9" fill="currentColor" stroke="none" />
+      </NavIcon>
+    )
+  },
+  {
+    tab: 'star-map',
+    label: 'Star Map',
+    to: '/star-map',
+    icon: (
+      <NavIcon>
+        <circle cx="6.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
+        <circle cx="17.5" cy="7" r="1" fill="currentColor" stroke="none" />
+        <circle cx="14.5" cy="16.5" r="1.4" fill="currentColor" stroke="none" />
+        <path d="M7.6 8.3l8.8-1" />
+        <path d="M16.9 7.9l-1.7 7.1" />
+      </NavIcon>
+    )
+  },
+  {
+    tab: 'missions',
+    label: 'Missions',
+    to: '/missions',
+    icon: (
+      <NavIcon>
+        <path d="M12 4.5l2.2 4.6l5.1.7l-3.7 3.6l.9 5.1L12 16.1L7.5 18.5l.9-5.1l-3.7-3.6l5.1-.7z" />
+      </NavIcon>
+    )
+  },
+  {
+    tab: 'save-load',
+    label: 'Save/Load',
+    to: '/save-load',
+    icon: (
+      <NavIcon>
+        <path d="M6 5h9l3 3v11H6z" />
+        <path d="M9 5v5h6V5" />
+        <path d="M9 16h6" />
+      </NavIcon>
+    )
+  }
 ];
 
 export function AppShell() {
@@ -63,9 +150,7 @@ export function AppShell() {
             aria-label={item.label}
             title={item.label}
           >
-            <span className="tab-link__icon" aria-hidden="true">
-              {item.icon}
-            </span>
+            {item.icon}
             <span className="sr-only">{item.label}</span>
           </NavLink>
         ))}

@@ -245,9 +245,12 @@ button:disabled {
 }
 
 .tab-link__icon {
-  font-size: 1rem;
-  line-height: 1;
-  font-weight: 700;
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+  overflow: visible;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .tab-link.is-active {
