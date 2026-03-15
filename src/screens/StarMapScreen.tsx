@@ -6,28 +6,32 @@ interface StarPoint {
   x: number;
   y: number;
   isCurrent: boolean;
+  inRange: boolean;
 }
 
-function hashName(name: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < name.length; index += 1) {
-    hash ^= name.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
+const MAP_COORDINATES: Record<string, { x: number; y: number }> = {
+  Lave: { x: 0, y: 0 },
+  Diso: { x: -20, y: 10 },
+  Leesti: { x: 45, y: -35 },
+  Zaonce: { x: -55, y: -40 },
+  Reorte: { x: 60, y: 12 }
+};
 
-  return hash >>> 0;
-}
+const JUMP_RANGE = 72;
 
-function createNearbyPoint(name: string, order: number): StarPoint {
-  const hash = hashName(name);
-  const angle = ((hash % 360) * Math.PI) / 180;
-  const radius = 42 + (hash % 28) + order * 2;
+function getRelativePoint(currentSystem: string, targetSystem: string): StarPoint {
+  const current = MAP_COORDINATES[currentSystem] ?? { x: 0, y: 0 };
+  const target = MAP_COORDINATES[targetSystem] ?? { x: 0, y: 0 };
+  const dx = target.x - current.x;
+  const dy = target.y - current.y;
+  const distance = Math.hypot(dx, dy);
 
   return {
-    name,
-    x: Math.cos(angle) * radius,
-    y: Math.sin(angle) * radius,
-    isCurrent: false
+    name: targetSystem,
+    x: dx,
+    y: dy,
+    isCurrent: currentSystem === targetSystem,
+    inRange: distance <= JUMP_RANGE
   };
 }
 
@@ -42,10 +46,10 @@ export function StarMapScreen() {
 
   const starPoints = useMemo<StarPoint[]>(
     () => [
-      { name: universe.currentSystem, x: 0, y: 0, isCurrent: true },
+      getRelativePoint(universe.currentSystem, universe.currentSystem),
       ...universe.nearbySystems
         .filter((name) => name !== universe.currentSystem)
-        .map((name, index) => createNearbyPoint(name, index))
+        .map((name) => getRelativePoint(universe.currentSystem, name))
     ],
     [universe.currentSystem, universe.nearbySystems]
   );
@@ -57,18 +61,20 @@ export function StarMapScreen() {
     Reorte: 5
   };
 
+  const selectedPoint = starPoints.find((star) => star.name === selectedSystem) ?? null;
+
   return (
     <section className="screen">
       <h2>Local Star Map</h2>
       <p>Select a nearby system, then confirm travel.</p>
       <div className="star-map" role="img" aria-label={`Map of stars around ${universe.currentSystem}`}>
-        <svg viewBox="-100 -100 200 200" aria-hidden="true">
-          <circle className="star-map__range" cx="0" cy="0" r="72" />
+        <svg viewBox="-110 -110 220 220" aria-hidden="true">
+          <circle className="star-map__range" cx="0" cy="0" r={JUMP_RANGE} />
           {starPoints.map((star) => (
             <g
               key={star.name}
               transform={`translate(${star.x} ${star.y})`}
-              className={`star-map__point ${star.isCurrent ? 'is-current' : ''} ${selectedSystem === star.name ? 'is-selected' : ''}`}
+              className={`star-map__point ${star.isCurrent ? 'is-current' : ''} ${selectedSystem === star.name ? 'is-selected' : ''} ${star.inRange ? 'is-in-range' : 'is-out-of-range'}`}
               onClick={() => {
                 if (!star.isCurrent) {
                   setSelectedSystem(star.name);
@@ -84,13 +90,15 @@ export function StarMapScreen() {
           ))}
         </svg>
       </div>
-      {selectedSystem ? (
+      {selectedSystem && selectedPoint ? (
         <div className="star-map__actions">
           <p>
             Selected destination: <strong>{selectedSystem}</strong>
           </p>
+          {!selectedPoint.inRange ? <p className="status">This system is outside jump range.</p> : null}
           <button
             type="button"
+            disabled={!selectedPoint.inRange}
             onClick={() =>
               dockAtSystem(
                 selectedSystem,

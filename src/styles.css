@@ -327,6 +327,11 @@ button:disabled {
   fill: #ffd25f;
 }
 
+.star-map__point.is-out-of-range .star-map__star,
+.star-map__point.is-out-of-range .star-map__label {
+  opacity: 0.55;
+}
+
 .star-map__point.is-selected .star-map__target {
   fill: rgba(120, 149, 247, 0.18);
   stroke: #8fb0ff;
