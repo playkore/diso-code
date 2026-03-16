@@ -55,7 +55,6 @@ export function StarMapScreen() {
   return (
     <section className="screen">
       <h2>Local Star Map</h2>
-      <p>Select a nearby system, then confirm travel. Jumps consume fuel equal to distance travelled.</p>
       <div className="star-map" role="img" aria-label={`Map of stars around ${universe.currentSystem}`}>
         <svg viewBox="-110 -110 220 220" aria-hidden="true">
           <circle className="star-map__range" cx="0" cy="0" r={(currentFuel / 0.4) * MAP_SCALE} />
