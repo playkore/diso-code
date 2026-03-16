@@ -119,7 +119,7 @@ export function TravelScreen() {
     };
     resize();
 
-    const input = { turn: 0, thrust: 0, fire: false, jump: false };
+    const input = { turn: 0, thrust: 0, fire: false, jump: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
     const keys: Record<string, boolean> = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ' ': false, j: false, J: false };
     let score = 0;
     let flightState: FlightState = 'READY';
@@ -269,8 +269,11 @@ export function TravelScreen() {
       }
 
       setKnob(dx, dy);
-      input.turn = dx / maxDist;
-      input.thrust = dy < 0 ? -(dy / maxDist) : 0;
+      input.vectorX = dx / maxDist;
+      input.vectorY = dy / maxDist;
+      input.vectorStrength = Math.min(1, Math.hypot(input.vectorX, input.vectorY));
+      input.turn = input.vectorX;
+      input.thrust = input.vectorStrength;
     };
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -319,6 +322,9 @@ export function TravelScreen() {
       joyPointerId = null;
       input.turn = 0;
       input.thrust = 0;
+      input.vectorX = 0;
+      input.vectorY = 0;
+      input.vectorStrength = 0;
       setKnob(0, 0);
     };
 
@@ -402,6 +408,87 @@ export function TravelScreen() {
       ctx.restore();
     };
 
+    const drawMiniMap = () => {
+      const radarWidth = 156;
+      const radarHeight = 156;
+      const radarX = cw - radarWidth - 18;
+      const radarY = 82;
+      const radarCenterX = radarX + radarWidth / 2;
+      const radarCenterY = radarY + radarHeight / 2;
+      const radarRadius = 48;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.strokeStyle = 'rgba(0, 255, 0, 0.65)';
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = 'rgba(0, 255, 0, 0.25)';
+      ctx.fillRect(radarX, radarY, radarWidth, radarHeight);
+      ctx.strokeRect(radarX, radarY, radarWidth, radarHeight);
+
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(120, 255, 120, 0.45)';
+      ctx.beginPath();
+      ctx.arc(radarCenterX, radarCenterY, radarRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(radarCenterX, radarCenterY, radarRadius * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(radarCenterX - radarRadius, radarCenterY);
+      ctx.lineTo(radarCenterX + radarRadius, radarCenterY);
+      ctx.moveTo(radarCenterX, radarCenterY - radarRadius);
+      ctx.lineTo(radarCenterX, radarCenterY + radarRadius);
+      ctx.stroke();
+
+      ctx.fillStyle = '#86ff86';
+      ctx.font = 'bold 12px "Courier New", monospace';
+      ctx.fillText('DOCK RADAR', radarX + 12, radarY + 18);
+
+      ctx.save();
+      ctx.translate(radarCenterX, radarCenterY);
+      ctx.rotate(player.angle + Math.PI / 2);
+      ctx.strokeStyle = '#86ff86';
+      ctx.beginPath();
+      ctx.moveTo(0, -14);
+      ctx.lineTo(9, 10);
+      ctx.lineTo(0, 5);
+      ctx.lineTo(-9, 10);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#86ff86';
+      ctx.font = '11px "Courier New", monospace';
+
+      if (station) {
+        const dx = station.x - player.x;
+        const dy = station.y - player.y;
+        const distance = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const radarDistance = Math.min(radarRadius - 8, distance * 0.08);
+        const blipX = radarCenterX + Math.cos(angle) * radarDistance;
+        const blipY = radarCenterY + Math.sin(angle) * radarDistance;
+
+        ctx.fillStyle = '#ffd35c';
+        ctx.beginPath();
+        ctx.arc(blipX, blipY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 211, 92, 0.55)';
+        ctx.beginPath();
+        ctx.moveTo(radarCenterX, radarCenterY);
+        ctx.lineTo(blipX, blipY);
+        ctx.stroke();
+
+        ctx.fillStyle = '#86ff86';
+        ctx.fillText(`DIST ${Math.round(distance)}u`, radarX + 12, radarY + radarHeight - 16);
+      } else {
+        ctx.fillText('DIST ----', radarX + 12, radarY + radarHeight - 16);
+      }
+
+      ctx.restore();
+    };
+
     const draw = () => {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, cw, ch);
@@ -460,6 +547,8 @@ export function TravelScreen() {
         drawWireframe(SHAPE_PLAYER, cw / 2, ch / 2, player.angle, '#0f0');
       }
 
+      drawMiniMap();
+
       ctx.shadowBlur = 0;
     };
 
@@ -488,6 +577,12 @@ export function TravelScreen() {
         input.thrust = 0;
       }
 
+      if (!joyActive) {
+        input.vectorX = 0;
+        input.vectorY = 0;
+        input.vectorStrength = 0;
+      }
+
       input.fire = keys[' '] || input.fire;
       input.jump = keys.j || keys.J || input.jump;
 
@@ -496,18 +591,33 @@ export function TravelScreen() {
           flightState = 'PLAYING';
         }
 
-        player.angle += input.turn * 0.08 * dt;
-        if (input.thrust > 0) {
-          player.vx += Math.cos(player.angle) * input.thrust * 0.2 * dt;
-          player.vy += Math.sin(player.angle) * input.thrust * 0.2 * dt;
+        if (joyActive && input.vectorStrength > 0.08) {
+          const targetAngle = Math.atan2(input.vectorY, input.vectorX);
+          player.angle = targetAngle;
+          player.vx += Math.cos(targetAngle) * input.vectorStrength * 0.24 * dt;
+          player.vy += Math.sin(targetAngle) * input.vectorStrength * 0.24 * dt;
           particles.push({
-            x: player.x - Math.cos(player.angle) * 15,
-            y: player.y - Math.sin(player.angle) * 15,
+            x: player.x - Math.cos(targetAngle) * 15,
+            y: player.y - Math.sin(targetAngle) * 15,
             vx: -player.vx * 0.5 + (Math.random() - 0.5),
             vy: -player.vy * 0.5 + (Math.random() - 0.5),
             life: 10,
             color: '#0f0'
           });
+        } else {
+          player.angle += input.turn * 0.08 * dt;
+          if (input.thrust > 0) {
+            player.vx += Math.cos(player.angle) * input.thrust * 0.2 * dt;
+            player.vy += Math.sin(player.angle) * input.thrust * 0.2 * dt;
+            particles.push({
+              x: player.x - Math.cos(player.angle) * 15,
+              y: player.y - Math.sin(player.angle) * 15,
+              vx: -player.vx * 0.5 + (Math.random() - 0.5),
+              vy: -player.vy * 0.5 + (Math.random() - 0.5),
+              life: 10,
+              color: '#0f0'
+            });
+          }
         }
 
         player.vx *= 0.99;
