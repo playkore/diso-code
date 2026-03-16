@@ -483,7 +483,7 @@ button:disabled {
   height: 100%;
   overflow: hidden;
   background: #000;
-  color: #78ff78;
+  color: #55ff55;
   font-family: 'Courier New', Courier, monospace;
   touch-action: none;
   user-select: none;
@@ -501,7 +501,8 @@ button:disabled {
   left: 0.8rem;
   display: grid;
   gap: 0.22rem;
-  text-shadow: 0 0 8px rgba(120, 255, 120, 0.85);
+  color: #55ff55;
+  text-shadow: none;
   pointer-events: none;
 }
 
@@ -511,7 +512,8 @@ button:disabled {
 }
 
 .travel-screen__hud-subtle {
-  opacity: 0.72;
+  color: #ffff55;
+  opacity: 1;
   font-size: 0.8rem;
 }
 
@@ -524,7 +526,8 @@ button:disabled {
   text-align: center;
   font-size: clamp(1.1rem, 2.8vw, 1.7rem);
   font-weight: 700;
-  text-shadow: 0 0 14px rgba(120, 255, 120, 0.85);
+  color: #55ff55;
+  text-shadow: none;
   pointer-events: none;
   white-space: pre-line;
 }
@@ -537,20 +540,21 @@ button:disabled {
 
 .travel-screen__button {
   position: absolute;
-  border: 2px solid #0f0;
+  border: 2px solid #ffff55;
   border-radius: 50%;
-  color: #8cff8c;
+  color: #ffff55;
   text-align: center;
   font-weight: 700;
   pointer-events: auto;
-  background: rgba(0, 255, 0, 0.05);
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-  text-shadow: 0 0 5px #0f0;
+  background: #000;
+  box-shadow: none;
+  text-shadow: none;
   font-family: inherit;
 }
 
 .travel-screen__button:active {
-  background: rgba(0, 255, 0, 0.3);
+  background: #ff5555;
+  color: #000;
 }
 
 .travel-screen__button--fire {
@@ -575,7 +579,7 @@ button:disabled {
   bottom: 1.8rem;
   width: 7.5rem;
   height: 7.5rem;
-  border: 2px dashed rgba(0, 255, 0, 0.3);
+  border: 2px dashed #ffff55;
   border-radius: 50%;
   pointer-events: auto;
 }
@@ -587,9 +591,9 @@ button:disabled {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: 50%;
-  background: rgba(0, 255, 0, 0.4);
+  background: #ff5555;
   pointer-events: none;
-  box-shadow: 0 0 10px #0f0;
+  box-shadow: none;
   transition: top 0.1s, left 0.1s;
 }
 
@@ -599,8 +603,9 @@ button:disabled {
   right: 0.9rem;
   text-align: right;
   font-size: 0.76rem;
-  opacity: 0.68;
-  text-shadow: 0 0 8px rgba(120, 255, 120, 0.55);
+  color: #ffff55;
+  opacity: 1;
+  text-shadow: none;
   pointer-events: none;
 }
 
@@ -614,5 +619,7 @@ button:disabled {
 .travel-screen__actions button {
   padding-inline: 1rem;
   font-family: inherit;
-  background: rgba(90, 18, 32, 0.82);
+  background: #ff5555;
+  border-color: #ffff55;
+  color: #000;
 }

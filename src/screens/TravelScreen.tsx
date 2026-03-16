@@ -72,6 +72,11 @@ const SHAPE_ENEMY = [
   [-8, 10]
 ] as const;
 
+const CGA_BLACK = '#000000';
+const CGA_GREEN = '#55ff55';
+const CGA_RED = '#ff5555';
+const CGA_YELLOW = '#ffff55';
+
 export function TravelScreen() {
   const navigate = useNavigate();
   const session = useGameStore((state) => state.travelSession);
@@ -158,7 +163,7 @@ export function TravelScreen() {
     const updateHud = () => {
       scoreNode.textContent = String(score);
       shieldsNode.textContent = String(Math.max(0, Math.round(player.shields)));
-      shieldsNode.style.color = player.shields <= 30 ? '#f55' : '#86ff86';
+      shieldsNode.style.color = player.shields <= 30 ? CGA_RED : CGA_GREEN;
       jumpNode.textContent =
         flightState === 'READY'
           ? 'READY'
@@ -228,7 +233,7 @@ export function TravelScreen() {
 
     const gameOver = () => {
       flightState = 'GAMEOVER';
-      spawnExplosion(player.x, player.y, '#fff');
+      spawnExplosion(player.x, player.y, CGA_RED);
       showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
       updateHud();
     };
@@ -360,7 +365,7 @@ export function TravelScreen() {
       x: number,
       y: number,
       angle: number,
-      color = '#0f0',
+      color = CGA_YELLOW,
       scale = 1
     ) => {
       ctx.save();
@@ -385,10 +390,10 @@ export function TravelScreen() {
       ctx.save();
       ctx.translate(target.x - camX, target.y - camY);
       ctx.rotate(target.angle);
-      ctx.strokeStyle = '#0f0';
+      ctx.strokeStyle = CGA_YELLOW;
       ctx.lineWidth = 2;
       ctx.shadowBlur = 8;
-      ctx.shadowColor = '#0f0';
+      ctx.shadowColor = CGA_YELLOW;
 
       const points = Array.from({ length: 8 }, (_, index) => ({
         x: Math.cos((index * Math.PI) / 4) * target.radius,
@@ -418,16 +423,16 @@ export function TravelScreen() {
       const radarRadius = 48;
 
       ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.strokeStyle = 'rgba(0, 255, 0, 0.65)';
+      ctx.fillStyle = CGA_BLACK;
+      ctx.strokeStyle = CGA_GREEN;
       ctx.lineWidth = 1;
       ctx.shadowBlur = 12;
-      ctx.shadowColor = 'rgba(0, 255, 0, 0.25)';
+      ctx.shadowColor = CGA_GREEN;
       ctx.fillRect(radarX, radarY, radarWidth, radarHeight);
       ctx.strokeRect(radarX, radarY, radarWidth, radarHeight);
 
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(120, 255, 120, 0.45)';
+      ctx.strokeStyle = CGA_GREEN;
       ctx.beginPath();
       ctx.arc(radarCenterX, radarCenterY, radarRadius, 0, Math.PI * 2);
       ctx.stroke();
@@ -441,14 +446,14 @@ export function TravelScreen() {
       ctx.lineTo(radarCenterX, radarCenterY + radarRadius);
       ctx.stroke();
 
-      ctx.fillStyle = '#86ff86';
+      ctx.fillStyle = CGA_GREEN;
       ctx.font = 'bold 12px "Courier New", monospace';
       ctx.fillText('DOCK RADAR', radarX + 12, radarY + 18);
 
       ctx.save();
       ctx.translate(radarCenterX, radarCenterY);
       ctx.rotate(player.angle + Math.PI / 2);
-      ctx.strokeStyle = '#86ff86';
+      ctx.strokeStyle = CGA_GREEN;
       ctx.beginPath();
       ctx.moveTo(0, -14);
       ctx.lineTo(9, 10);
@@ -458,7 +463,7 @@ export function TravelScreen() {
       ctx.stroke();
       ctx.restore();
 
-      ctx.fillStyle = '#86ff86';
+      ctx.fillStyle = CGA_GREEN;
       ctx.font = '11px "Courier New", monospace';
 
       if (station) {
@@ -470,17 +475,17 @@ export function TravelScreen() {
         const blipX = radarCenterX + Math.cos(angle) * radarDistance;
         const blipY = radarCenterY + Math.sin(angle) * radarDistance;
 
-        ctx.fillStyle = '#ffd35c';
+        ctx.fillStyle = CGA_RED;
         ctx.beginPath();
         ctx.arc(blipX, blipY, 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 211, 92, 0.55)';
+        ctx.strokeStyle = CGA_YELLOW;
         ctx.beginPath();
         ctx.moveTo(radarCenterX, radarCenterY);
         ctx.lineTo(blipX, blipY);
         ctx.stroke();
 
-        ctx.fillStyle = '#86ff86';
+        ctx.fillStyle = CGA_GREEN;
         ctx.fillText(`DIST ${Math.round(distance)}u`, radarX + 12, radarY + radarHeight - 16);
       } else {
         ctx.fillText('DIST ----', radarX + 12, radarY + radarHeight - 16);
@@ -496,10 +501,10 @@ export function TravelScreen() {
       const camX = player.x - cw / 2;
       const camY = player.y - ch / 2;
 
-      ctx.fillStyle = '#fff';
-      ctx.strokeStyle = '#fff';
+      ctx.fillStyle = CGA_YELLOW;
+      ctx.strokeStyle = CGA_YELLOW;
       ctx.shadowBlur = 2;
-      ctx.shadowColor = '#fff';
+      ctx.shadowColor = CGA_YELLOW;
 
       for (const star of stars) {
         const sx = ((star.x - player.x * star.z) % cw + cw) % cw;
@@ -522,12 +527,12 @@ export function TravelScreen() {
       }
 
       for (const enemy of enemies) {
-        drawWireframe(SHAPE_ENEMY, enemy.x - camX, enemy.y - camY, enemy.angle, '#f44');
+        drawWireframe(SHAPE_ENEMY, enemy.x - camX, enemy.y - camY, enemy.angle, CGA_RED);
       }
 
       ctx.lineWidth = 2;
       for (const laser of lasers) {
-        ctx.strokeStyle = laser.isPlayer ? '#0f0' : '#f44';
+        ctx.strokeStyle = laser.isPlayer ? CGA_GREEN : CGA_RED;
         ctx.shadowBlur = 5;
         ctx.shadowColor = ctx.strokeStyle;
         ctx.beginPath();
@@ -544,7 +549,7 @@ export function TravelScreen() {
       }
 
       if (flightState !== 'GAMEOVER') {
-        drawWireframe(SHAPE_PLAYER, cw / 2, ch / 2, player.angle, '#0f0');
+        drawWireframe(SHAPE_PLAYER, cw / 2, ch / 2, player.angle, CGA_YELLOW);
       }
 
       drawMiniMap();
@@ -602,7 +607,7 @@ export function TravelScreen() {
             vx: -player.vx * 0.5 + (Math.random() - 0.5),
             vy: -player.vy * 0.5 + (Math.random() - 0.5),
             life: 10,
-            color: '#0f0'
+            color: CGA_GREEN
           });
         } else {
           player.angle += input.turn * 0.08 * dt;
@@ -615,7 +620,7 @@ export function TravelScreen() {
               vx: -player.vx * 0.5 + (Math.random() - 0.5),
               vy: -player.vy * 0.5 + (Math.random() - 0.5),
               life: 10,
-              color: '#0f0'
+              color: CGA_GREEN
             });
           }
         }
@@ -675,7 +680,7 @@ export function TravelScreen() {
               player.shields -= 20;
               player.vx *= -1.5;
               player.vy *= -1.5;
-              spawnExplosion(player.x, player.y, '#0f0');
+              spawnExplosion(player.x, player.y, CGA_RED);
               if (player.shields <= 0) {
                 gameOver();
               } else {
@@ -757,9 +762,9 @@ export function TravelScreen() {
             if (Math.hypot(laser.x - enemy.x, laser.y - enemy.y) < 15) {
               enemy.hp -= 10;
               hit = true;
-              spawnExplosion(laser.x, laser.y, '#0f0');
+              spawnExplosion(laser.x, laser.y, CGA_GREEN);
               if (enemy.hp <= 0) {
-                spawnExplosion(enemy.x, enemy.y, '#f00');
+                spawnExplosion(enemy.x, enemy.y, CGA_RED);
                 enemies.splice(j, 1);
                 score += 100;
               }
@@ -770,7 +775,7 @@ export function TravelScreen() {
           if (Math.hypot(laser.x - player.x, laser.y - player.y) < player.radius) {
             player.shields -= 10;
             hit = true;
-            spawnExplosion(laser.x, laser.y, '#f00');
+            spawnExplosion(laser.x, laser.y, CGA_RED);
             if (player.shields <= 0) {
               gameOver();
             }
