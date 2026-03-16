@@ -3,6 +3,7 @@ import {
   canBuyMissile,
   getAvailableEquipmentForSystem,
   getInstalledEquipmentList,
+  isMissileAvailableAtTechLevel,
   getLaserOffersForSystem
 } from '../domain/outfitting';
 import { LASER_CATALOG, MISSILE_CATALOG, PLAYER_SHIP, type LaserMountPosition } from '../domain/shipCatalog';
@@ -22,6 +23,7 @@ export function EquipmentScreen() {
   const equipmentOffers = getAvailableEquipmentForSystem(techLevel, commander);
   const installedEquipment = getInstalledEquipmentList(commander);
   const missileState = canBuyMissile(commander, techLevel);
+  const missileVisible = isMissileAvailableAtTechLevel(techLevel);
 
   return (
     <section className="screen">
@@ -67,11 +69,13 @@ export function EquipmentScreen() {
             <p className="dialog-kicker">Weapons</p>
             <p className="muted">Directional lasers are purchased per mount.</p>
           </div>
-          <button type="button" onClick={() => buyMissile()} disabled={!missileState.ok}>
-            Buy Missile {formatCredits(MISSILE_CATALOG.price)}
-          </button>
+          {missileVisible ? (
+            <button type="button" onClick={() => buyMissile()} disabled={!missileState.ok}>
+              Buy Missile {formatCredits(MISSILE_CATALOG.price)}
+            </button>
+          ) : null}
         </div>
-        {!missileState.ok ? <p className="muted">{missileState.reason}</p> : null}
+        {missileVisible && !missileState.ok ? <p className="muted">{missileState.reason}</p> : null}
         <ul className="card-list">
           {LASER_MOUNTS.map((mount) => {
             const installedLaserId = commander.laserMounts[mount];

@@ -9,6 +9,7 @@ import {
   getSessionMarketItems,
   applyLocalMarketTrade
 } from '../market';
+import { getAvailableEquipmentForSystem, getLaserOffersForSystem, isMissileAvailableAtTechLevel } from '../outfitting';
 import {
   applyMissionExternalEvent,
   getMissionMessagesForDocking,
@@ -105,6 +106,17 @@ describe('market generation', () => {
 
     expect(before?.price).toBe(after?.price);
     expect(after?.quantity).toBe((before?.quantity ?? 0) - 3);
+  });
+
+  it('omits tech-locked outfitting offers from system markets', () => {
+    const commander = createDefaultCommander();
+    const equipmentOffers = getAvailableEquipmentForSystem(1, commander);
+    const laserOffers = getLaserOffersForSystem(1, commander, 'front');
+
+    expect(equipmentOffers.every((offer) => offer.requiredTechLevel <= 1)).toBe(true);
+    expect(laserOffers.every((offer) => offer.requiredTechLevel <= 1)).toBe(true);
+    expect(isMissileAvailableAtTechLevel(0)).toBe(false);
+    expect(isMissileAvailableAtTechLevel(1)).toBe(true);
   });
 });
 
@@ -252,7 +264,7 @@ describe('outfitting rules', () => {
     const lowTechOffers = getAvailableEquipmentForSystem(2, commander);
     const highTechOffers = getAvailableEquipmentForSystem(10, commander);
 
-    expect(lowTechOffers.find((offer) => offer.id === 'docking_computer')?.available).toBe(false);
+    expect(lowTechOffers.find((offer) => offer.id === 'docking_computer')).toBeUndefined();
     expect(highTechOffers.find((offer) => offer.id === 'docking_computer')?.available).toBe(true);
   });
 

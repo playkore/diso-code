@@ -81,13 +81,17 @@ export function canBuyMissile(commander: CommanderState, techLevel: number): { o
   return { ok: true };
 }
 
+export function isMissileAvailableAtTechLevel(techLevel: number): boolean {
+  return techLevel >= MISSILE_CATALOG.requiredTechLevel;
+}
+
 export function getAvailableEquipmentForSystem(techLevel: number, commander: CommanderState): EquipmentOffer[] {
-  return EQUIPMENT_ORDER.map((id) => {
+  return EQUIPMENT_ORDER.filter((id) => techLevel >= EQUIPMENT_CATALOG[id].requiredTechLevel).map((id) => {
     const equipment = EQUIPMENT_CATALOG[id];
     const result = canBuyEquipment(commander, techLevel, id);
     return {
       ...equipment,
-      available: techLevel >= equipment.requiredTechLevel,
+      available: true,
       installed: commander.installedEquipment[id],
       reason: result.ok ? undefined : result.reason
     };
@@ -95,12 +99,12 @@ export function getAvailableEquipmentForSystem(techLevel: number, commander: Com
 }
 
 export function getLaserOffersForSystem(techLevel: number, commander: CommanderState, mount: LaserMountPosition): LaserOffer[] {
-  return LASER_ORDER.map((id) => {
+  return LASER_ORDER.filter((id) => techLevel >= LASER_CATALOG[id].requiredTechLevel).map((id) => {
     const laser = LASER_CATALOG[id];
     const result = canInstallLaser(commander, techLevel, mount, id);
     return {
       ...laser,
-      available: techLevel >= laser.requiredTechLevel,
+      available: true,
       reason: result.ok ? undefined : result.reason
     };
   });
