@@ -1,5 +1,7 @@
 import { cargoUsedTonnes, getLegalStatus } from '../domain/commander';
 import { MAX_FUEL, getFuelUnits } from '../domain/fuel';
+import { getInstalledEquipmentList } from '../domain/outfitting';
+import { LASER_CATALOG } from '../domain/shipCatalog';
 import { useGameStore } from '../store/useGameStore';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
@@ -9,6 +11,11 @@ export function InventoryScreen() {
   const buyFuel = useGameStore((state) => state.buyFuel);
   const cargoUsed = cargoUsedTonnes(commander.cargo);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(commander.fuel));
+  const installedEquipment = getInstalledEquipmentList(commander);
+  const laserEntries = Object.entries(commander.laserMounts).map(([mount, laserId]) => ({
+    mount,
+    name: laserId ? LASER_CATALOG[laserId].name : 'Empty'
+  }));
 
   return (
     <section className="screen">
@@ -26,11 +33,39 @@ export function InventoryScreen() {
         <dd>{commander.rating}</dd>
         <dt>Tally</dt>
         <dd>{commander.tally}</dd>
+        <dt>Ship</dt>
+        <dd>Cobra Mk III</dd>
         <dt>Cargo</dt>
         <dd>
           {cargoUsed} / {commander.cargoCapacity} t
         </dd>
+        <dt>Missiles</dt>
+        <dd>
+          {commander.missilesInstalled} / {commander.missileCapacity}
+        </dd>
       </dl>
+      <section className="subpanel">
+        <p className="dialog-kicker">Laser Mounts</p>
+        <ul className="chip-list">
+          {laserEntries.map((entry) => (
+            <li key={entry.mount}>
+              {entry.mount}: {entry.name}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section className="subpanel">
+        <p className="dialog-kicker">Installed Equipment</p>
+        {installedEquipment.length ? (
+          <ul className="chip-list">
+            {installedEquipment.map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">No optional systems installed.</p>
+        )}
+      </section>
       <div className="fuel-actions">
         <button type="button" onClick={() => buyFuel(1)} disabled={missingFuelUnits < 1}>
           Buy 0.1 LY

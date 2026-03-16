@@ -27,6 +27,20 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     )
   },
   {
+    tab: 'equipment',
+    label: 'Equipment',
+    to: '/equipment',
+    icon: (
+      <NavIcon>
+        <path d="M8 8l8 8" />
+        <path d="M16 8l-2.2 2.2" />
+        <path d="M10.2 13.8L8 16" />
+        <path d="M6 18l2.2-2.2" />
+        <path d="M18 6l-2.2 2.2" />
+      </NavIcon>
+    )
+  },
+  {
     tab: 'inventory',
     label: 'Inventory',
     to: '/inventory',

@@ -1,5 +1,6 @@
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { EquipmentScreen } from './screens/EquipmentScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
 import { MarketScreen } from './screens/MarketScreen';
 import { MissionsScreen } from './screens/MissionsScreen';
@@ -14,6 +15,7 @@ const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <MarketScreen /> },
+      { path: 'equipment', element: <EquipmentScreen /> },
       { path: 'inventory', element: <InventoryScreen /> },
       { path: 'galaxy', element: <Navigate to="/star-map" replace /> },
       { path: 'system-data', element: <SystemDataScreen /> },

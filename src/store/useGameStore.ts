@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { applyLegalFloor, createDefaultCommander, cargoUsedTonnes, normalizeCommanderState } from '../domain/commander';
+import { canBuyEquipment, canBuyMissile, canInstallLaser } from '../domain/outfitting';
 import {
   encodeCommanderBinary256
 } from '../domain/commanderPersistence';
@@ -17,6 +18,7 @@ import {
 } from '../domain/missions';
 import { getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits, getRefuelCost, MAX_FUEL } from '../domain/fuel';
+import { EQUIPMENT_CATALOG, LASER_CATALOG, MISSILE_CATALOG, type EquipmentId, type LaserId, type LaserMountPosition } from '../domain/shipCatalog';
 import type { AppTab, CommanderState, MarketState, MissionsState, TravelState, UiMessage, UiState, UniverseState } from './types';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
@@ -58,6 +60,9 @@ interface GameStore {
   buyFuel: (units: number) => void;
   buyCommodity: (commodityKey: string, amount: number) => void;
   sellCommodity: (commodityKey: string, amount: number) => void;
+  buyEquipment: (equipmentId: EquipmentId) => void;
+  buyLaser: (mount: LaserMountPosition, laserId: LaserId) => void;
+  buyMissile: () => void;
   triggerMissionExternalEvent: (event: MissionExternalEvent) => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
@@ -132,6 +137,10 @@ function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'marke
     universe: state.universe,
     marketSession: state.market.session
   };
+}
+
+function getCurrentTechLevel(systemName: string): number {
+  return getSystemByName(systemName)?.data.techLevel ?? 0;
 }
 
 function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
@@ -592,6 +601,113 @@ export const useGameStore = create<GameStore>((set, get) => {
               'success',
               `Sold ${units} ${item.name}`,
               `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`
+            )
+          )
+        };
+      }),
+    buyEquipment: (equipmentId) =>
+      set((state) => {
+        const techLevel = getCurrentTechLevel(state.universe.currentSystem);
+        const equipment = EQUIPMENT_CATALOG[equipmentId];
+        const check = canBuyEquipment(state.commander, techLevel, equipmentId);
+
+        if (!check.ok) {
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage('error', `Cannot buy ${equipment.name}`, check.reason ?? 'The outfitting terminal rejected the order.')
+            )
+          };
+        }
+
+        const nextCommander = normalizeCommanderState({
+          ...state.commander,
+          cash: state.commander.cash - equipment.price,
+          cargoCapacity: equipment.expandsCargoBayTo ?? state.commander.cargoCapacity,
+          installedEquipment: {
+            ...state.commander.installedEquipment,
+            [equipmentId]: true
+          }
+        });
+
+        return {
+          commander: nextCommander,
+          ui: withUiMessage(
+            state.ui,
+            createUiMessage(
+              'success',
+              `${equipment.name} installed`,
+              `Spent ${formatCredits(equipment.price)}. Balance now ${formatCredits(nextCommander.cash)}.`
+            )
+          )
+        };
+      }),
+    buyLaser: (mount, laserId) =>
+      set((state) => {
+        const techLevel = getCurrentTechLevel(state.universe.currentSystem);
+        const laser = LASER_CATALOG[laserId];
+        const check = canInstallLaser(state.commander, techLevel, mount, laserId);
+
+        if (!check.ok) {
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage('error', `Cannot install ${laser.name}`, check.reason ?? 'The mount rejected the fit.')
+            )
+          };
+        }
+
+        const previous = state.commander.laserMounts[mount];
+        const nextCommander = normalizeCommanderState({
+          ...state.commander,
+          cash: state.commander.cash - laser.price,
+          laserMounts: {
+            ...state.commander.laserMounts,
+            [mount]: laserId
+          }
+        });
+        const previousText = previous ? ` Replaced ${LASER_CATALOG[previous].name}.` : '';
+
+        return {
+          commander: nextCommander,
+          ui: withUiMessage(
+            state.ui,
+            createUiMessage(
+              'success',
+              `${laser.name} fitted`,
+              `Spent ${formatCredits(laser.price)} on the ${mount} mount.${previousText} Balance ${formatCredits(nextCommander.cash)}.`
+            )
+          )
+        };
+      }),
+    buyMissile: () =>
+      set((state) => {
+        const techLevel = getCurrentTechLevel(state.universe.currentSystem);
+        const check = canBuyMissile(state.commander, techLevel);
+
+        if (!check.ok) {
+          return {
+            ui: withUiMessage(
+              state.ui,
+              createUiMessage('error', 'Cannot buy missile', check.reason ?? 'The rack cannot accept another missile.')
+            )
+          };
+        }
+
+        const nextCommander = normalizeCommanderState({
+          ...state.commander,
+          cash: state.commander.cash - MISSILE_CATALOG.price,
+          missilesInstalled: state.commander.missilesInstalled + MISSILE_CATALOG.capacityUse
+        });
+
+        return {
+          commander: nextCommander,
+          ui: withUiMessage(
+            state.ui,
+            createUiMessage(
+              'success',
+              'Missile loaded',
+              `Spent ${formatCredits(MISSILE_CATALOG.price)}. Rack now ${nextCommander.missilesInstalled}/${nextCommander.missileCapacity}.`
             )
           )
         };

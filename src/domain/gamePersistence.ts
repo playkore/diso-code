@@ -2,7 +2,7 @@ import type { CommanderState } from './commander';
 import type { DockedMarketSession } from './market';
 import type { UniverseState } from '../store/types';
 
-export const GAME_SAVE_SCHEMA_VERSION = 1;
+export const GAME_SAVE_SCHEMA_VERSION = 2;
 
 export interface GameSnapshot {
   commander: CommanderState;

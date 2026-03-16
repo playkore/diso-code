@@ -1,6 +1,8 @@
 import { normalizeCommanderState, type CommanderState } from './commander';
+import type { MissionVariant } from './missions';
+import type { LaserId } from './shipCatalog';
 
-export const COMMANDER_SCHEMA_VERSION = 1;
+export const COMMANDER_SCHEMA_VERSION = 2;
 
 export interface CommanderSaveFile {
   version: number;
@@ -15,6 +17,113 @@ function fnv1a32(input: string): number {
     hash = Math.imul(hash, 0x01000193);
   }
   return hash >>> 0;
+}
+
+type CompactCommanderPayload = [
+  string,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  Record<string, number>,
+  number,
+  number,
+  number,
+  number,
+  [LaserId | null, LaserId | null, LaserId | null, LaserId | null],
+  number,
+  number,
+  string,
+  string,
+  number,
+  MissionVariant
+];
+
+function encodeInstalledEquipmentBits(commander: CommanderState): number {
+  return (
+    (commander.installedEquipment.fuel_scoops ? 1 << 0 : 0) |
+    (commander.installedEquipment.ecm ? 1 << 1 : 0) |
+    (commander.installedEquipment.docking_computer ? 1 << 2 : 0) |
+    (commander.installedEquipment.extra_energy_unit ? 1 << 3 : 0) |
+    (commander.installedEquipment.large_cargo_bay ? 1 << 4 : 0) |
+    (commander.installedEquipment.escape_pod ? 1 << 5 : 0) |
+    (commander.installedEquipment.energy_bomb ? 1 << 6 : 0)
+  );
+}
+
+function decodeInstalledEquipmentBits(bits: number) {
+  return {
+    fuel_scoops: (bits & (1 << 0)) !== 0,
+    ecm: (bits & (1 << 1)) !== 0,
+    docking_computer: (bits & (1 << 2)) !== 0,
+    extra_energy_unit: (bits & (1 << 3)) !== 0,
+    large_cargo_bay: (bits & (1 << 4)) !== 0,
+    escape_pod: (bits & (1 << 5)) !== 0,
+    energy_bomb: (bits & (1 << 6)) !== 0
+  };
+}
+
+function toCompactPayload(commander: CommanderState): CompactCommanderPayload {
+  return [
+    commander.name,
+    commander.cash,
+    commander.fuel,
+    commander.maxFuel,
+    commander.legalValue,
+    commander.baseCargoCapacity,
+    commander.cargoCapacity,
+    commander.maxCargoCapacity,
+    commander.cargo,
+    commander.energyBanks,
+    commander.energyPerBank,
+    commander.missileCapacity,
+    commander.missilesInstalled,
+    [
+      commander.laserMounts.front,
+      commander.laserMounts.rear,
+      commander.laserMounts.left,
+      commander.laserMounts.right
+    ],
+    encodeInstalledEquipmentBits(commander),
+    commander.tally,
+    commander.rating,
+    commander.currentSystem,
+    commander.missionTP,
+    commander.missionVariant
+  ];
+}
+
+function fromCompactPayload(payload: CompactCommanderPayload): CommanderState {
+  return normalizeCommanderState({
+    name: payload[0],
+    cash: payload[1],
+    fuel: payload[2],
+    maxFuel: payload[3],
+    legalValue: payload[4],
+    baseCargoCapacity: payload[5],
+    cargoCapacity: payload[6],
+    maxCargoCapacity: payload[7],
+    cargo: payload[8],
+    energyBanks: payload[9],
+    energyPerBank: payload[10],
+    missileCapacity: payload[11],
+    missilesInstalled: payload[12],
+    laserMounts: {
+      front: payload[13][0],
+      rear: payload[13][1],
+      left: payload[13][2],
+      right: payload[13][3]
+    },
+    installedEquipment: decodeInstalledEquipmentBits(payload[14]),
+    tally: payload[15],
+    rating: payload[16],
+    currentSystem: payload[17],
+    missionTP: payload[18],
+    missionVariant: payload[19]
+  });
 }
 
 export function buildCommanderSave(commander: CommanderState): CommanderSaveFile {
@@ -63,7 +172,10 @@ export function encodeCommanderBinary256(commander: CommanderState): Uint8Array 
     view.setUint8(16 + i, name.charCodeAt(i) & 0xff);
   }
 
-  const payload = JSON.stringify(normalized).slice(0, 220);
+  const payload = JSON.stringify(toCompactPayload(normalized));
+  if (payload.length > 216) {
+    throw new Error('Commander payload exceeds 256-byte binary save capacity');
+  }
   for (let i = 0; i < payload.length; i += 1) {
     view.setUint8(36 + i, payload.charCodeAt(i) & 0xff);
   }
@@ -96,5 +208,5 @@ export function decodeCommanderBinary256(bytes: Uint8Array): CommanderState {
     payloadChars.push(String.fromCharCode(code));
   }
 
-  return normalizeCommanderState(JSON.parse(payloadChars.join('')) as CommanderState);
+  return fromCompactPayload(JSON.parse(payloadChars.join('')) as CompactCommanderPayload);
 }
