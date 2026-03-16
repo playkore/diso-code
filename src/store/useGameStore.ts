@@ -33,6 +33,7 @@ type SaveSlotId = 1 | 2 | 3;
 
 const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
 const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
+const SETTINGS_STORAGE_KEY = 'diso-code:settings';
 
 interface GameStore {
   universe: UniverseState;
@@ -43,6 +44,7 @@ interface GameStore {
   ui: UiState;
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
+  setInstantTravelEnabled: (enabled: boolean) => void;
   beginTravel: (systemName: string) => boolean;
   cancelTravel: () => void;
   completeTravel: () => void;
@@ -254,10 +256,37 @@ function loadPersistedSaveStates(): Partial<Record<SaveSlotId, SaveState>> {
   }
 }
 
+function loadInstantTravelEnabled(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return false;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return false;
+    }
+
+    const parsed = JSON.parse(raw) as { instantTravelEnabled?: boolean };
+    return parsed.instantTravelEnabled === true;
+  } catch {
+    return false;
+  }
+}
+
+function persistInstantTravelEnabled(enabled: boolean) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+
+  window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ instantTravelEnabled: enabled }));
+}
+
 export const useGameStore = create<GameStore>((set, get) => {
   const initialCommander = createDefaultCommander();
   const initialState = createInitialGameState(initialCommander);
   const persistedSaveStates = loadPersistedSaveStates();
+  const instantTravelEnabled = loadInstantTravelEnabled();
   return {
     universe: initialState.universe,
     commander: initialState.commander,
@@ -268,9 +297,24 @@ export const useGameStore = create<GameStore>((set, get) => {
     ui: {
       activeTab: 'market',
       compactMode: true,
+      instantTravelEnabled,
       activityLog: []
     },
     setActiveTab: (tab) => set((state) => ({ ui: { ...state.ui, activeTab: tab } })),
+    setInstantTravelEnabled: (enabled) =>
+      set((state) => {
+        persistInstantTravelEnabled(enabled);
+        return {
+          ui: withUiMessage(
+            { ...state.ui, instantTravelEnabled: enabled },
+            createUiMessage(
+              'info',
+              enabled ? 'Instant travel enabled' : 'Space travel enabled',
+              enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
+            )
+          )
+        };
+      }),
     beginTravel: (systemName) => {
       const state = get();
       const distance = getSystemDistance(state.universe.currentSystem, systemName);
@@ -292,6 +336,19 @@ export const useGameStore = create<GameStore>((set, get) => {
               `Jump needs ${formatLightYears(jumpFuelCost)} but only ${formatLightYears(state.commander.fuel)} remain.`
             )
           )
+        });
+        return false;
+      }
+
+      if (state.ui.instantTravelEnabled) {
+        const nextState = createArrivalState(state, systemName);
+        if (!nextState) {
+          return false;
+        }
+
+        set({
+          ...nextState,
+          travelSession: null
         });
         return false;
       }

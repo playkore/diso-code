@@ -39,6 +39,7 @@ export interface TravelState {
 export interface UiState {
   activeTab: AppTab;
   compactMode: boolean;
+  instantTravelEnabled: boolean;
   latestEvent?: UiMessage;
   activityLog: UiMessage[];
 }

@@ -112,7 +112,6 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <header>
-        <h1>DISO Commander Console</h1>
         <dl className="hud-grid" aria-label="Commander status">
           <div>
             <dt>Credits</dt>

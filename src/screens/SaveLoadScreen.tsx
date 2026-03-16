@@ -10,6 +10,8 @@ export function SaveLoadScreen() {
   const saveToSlot = useGameStore((state) => state.saveToSlot);
   const loadFromSlot = useGameStore((state) => state.loadFromSlot);
   const startNewGame = useGameStore((state) => state.startNewGame);
+  const instantTravelEnabled = useGameStore((state) => state.ui.instantTravelEnabled);
+  const setInstantTravelEnabled = useGameStore((state) => state.setInstantTravelEnabled);
   const saveStates = useGameStore((state) => state.saveStates);
   const commander = useGameStore((state) => state.commander);
   const universe = useGameStore((state) => state.universe);
@@ -143,6 +145,18 @@ export function SaveLoadScreen() {
           </div>
         </div>
       ) : null}
+      <section className="save-panel save-panel--settings">
+        <p className="dialog-kicker">Settings</p>
+        <label className="settings-toggle">
+          <input
+            type="checkbox"
+            checked={instantTravelEnabled}
+            onChange={(event) => setInstantTravelEnabled(event.target.checked)}
+          />
+          <span>Bypass space travel arcade segment</span>
+        </label>
+        <p className="muted">When enabled, travelling from the star map docks instantly at the destination.</p>
+      </section>
     </section>
   );
 }
