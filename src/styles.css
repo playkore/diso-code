@@ -1,7 +1,11 @@
 :root {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  color: #f4f8ff;
-  background: #0b1020;
+  font-family: 'Courier New', Courier, monospace;
+  color: #55ff55;
+  background: #000;
+  --cga-black: #000000;
+  --cga-green: #55ff55;
+  --cga-red: #ff5555;
+  --cga-yellow: #ffff55;
 }
 
 * {
@@ -11,7 +15,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, #1c2649, #0b1020 55%);
+  background: #000;
 }
 
 #root {
@@ -40,9 +44,8 @@ header {
   z-index: 5;
   padding: 0.55rem 0.7rem;
   border-radius: 0.75rem;
-  background: rgba(8, 13, 28, 0.96);
-  border: 1px solid #2d3d72;
-  backdrop-filter: blur(14px);
+  background: #000;
+  border: 2px solid var(--cga-yellow);
 }
 
 .hud-grid {
@@ -55,15 +58,15 @@ header {
 .hud-grid div {
   padding: 0.35rem 0.45rem;
   border-radius: 0.6rem;
-  border: 1px solid #304489;
-  background: rgba(19, 30, 66, 0.8);
+  border: 2px solid var(--cga-yellow);
+  background: #000;
   display: grid;
   gap: 0.12rem;
 }
 
 .hud-grid dt {
   margin: 0;
-  color: #93abff;
+  color: var(--cga-yellow);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -80,17 +83,18 @@ header {
   margin-top: 0.45rem;
   display: grid;
   gap: 0.2rem;
-  border: 1px solid #4a70db;
+  border: 2px solid var(--cga-red);
   border-radius: 0.5rem;
   padding: 0.4rem 0.5rem;
-  background: rgba(38, 72, 163, 0.25);
+  background: #000;
+  color: var(--cga-red);
 }
 
 .screen {
   padding: 0.8rem;
   border-radius: 0.75rem;
-  background: rgba(8, 13, 28, 0.75);
-  border: 1px solid #2d3d72;
+  background: #000;
+  border: 2px solid var(--cga-yellow);
 }
 
 main {
@@ -112,9 +116,9 @@ main {
   display: grid;
   gap: 0.15rem;
   padding: 0.5rem;
-  border: 1px solid #304489;
+  border: 2px solid var(--cga-yellow);
   border-radius: 0.6rem;
-  background: rgba(19, 30, 66, 0.8);
+  background: #000;
 }
 
 .market-row {
@@ -135,7 +139,7 @@ main {
 }
 
 .market-row__summary span {
-  color: #adc0ff;
+  color: var(--cga-yellow);
   font-size: 0.84rem;
   white-space: nowrap;
   overflow: hidden;
@@ -155,11 +159,12 @@ main {
 }
 
 .segment-control__button {
-  background: rgba(19, 30, 66, 0.8);
+  background: #000;
 }
 
 .segment-control__button.is-active {
-  background: #2648a3;
+  background: var(--cga-red);
+  color: #000;
 }
 
 .detail-grid {
@@ -170,7 +175,7 @@ main {
 }
 
 .detail-grid dt {
-  color: #93abff;
+  color: var(--cga-yellow);
 }
 
 .chip-list {
@@ -181,8 +186,8 @@ main {
   padding: 0.35rem;
   text-align: center;
   border-radius: 999px;
-  border: 1px solid #3258be;
-  background: #15254f;
+  border: 2px solid var(--cga-yellow);
+  background: #000;
 }
 
 .chip-list button {
@@ -210,15 +215,15 @@ main {
 
 .save-panel {
   padding: 0.75rem;
-  border: 1px solid #304489;
+  border: 2px solid var(--cga-yellow);
   border-radius: 0.75rem;
-  background: rgba(19, 30, 66, 0.8);
+  background: #000;
 }
 
 .save-panel__actions {
   margin-top: 0.9rem;
   padding-top: 0.9rem;
-  border-top: 1px solid rgba(74, 112, 219, 0.28);
+  border-top: 2px solid var(--cga-yellow);
 }
 
 .save-panel--settings {
@@ -236,6 +241,7 @@ main {
   width: 1rem;
   height: 1rem;
   margin: 0;
+  accent-color: var(--cga-red);
 }
 
 .save-slot__header {
@@ -261,9 +267,10 @@ main {
 button {
   padding: 0.45rem 0.35rem;
   border-radius: 0.5rem;
-  color: #f4f8ff;
-  background: #1f3c89;
-  border: 1px solid #4a70db;
+  color: var(--cga-yellow);
+  background: #000;
+  border: 2px solid var(--cga-yellow);
+  font-family: inherit;
 }
 
 button:disabled {
@@ -271,13 +278,14 @@ button:disabled {
 }
 
 .button-danger {
-  background: linear-gradient(180deg, #7f2840, #5c1830);
-  border-color: #d36b7d;
+  background: var(--cga-red);
+  border-color: var(--cga-yellow);
+  color: #000;
 }
 
 .muted,
 .status {
-  color: #adc0ff;
+  color: var(--cga-yellow);
 }
 
 .save-preview {
@@ -285,9 +293,9 @@ button:disabled {
   overflow: auto;
   font-size: 0.75rem;
   padding: 0.5rem;
-  border: 1px solid #304489;
+  border: 2px solid var(--cga-yellow);
   border-radius: 0.5rem;
-  background: rgba(19, 30, 66, 0.8);
+  background: #000;
 }
 
 .dialog-backdrop {
@@ -296,8 +304,7 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(4, 7, 18, 0.72);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.92);
   z-index: 20;
 }
 
@@ -305,16 +312,14 @@ button:disabled {
   width: min(100%, 24rem);
   padding: 1rem;
   border-radius: 1rem;
-  border: 1px solid #3a4f98;
-  background:
-    radial-gradient(circle at top, rgba(66, 95, 186, 0.28), transparent 45%),
-    rgba(8, 13, 28, 0.96);
-  box-shadow: 0 1.2rem 3rem rgba(0, 0, 0, 0.45);
+  border: 2px solid var(--cga-yellow);
+  background: #000;
+  box-shadow: none;
 }
 
 .dialog-kicker {
   margin: 0 0 0.25rem;
-  color: #93abff;
+  color: var(--cga-yellow);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -327,7 +332,7 @@ button:disabled {
 
 .dialog-panel p {
   margin: 0;
-  color: #d7e3ff;
+  color: var(--cga-green);
 }
 
 .dialog-actions {
@@ -343,8 +348,8 @@ button:disabled {
   gap: 0.3rem;
   padding: 0.35rem;
   border-radius: 0.75rem;
-  background: rgba(8, 13, 28, 0.92);
-  border: 1px solid #2d3d72;
+  background: #000;
+  border: 2px solid var(--cga-yellow);
 }
 
 .tab-link {
@@ -352,7 +357,7 @@ button:disabled {
   place-items: center;
   text-align: center;
   text-decoration: none;
-  color: #adc0ff;
+  color: var(--cga-green);
   min-height: 2.5rem;
   padding: 0.3rem 0.1rem;
   border-radius: 0.5rem;
@@ -368,8 +373,8 @@ button:disabled {
 }
 
 .tab-link.is-active {
-  background: #2648a3;
-  color: #ffffff;
+  background: var(--cga-red);
+  color: #000;
 }
 
 .sr-only {
@@ -418,10 +423,10 @@ button:disabled {
 
 .star-map {
   margin-top: 0.75rem;
-  border: 1px solid #304489;
+  border: 2px solid var(--cga-yellow);
   border-radius: 0.75rem;
   padding: 0.5rem;
-  background: radial-gradient(circle at center, rgba(41, 66, 140, 0.35), rgba(7, 12, 25, 0.92));
+  background: #000;
 }
 
 .star-map svg {
@@ -440,13 +445,13 @@ button:disabled {
 
 .star-map__range {
   fill: none;
-  stroke: rgba(120, 149, 247, 0.5);
+  stroke: var(--cga-green);
   stroke-width: 0.8;
   stroke-dasharray: 3 2;
 }
 
 .star-map__range--max {
-  stroke: rgba(120, 149, 247, 0.18);
+  stroke: var(--cga-yellow);
   stroke-dasharray: none;
 }
 
@@ -455,11 +460,11 @@ button:disabled {
 }
 
 .star-map__star {
-  fill: #8fb0ff;
+  fill: var(--cga-green);
 }
 
 .star-map__star.is-current {
-  fill: #ffd25f;
+  fill: var(--cga-yellow);
 }
 
 .star-map__point.is-out-of-range .star-map__star,
@@ -468,13 +473,13 @@ button:disabled {
 }
 
 .star-map__point.is-selected .star-map__target {
-  fill: rgba(120, 149, 247, 0.18);
-  stroke: #8fb0ff;
+  fill: transparent;
+  stroke: var(--cga-red);
   stroke-width: 0.9;
 }
 
 .star-map__label {
-  fill: #d7e3ff;
+  fill: var(--cga-yellow);
   font-size: 5.5px;
 }
 
