@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createDefaultCommander, cargoUsedTonnes } from '../domain/commander';
+import { applyLegalFloor, createDefaultCommander, cargoUsedTonnes, normalizeCommanderState } from '../domain/commander';
 import {
   encodeCommanderBinary256
 } from '../domain/commanderPersistence';
@@ -31,6 +31,12 @@ interface SaveState {
 
 type SaveSlotId = 1 | 2 | 3;
 
+interface TravelCompletionReport {
+  legalValue?: number;
+  tallyDelta?: number;
+  missionEvents?: MissionExternalEvent[];
+}
+
 const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
 const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
 const SETTINGS_STORAGE_KEY = 'diso-code:settings';
@@ -47,7 +53,7 @@ interface GameStore {
   setInstantTravelEnabled: (enabled: boolean) => void;
   beginTravel: (systemName: string) => boolean;
   cancelTravel: () => void;
-  completeTravel: () => void;
+  completeTravel: (report?: TravelCompletionReport) => void;
   dockAtSystem: (systemName: string) => void;
   buyFuel: (units: number) => void;
   buyCommodity: (commodityKey: string, amount: number) => void;
@@ -102,20 +108,21 @@ function getCheapestCommodity(session: DockedMarketSession) {
 }
 
 function createInitialGameState(commander: CommanderState) {
-  const system = getSystemByName(commander.currentSystem);
+  const normalizedCommander = normalizeCommanderState(commander);
+  const system = getSystemByName(normalizedCommander.currentSystem);
   const economy = system?.data.economy ?? 5;
 
   return {
     universe: {
-      currentSystem: commander.currentSystem,
-      nearbySystems: getNearbySystemNames(commander.currentSystem),
+      currentSystem: normalizedCommander.currentSystem,
+      nearbySystems: getNearbySystemNames(normalizedCommander.currentSystem),
       stardate: 3124,
       economy,
       marketFluctuation: 0
     },
-    commander,
-    market: createMarketState(commander.currentSystem, economy, 0),
-    missions: updateMissionLog(commander)
+    commander: normalizedCommander,
+    market: createMarketState(normalizedCommander.currentSystem, economy, 0),
+    missions: updateMissionLog(normalizedCommander)
   };
 }
 
@@ -137,8 +144,9 @@ function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'u
     return null;
   }
 
-  const nextCommander = { ...state.commander, currentSystem: systemName };
+  const nextCommander = normalizeCommanderState({ ...state.commander, currentSystem: systemName });
   nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
+  nextCommander.legalValue = applyLegalFloor(nextCommander.legalValue, nextCommander.cargo);
   const progress = applyDockingMissionState({ tp: nextCommander.missionTP, variant: nextCommander.missionVariant });
   nextCommander.missionTP = progress.tp;
   const nextSystem = getSystemByName(systemName);
@@ -175,10 +183,10 @@ function restoreSnapshot(snapshot: GameSnapshot) {
     tp: snapshot.commander.missionTP,
     variant: snapshot.commander.missionVariant
   });
-  const commander = {
+  const commander = normalizeCommanderState({
     ...snapshot.commander,
     missionTP: missionProgress.tp
-  };
+  });
 
   return {
     commander,
@@ -353,7 +361,13 @@ export const useGameStore = create<GameStore>((set, get) => {
         return false;
       }
 
+      const commander = {
+        ...state.commander,
+        legalValue: applyLegalFloor(state.commander.legalValue, state.commander.cargo)
+      };
+
       set({
+        commander,
         travelSession: {
           originSystem: state.universe.currentSystem,
           destinationSystem: systemName,
@@ -364,13 +378,36 @@ export const useGameStore = create<GameStore>((set, get) => {
       return true;
     },
     cancelTravel: () => set({ travelSession: null }),
-    completeTravel: () =>
+    completeTravel: (report) =>
       set((state) => {
         if (!state.travelSession) {
           return state;
         }
 
-        const nextState = createArrivalState(state, state.travelSession.destinationSystem);
+        let commander = normalizeCommanderState({
+          ...state.commander,
+          legalValue: report?.legalValue ?? state.commander.legalValue,
+          tally: state.commander.tally + (report?.tallyDelta ?? 0)
+        });
+
+        if (report?.missionEvents?.length) {
+          const progress = report.missionEvents.reduce(
+            (current, event) => applyMissionExternalEvent(current, event),
+            { tp: commander.missionTP, variant: commander.missionVariant }
+          );
+          commander = normalizeCommanderState({
+            ...commander,
+            missionTP: progress.tp
+          });
+        }
+
+        const nextState = createArrivalState(
+          {
+            ...state,
+            commander
+          },
+          state.travelSession.destinationSystem
+        );
         if (!nextState) {
           return {
             ...state,

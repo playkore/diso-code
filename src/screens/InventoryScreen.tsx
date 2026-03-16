@@ -1,4 +1,4 @@
-import { cargoUsedTonnes } from '../domain/commander';
+import { cargoUsedTonnes, getLegalStatus } from '../domain/commander';
 import { MAX_FUEL, getFuelUnits } from '../domain/fuel';
 import { useGameStore } from '../store/useGameStore';
 import { formatCredits } from '../utils/money';
@@ -21,7 +21,7 @@ export function InventoryScreen() {
         <dt>Fuel</dt>
         <dd>{formatLightYears(commander.fuel)}</dd>
         <dt>Legal</dt>
-        <dd>{commander.legalStatus}</dd>
+        <dd>{getLegalStatus(commander.legalValue)} ({commander.legalValue})</dd>
         <dt>Rating</dt>
         <dd>{commander.rating}</dd>
         <dt>Tally</dt>

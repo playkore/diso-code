@@ -1,63 +1,23 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { getSystemByName } from '../domain/galaxyCatalog';
+import { applyLegalFloor, getLegalStatus } from '../domain/commander';
+import {
+  canEnemyLaserFireByCnt,
+  canEnemyLaserHitByCnt,
+  createMathRandomSource,
+  createTravelCombatState,
+  enterArrivalSpace,
+  setCombatSystemContext,
+  stepTravelCombat,
+  type CombatProjectile,
+  type CombatShipRoles,
+  type FlightPhase,
+  type TravelCombatState
+} from '../domain/travelCombat';
+import { hasMissionFlag } from '../domain/missions';
 import { useGameStore } from '../store/useGameStore';
 import { formatLightYears } from '../utils/distance';
-
-type FlightState = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'GAMEOVER';
-
-interface Enemy {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  angle: number;
-  fireCooldown: number;
-  hp: number;
-}
-
-interface Laser {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  isPlayer: boolean;
-}
-
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  color: string;
-}
-
-interface Star {
-  x: number;
-  y: number;
-  z: number;
-}
-
-interface Station {
-  x: number;
-  y: number;
-  radius: number;
-  angle: number;
-  rotSpeed: number;
-}
-
-interface Player {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  angle: number;
-  radius: number;
-  shields: number;
-  maxSpeed: number;
-  fireCooldown: number;
-}
 
 const SHAPE_PLAYER = [
   [15, 0],
@@ -72,14 +32,74 @@ const SHAPE_ENEMY = [
   [-8, 10]
 ] as const;
 
+const SHAPE_POLICE = [
+  [13, 0],
+  [0, -12],
+  [-10, 0],
+  [0, 12]
+] as const;
+
+const SHAPE_THARGOID = [
+  [12, 0],
+  [4, -12],
+  [-8, -8],
+  [-12, 0],
+  [-8, 8],
+  [4, 12]
+] as const;
+
+const SHAPE_STATION = [
+  [45, 0],
+  [20, -35],
+  [-20, -35],
+  [-45, 0],
+  [-20, 35],
+  [20, 35]
+] as const;
+
 const CGA_BLACK = '#000000';
 const CGA_GREEN = '#55ff55';
 const CGA_RED = '#ff5555';
 const CGA_YELLOW = '#ffff55';
+const CGA_CYAN = '#55ffff';
+
+function getEnemyColor(roles: CombatShipRoles, missionTag?: string) {
+  if (missionTag === 'constrictor') {
+    return CGA_CYAN;
+  }
+  if (missionTag === 'thargoid-plans') {
+    return '#ff88ff';
+  }
+  if (roles.cop) {
+    return CGA_CYAN;
+  }
+  if (roles.innocent || roles.trader) {
+    return CGA_YELLOW;
+  }
+  return CGA_RED;
+}
+
+function getEnemyShape(state: TravelCombatState['enemies'][number]) {
+  if (state.roles.cop) {
+    return SHAPE_POLICE;
+  }
+  if (state.blueprintId === 'thargoid' || state.blueprintId === 'thargon') {
+    return SHAPE_THARGOID;
+  }
+  return SHAPE_ENEMY;
+}
+
+function getProjectileColor(projectile: CombatProjectile) {
+  if (projectile.kind === 'missile') {
+    return CGA_YELLOW;
+  }
+  return projectile.owner === 'player' ? CGA_GREEN : CGA_RED;
+}
 
 export function TravelScreen() {
   const navigate = useNavigate();
   const session = useGameStore((state) => state.travelSession);
+  const commander = useGameStore((state) => state.commander);
   const completeTravel = useGameStore((state) => state.completeTravel);
   const cancelTravel = useGameStore((state) => state.cancelTravel);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -88,6 +108,8 @@ export function TravelScreen() {
   const scoreRef = useRef<HTMLSpanElement | null>(null);
   const shieldsRef = useRef<HTMLSpanElement | null>(null);
   const jumpRef = useRef<HTMLSpanElement | null>(null);
+  const legalRef = useRef<HTMLSpanElement | null>(null);
+  const threatRef = useRef<HTMLSpanElement | null>(null);
   const knobRef = useRef<HTMLDivElement | null>(null);
   const jumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const fireButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -97,17 +119,25 @@ export function TravelScreen() {
       return undefined;
     }
 
+    const originSystem = getSystemByName(session.originSystem)?.data;
+    const destinationSystem = getSystemByName(session.destinationSystem)?.data;
+    if (!originSystem || !destinationSystem) {
+      return undefined;
+    }
+
     const canvas = canvasRef.current;
     const viewport = viewportRef.current;
     const messageNode = messageRef.current;
     const scoreNode = scoreRef.current;
     const shieldsNode = shieldsRef.current;
     const jumpNode = jumpRef.current;
+    const legalNode = legalRef.current;
+    const threatNode = threatRef.current;
     const knobNode = knobRef.current;
     const jumpButton = jumpButtonRef.current;
     const fireButton = fireButtonRef.current;
 
-    if (!canvas || !viewport || !messageNode || !scoreNode || !shieldsNode || !jumpNode || !knobNode || !jumpButton || !fireButton) {
+    if (!canvas || !viewport || !messageNode || !scoreNode || !shieldsNode || !jumpNode || !legalNode || !threatNode || !knobNode || !jumpButton || !fireButton) {
       return undefined;
     }
 
@@ -115,6 +145,18 @@ export function TravelScreen() {
     if (!ctx) {
       return undefined;
     }
+
+    const random = createMathRandomSource();
+    const combatState = createTravelCombatState(
+      {
+        legalValue: applyLegalFloor(commander.legalValue, commander.cargo),
+        government: originSystem.government,
+        techLevel: originSystem.techLevel,
+        missionTP: commander.missionTP,
+        missionVariant: commander.missionVariant
+      },
+      random
+    );
 
     let cw = 0;
     let ch = 0;
@@ -126,9 +168,7 @@ export function TravelScreen() {
 
     const input = { turn: 0, thrust: 0, fire: false, jump: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
     const keys: Record<string, boolean> = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ' ': false, j: false, J: false };
-    let score = 0;
-    let flightState: FlightState = 'READY';
-    let msgTimer = 0;
+    let flightState: FlightPhase = 'READY';
     let jumpTimer = 0;
     let animationFrameId = 0;
     let joyActive = false;
@@ -136,58 +176,9 @@ export function TravelScreen() {
     let joyCenter = { x: 0, y: 0 };
     let lastTimestamp = 0;
     let stationaryTicks = 0;
-
-    const player: Player = {
-      x: 0,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: -Math.PI / 2,
-      radius: 12,
-      shields: 100,
-      maxSpeed: 8,
-      fireCooldown: 0
-    };
-
-    let stars: Star[] = [];
-    let lasers: Laser[] = [];
-    let enemies: Enemy[] = [];
-    let particles: Particle[] = [];
-    let station: Station | null = null;
-
-    const showMessage = (text: string, duration: number) => {
-      messageNode.textContent = text;
-      msgTimer = duration;
-    };
-
-    const updateHud = () => {
-      scoreNode.textContent = String(score);
-      shieldsNode.textContent = String(Math.max(0, Math.round(player.shields)));
-      shieldsNode.style.color = player.shields <= 30 ? CGA_RED : CGA_GREEN;
-      jumpNode.textContent =
-        flightState === 'READY'
-          ? 'READY'
-          : flightState === 'PLAYING'
-            ? 'CHARGED'
-            : flightState === 'JUMPING'
-              ? 'ENGAGED'
-              : flightState === 'ARRIVED'
-                ? 'COMPLETE'
-                : 'OFFLINE';
-    };
-
-    const spawnExplosion = (x: number, y: number, color: string) => {
-      for (let i = 0; i < 20; i += 1) {
-        particles.push({
-          x,
-          y,
-          vx: (Math.random() - 0.5) * 10,
-          vy: (Math.random() - 0.5) * 10,
-          life: 30 + Math.random() * 20,
-          color
-        });
-      }
-    };
+    let stars: Array<{ x: number; y: number; z: number }> = [];
+    let overlayMessage = '';
+    let overlayTimer = 0;
 
     const initSpace = () => {
       stars = [];
@@ -200,22 +191,31 @@ export function TravelScreen() {
       }
     };
 
-    const initDestinationSpace = () => {
-      initSpace();
-      station = {
-        x: Math.random() * 1000 - 500 + 500,
-        y: Math.random() * 1000 - 500 - 500,
-        radius: 80,
-        angle: 0,
-        rotSpeed: 0.005
-      };
-      enemies = [];
-      lasers = [];
-      particles = [];
-      score += 250;
-      flightState = 'ARRIVED';
-      showMessage(`SYSTEM REACHED: ${session.destinationSystem}`, 2200);
-      updateHud();
+    const showMessage = (text: string, duration: number) => {
+      overlayMessage = text;
+      overlayTimer = duration;
+      messageNode.textContent = text;
+    };
+
+    const updateHud = () => {
+      scoreNode.textContent = String(combatState.score);
+      shieldsNode.textContent = String(Math.max(0, Math.round(combatState.player.shields)));
+      shieldsNode.style.color = combatState.player.shields <= 30 ? CGA_RED : CGA_GREEN;
+      jumpNode.textContent =
+        flightState === 'READY'
+          ? 'READY'
+          : flightState === 'PLAYING'
+            ? 'CHARGED'
+            : flightState === 'JUMPING'
+              ? 'ENGAGED'
+              : flightState === 'ARRIVED'
+                ? 'COMPLETE'
+                : 'OFFLINE';
+      legalNode.textContent = `${getLegalStatus(combatState.legalValue)} ${combatState.legalValue}`;
+      legalNode.style.color = combatState.legalValue >= 50 ? CGA_RED : combatState.legalValue >= 1 ? CGA_YELLOW : CGA_GREEN;
+      const hostileCount = combatState.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
+      threatNode.textContent = `F${combatState.encounter.activeBlueprintFile} / ${hostileCount}`;
+      threatNode.style.color = hostileCount > 0 ? CGA_RED : CGA_GREEN;
     };
 
     const startJump = () => {
@@ -225,33 +225,26 @@ export function TravelScreen() {
       flightState = 'JUMPING';
       jumpTimer = 100;
       showMessage(`HYPERSPACE TO ${session.destinationSystem.toUpperCase()}`, 2000);
-      player.vx = Math.cos(player.angle) * 5;
-      player.vy = Math.sin(player.angle) * 5;
+      combatState.player.vx = Math.cos(combatState.player.angle) * 5;
+      combatState.player.vy = Math.sin(combatState.player.angle) * 5;
       input.jump = false;
       updateHud();
     };
 
-    const gameOver = () => {
-      flightState = 'GAMEOVER';
-      spawnExplosion(player.x, player.y, CGA_RED);
-      showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
-      updateHud();
-    };
-
     const resetPrototype = () => {
-      player.x = 0;
-      player.y = 0;
-      player.vx = 0;
-      player.vy = 0;
-      player.angle = -Math.PI / 2;
-      player.shields = 100;
-      player.fireCooldown = 0;
-      score = 0;
+      const fresh = createTravelCombatState(
+        {
+          legalValue: applyLegalFloor(commander.legalValue, commander.cargo),
+          government: originSystem.government,
+          techLevel: originSystem.techLevel,
+          missionTP: commander.missionTP,
+          missionVariant: commander.missionVariant
+        },
+        random
+      );
+      Object.assign(combatState, fresh);
+      setCombatSystemContext(combatState, { government: originSystem.government, techLevel: originSystem.techLevel, witchspace: false }, random);
       initSpace();
-      lasers = [];
-      enemies = [];
-      particles = [];
-      station = null;
       flightState = 'READY';
       showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
       updateHud();
@@ -386,31 +379,21 @@ export function TravelScreen() {
       ctx.restore();
     };
 
-    const drawStation = (target: Station, camX: number, camY: number) => {
-      ctx.save();
-      ctx.translate(target.x - camX, target.y - camY);
-      ctx.rotate(target.angle);
-      ctx.strokeStyle = CGA_YELLOW;
-      ctx.lineWidth = 2;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = CGA_YELLOW;
-
-      const points = Array.from({ length: 8 }, (_, index) => ({
-        x: Math.cos((index * Math.PI) / 4) * target.radius,
-        y: Math.sin((index * Math.PI) / 4) * target.radius
-      }));
-
-      ctx.beginPath();
-      ctx.moveTo(points[1].x, points[1].y);
-      for (let i = 2; i <= 8; i += 1) {
-        ctx.lineTo(points[i % 8].x, points[i % 8].y);
+    const drawStation = (camX: number, camY: number) => {
+      if (!combatState.station) {
+        return;
       }
-      ctx.stroke();
 
+      drawWireframe(SHAPE_STATION, combatState.station.x - camX, combatState.station.y - camY, combatState.station.angle, CGA_YELLOW, 1.8);
+      ctx.save();
+      ctx.translate(combatState.station.x - camX, combatState.station.y - camY);
+      ctx.strokeStyle = combatState.encounter.safeZone ? CGA_CYAN : '#444444';
+      ctx.setLineDash([6, 8]);
       ctx.beginPath();
-      ctx.arc(0, 0, target.radius - 20, 0, Math.PI * 2);
+      ctx.arc(0, 0, combatState.station.safeZoneRadius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
+      ctx.setLineDash([]);
     };
 
     const drawMiniMap = () => {
@@ -430,9 +413,8 @@ export function TravelScreen() {
       ctx.shadowColor = CGA_GREEN;
       ctx.fillRect(radarX, radarY, radarWidth, radarHeight);
       ctx.strokeRect(radarX, radarY, radarWidth, radarHeight);
-
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = CGA_GREEN;
+
       ctx.beginPath();
       ctx.arc(radarCenterX, radarCenterY, radarRadius, 0, Math.PI * 2);
       ctx.stroke();
@@ -452,7 +434,7 @@ export function TravelScreen() {
 
       ctx.save();
       ctx.translate(radarCenterX, radarCenterY);
-      ctx.rotate(player.angle + Math.PI / 2);
+      ctx.rotate(combatState.player.angle + Math.PI / 2);
       ctx.strokeStyle = CGA_GREEN;
       ctx.beginPath();
       ctx.moveTo(0, -14);
@@ -463,32 +445,31 @@ export function TravelScreen() {
       ctx.stroke();
       ctx.restore();
 
-      ctx.fillStyle = CGA_GREEN;
-      ctx.font = '11px "Courier New", monospace';
-
-      if (station) {
-        const dx = station.x - player.x;
-        const dy = station.y - player.y;
+      if (combatState.station) {
+        const dx = combatState.station.x - combatState.player.x;
+        const dy = combatState.station.y - combatState.player.y;
         const distance = Math.hypot(dx, dy);
         const angle = Math.atan2(dy, dx);
         const radarDistance = Math.min(radarRadius - 8, distance * 0.08);
         const blipX = radarCenterX + Math.cos(angle) * radarDistance;
         const blipY = radarCenterY + Math.sin(angle) * radarDistance;
 
-        ctx.fillStyle = CGA_RED;
+        ctx.fillStyle = CGA_YELLOW;
         ctx.beginPath();
         ctx.arc(blipX, blipY, 4, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = CGA_YELLOW;
-        ctx.beginPath();
-        ctx.moveTo(radarCenterX, radarCenterY);
-        ctx.lineTo(blipX, blipY);
-        ctx.stroke();
+      }
 
-        ctx.fillStyle = CGA_GREEN;
-        ctx.fillText(`DIST ${Math.round(distance)}u`, radarX + 12, radarY + radarHeight - 16);
-      } else {
-        ctx.fillText('DIST ----', radarX + 12, radarY + radarHeight - 16);
+      for (const enemy of combatState.enemies) {
+        const dx = enemy.x - combatState.player.x;
+        const dy = enemy.y - combatState.player.y;
+        const distance = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        const radarDistance = Math.min(radarRadius - 4, distance * 0.06);
+        ctx.fillStyle = getEnemyColor(enemy.roles, enemy.missionTag);
+        ctx.beginPath();
+        ctx.arc(radarCenterX + Math.cos(angle) * radarDistance, radarCenterY + Math.sin(angle) * radarDistance, 2.5, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       ctx.restore();
@@ -498,8 +479,8 @@ export function TravelScreen() {
       ctx.fillStyle = '#000';
       ctx.fillRect(0, 0, cw, ch);
 
-      const camX = player.x - cw / 2;
-      const camY = player.y - ch / 2;
+      const camX = combatState.player.x - cw / 2;
+      const camY = combatState.player.y - ch / 2;
 
       ctx.fillStyle = CGA_YELLOW;
       ctx.strokeStyle = CGA_YELLOW;
@@ -507,13 +488,13 @@ export function TravelScreen() {
       ctx.shadowColor = CGA_YELLOW;
 
       for (const star of stars) {
-        const sx = ((star.x - player.x * star.z) % cw + cw) % cw;
-        const sy = ((star.y - player.y * star.z) % ch + ch) % ch;
+        const sx = ((star.x - combatState.player.x * star.z) % cw + cw) % cw;
+        const sy = ((star.y - combatState.player.y * star.z) % ch + ch) % ch;
 
         if (flightState === 'JUMPING') {
           ctx.beginPath();
           ctx.moveTo(sx, sy);
-          ctx.lineTo(sx - player.vx * star.z * 2, sy - player.vy * star.z * 2);
+          ctx.lineTo(sx - combatState.player.vx * star.z * 2, sy - combatState.player.vy * star.z * 2);
           ctx.stroke();
         } else {
           ctx.fillRect(sx, sy, 1.5, 1.5);
@@ -522,26 +503,24 @@ export function TravelScreen() {
 
       ctx.shadowBlur = 0;
 
-      if (station) {
-        drawStation(station, camX, camY);
-      }
+      drawStation(camX, camY);
 
-      for (const enemy of enemies) {
-        drawWireframe(SHAPE_ENEMY, enemy.x - camX, enemy.y - camY, enemy.angle, CGA_RED);
+      for (const enemy of combatState.enemies) {
+        drawWireframe(getEnemyShape(enemy), enemy.x - camX, enemy.y - camY, enemy.angle, getEnemyColor(enemy.roles, enemy.missionTag));
       }
 
       ctx.lineWidth = 2;
-      for (const laser of lasers) {
-        ctx.strokeStyle = laser.isPlayer ? CGA_GREEN : CGA_RED;
+      for (const projectile of combatState.projectiles) {
+        ctx.strokeStyle = getProjectileColor(projectile);
         ctx.shadowBlur = 5;
         ctx.shadowColor = ctx.strokeStyle;
         ctx.beginPath();
-        ctx.moveTo(laser.x - camX, laser.y - camY);
-        ctx.lineTo(laser.x - camX - laser.vx, laser.y - camY - laser.vy);
+        ctx.moveTo(projectile.x - camX, projectile.y - camY);
+        ctx.lineTo(projectile.x - camX - projectile.vx, projectile.y - camY - projectile.vy);
         ctx.stroke();
       }
 
-      for (const particle of particles) {
+      for (const particle of combatState.particles) {
         ctx.fillStyle = particle.color;
         ctx.shadowBlur = 5;
         ctx.shadowColor = particle.color;
@@ -549,22 +528,24 @@ export function TravelScreen() {
       }
 
       if (flightState !== 'GAMEOVER') {
-        drawWireframe(SHAPE_PLAYER, cw / 2, ch / 2, player.angle, CGA_YELLOW);
+        drawWireframe(SHAPE_PLAYER, cw / 2, ch / 2, combatState.player.angle, CGA_YELLOW);
       }
 
       drawMiniMap();
-
       ctx.shadowBlur = 0;
     };
 
-    const update = (deltaMs: number) => {
+    const loop = (timestamp: number) => {
+      const deltaMs = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
       const dt = Math.min(deltaMs, 32) / 16.6667;
 
       if (flightState === 'GAMEOVER') {
         if (input.fire || keys[' ']) {
           resetPrototype();
         }
-        updateHud();
+        draw();
+        animationFrameId = window.requestAnimationFrame(loop);
         return;
       }
 
@@ -591,107 +572,86 @@ export function TravelScreen() {
       input.fire = keys[' '] || input.fire;
       input.jump = keys.j || keys.J || input.jump;
 
-      if (flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') {
-        if (flightState === 'READY' && (Math.abs(player.vx) > 0.02 || Math.abs(player.vy) > 0.02 || input.thrust > 0 || Math.abs(input.turn) > 0.1)) {
-          flightState = 'PLAYING';
+      if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || input.thrust > 0 || Math.abs(input.turn) > 0.1)) {
+        flightState = 'PLAYING';
+      }
+
+      if (joyActive && input.vectorStrength > 0.08 && flightState !== 'JUMPING') {
+        combatState.player.angle = Math.atan2(input.vectorY, input.vectorX);
+      }
+
+      const result = stepTravelCombat(
+        combatState,
+        {
+          thrust: flightState === 'JUMPING' ? 0 : input.thrust,
+          turn: flightState === 'JUMPING' ? 0 : input.turn,
+          fire: flightState === 'JUMPING' ? false : input.fire
+        },
+        dt,
+        flightState,
+        commander.cargo,
+        random
+      );
+
+      if ((flightState === 'READY' || flightState === 'PLAYING') && input.jump) {
+        startJump();
+      }
+
+      if (flightState === 'JUMPING') {
+        combatState.player.vx *= 1.05;
+        combatState.player.vy *= 1.05;
+        combatState.player.x += combatState.player.vx * dt;
+        combatState.player.y += combatState.player.vy * dt;
+        jumpTimer -= dt;
+        if (jumpTimer <= 0) {
+          setCombatSystemContext(combatState, { government: destinationSystem.government, techLevel: destinationSystem.techLevel, witchspace: false }, random);
+          enterArrivalSpace(combatState, random);
+          flightState = 'ARRIVED';
+          showMessage(`SYSTEM REACHED: ${session.destinationSystem.toUpperCase()}`, 1800);
         }
+      }
 
-        if (joyActive && input.vectorStrength > 0.08) {
-          const targetAngle = Math.atan2(input.vectorY, input.vectorX);
-          player.angle = targetAngle;
-          player.vx += Math.cos(targetAngle) * input.vectorStrength * 0.24 * dt;
-          player.vy += Math.sin(targetAngle) * input.vectorStrength * 0.24 * dt;
-          particles.push({
-            x: player.x - Math.cos(targetAngle) * 15,
-            y: player.y - Math.sin(targetAngle) * 15,
-            vx: -player.vx * 0.5 + (Math.random() - 0.5),
-            vy: -player.vy * 0.5 + (Math.random() - 0.5),
-            life: 10,
-            color: CGA_GREEN
-          });
-        } else {
-          player.angle += input.turn * 0.08 * dt;
-          if (input.thrust > 0) {
-            player.vx += Math.cos(player.angle) * input.thrust * 0.2 * dt;
-            player.vy += Math.sin(player.angle) * input.thrust * 0.2 * dt;
-            particles.push({
-              x: player.x - Math.cos(player.angle) * 15,
-              y: player.y - Math.sin(player.angle) * 15,
-              vx: -player.vx * 0.5 + (Math.random() - 0.5),
-              vy: -player.vy * 0.5 + (Math.random() - 0.5),
-              life: 10,
-              color: CGA_GREEN
-            });
-          }
-        }
+      if (combatState.station && flightState === 'ARRIVED') {
+        const distToStation = Math.hypot(combatState.player.x - combatState.station.x, combatState.player.y - combatState.station.y);
+        const speed = Math.hypot(combatState.player.vx, combatState.player.vy);
 
-        player.vx *= 0.99;
-        player.vy *= 0.99;
-        const speed = Math.hypot(player.vx, player.vy);
-        if (speed > player.maxSpeed) {
-          player.vx = (player.vx / speed) * player.maxSpeed;
-          player.vy = (player.vy / speed) * player.maxSpeed;
-        }
+        if (distToStation < combatState.station.radius + 15) {
+          const relativeAngle = Math.atan2(combatState.player.y - combatState.station.y, combatState.player.x - combatState.station.x);
+          const slotAngle = combatState.station.angle + Math.PI / 8;
+          const slotOffset = Math.atan2(Math.sin(relativeAngle - slotAngle), Math.cos(relativeAngle - slotAngle));
+          const noseAlignment = Math.atan2(Math.sin(combatState.player.angle - (slotAngle + Math.PI)), Math.cos(combatState.player.angle - (slotAngle + Math.PI)));
+          const isInsideSlot = Math.abs(slotOffset) < Math.PI / 7;
+          const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
 
-        player.x += player.vx * dt;
-        player.y += player.vy * dt;
-
-        if (player.fireCooldown > 0) {
-          player.fireCooldown -= dt;
-        }
-        if (input.fire && player.fireCooldown <= 0) {
-          lasers.push({
-            x: player.x + Math.cos(player.angle) * 15,
-            y: player.y + Math.sin(player.angle) * 15,
-            vx: player.vx + Math.cos(player.angle) * 15,
-            vy: player.vy + Math.sin(player.angle) * 15,
-            life: 60,
-            isPlayer: true
-          });
-          player.fireCooldown = 15;
-        }
-
-        if ((flightState === 'READY' || flightState === 'PLAYING') && input.jump) {
-          startJump();
-        }
-
-        if (station && flightState === 'ARRIVED') {
-          station.angle += station.rotSpeed * dt;
-          const distToStation = Math.hypot(player.x - station.x, player.y - station.y);
-
-          if (distToStation < station.radius + 15) {
-            const relativeAngle = Math.atan2(player.y - station.y, player.x - station.x);
-            const slotAngle = station.angle + Math.PI / 8;
-            const slotOffset = Math.atan2(Math.sin(relativeAngle - slotAngle), Math.cos(relativeAngle - slotAngle));
-            const noseAlignment = Math.atan2(Math.sin(player.angle - (slotAngle + Math.PI)), Math.cos(player.angle - (slotAngle + Math.PI)));
-            const isInsideSlot = Math.abs(slotOffset) < Math.PI / 7;
-            const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
-
-            if (distToStation < station.radius - 5) {
-              if (isInsideSlot && isFacingHangar && speed < 3.6) {
-                score += 500;
-                updateHud();
-                showMessage(`DOCKED AT ${session.destinationSystem.toUpperCase()}`, 800);
-                completeTravel();
-                navigate('/', { replace: true });
-                return;
+          if (distToStation < combatState.station.radius - 5) {
+            if (isInsideSlot && isFacingHangar && speed < 3.6) {
+              const missionEvents = [...combatState.missionEvents];
+              if (hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
+                missionEvents.push({ type: 'combat:thargoid-plans-delivered' });
               }
-
-              player.shields -= 20;
-              player.vx *= -1.5;
-              player.vy *= -1.5;
-              spawnExplosion(player.x, player.y, CGA_RED);
-              if (player.shields <= 0) {
-                gameOver();
-              } else {
-                showMessage('COLLISION WARNING', 1000);
-              }
+              completeTravel({
+                legalValue: combatState.legalValue,
+                tallyDelta: combatState.player.tallyKills,
+                missionEvents
+              });
+              navigate('/', { replace: true });
+              return;
             }
+
+            combatState.player.shields -= 20;
+            combatState.player.vx *= -1.5;
+            combatState.player.vy *= -1.5;
+            showMessage('COLLISION WARNING', 1000);
           }
         }
       }
 
-      if (flightState === 'ARRIVED' && Math.hypot(player.vx, player.vy) < 0.05) {
+      if (result.playerDestroyed) {
+        flightState = 'GAMEOVER';
+        showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
+      }
+
+      if (flightState === 'ARRIVED' && Math.hypot(combatState.player.vx, combatState.player.vy) < 0.05) {
         stationaryTicks += 1;
         if (stationaryTicks > 120) {
           showMessage('USE THRUST TO LINE UP WITH THE STATION SLOT', 1400);
@@ -701,119 +661,15 @@ export function TravelScreen() {
         stationaryTicks = 0;
       }
 
-      if ((flightState === 'PLAYING' || flightState === 'ARRIVED') && Math.random() < 0.005 && enemies.length < 3) {
-        enemies.push({
-          x: player.x + (Math.random() > 0.5 ? 800 : -800),
-          y: player.y + (Math.random() > 0.5 ? 800 : -800),
-          vx: 0,
-          vy: 0,
-          angle: 0,
-          fireCooldown: 0,
-          hp: 30
-        });
-      }
-
-      for (let i = enemies.length - 1; i >= 0; i -= 1) {
-        const enemy = enemies[i];
-        const dx = player.x - enemy.x;
-        const dy = player.y - enemy.y;
-        const dist = Math.hypot(dx, dy);
-        const targetAngle = Math.atan2(dy, dx);
-        const angleDiff = Math.atan2(Math.sin(targetAngle - enemy.angle), Math.cos(targetAngle - enemy.angle));
-        enemy.angle += Math.sign(angleDiff) * 0.05 * dt;
-
-        if (dist > 150) {
-          enemy.vx += Math.cos(enemy.angle) * 0.1 * dt;
-          enemy.vy += Math.sin(enemy.angle) * 0.1 * dt;
-        }
-
-        enemy.vx *= 0.98;
-        enemy.vy *= 0.98;
-        enemy.x += enemy.vx * dt;
-        enemy.y += enemy.vy * dt;
-
-        if (enemy.fireCooldown > 0) {
-          enemy.fireCooldown -= dt;
-        }
-
-        if (dist < 300 && Math.abs(angleDiff) < 0.2 && enemy.fireCooldown <= 0 && flightState !== 'JUMPING') {
-          lasers.push({
-            x: enemy.x + Math.cos(enemy.angle) * 12,
-            y: enemy.y + Math.sin(enemy.angle) * 12,
-            vx: enemy.vx + Math.cos(enemy.angle) * 10,
-            vy: enemy.vy + Math.sin(enemy.angle) * 10,
-            life: 50,
-            isPlayer: false
-          });
-          enemy.fireCooldown = 60;
+      if (overlayTimer > 0) {
+        overlayTimer -= deltaMs;
+        if (overlayTimer <= 0) {
+          overlayMessage = '';
         }
       }
 
-      for (let i = lasers.length - 1; i >= 0; i -= 1) {
-        const laser = lasers[i];
-        laser.x += laser.vx * dt;
-        laser.y += laser.vy * dt;
-        laser.life -= dt;
-        let hit = false;
-
-        if (laser.isPlayer) {
-          for (let j = enemies.length - 1; j >= 0; j -= 1) {
-            const enemy = enemies[j];
-            if (Math.hypot(laser.x - enemy.x, laser.y - enemy.y) < 15) {
-              enemy.hp -= 10;
-              hit = true;
-              spawnExplosion(laser.x, laser.y, CGA_GREEN);
-              if (enemy.hp <= 0) {
-                spawnExplosion(enemy.x, enemy.y, CGA_RED);
-                enemies.splice(j, 1);
-                score += 100;
-              }
-              break;
-            }
-          }
-        } else if (flightState !== 'JUMPING') {
-          if (Math.hypot(laser.x - player.x, laser.y - player.y) < player.radius) {
-            player.shields -= 10;
-            hit = true;
-            spawnExplosion(laser.x, laser.y, CGA_RED);
-            if (player.shields <= 0) {
-              gameOver();
-            }
-          }
-        }
-
-        if (laser.life <= 0 || hit) {
-          lasers.splice(i, 1);
-        }
-      }
-
-      for (let i = particles.length - 1; i >= 0; i -= 1) {
-        const particle = particles[i];
-        particle.x += particle.vx * dt;
-        particle.y += particle.vy * dt;
-        particle.life -= dt;
-        if (particle.life <= 0) {
-          particles.splice(i, 1);
-        }
-      }
-
-      if (flightState === 'JUMPING') {
-        player.vx *= 1.05;
-        player.vy *= 1.05;
-        player.x += player.vx * dt;
-        player.y += player.vy * dt;
-        jumpTimer -= dt;
-        if (jumpTimer <= 0) {
-          initDestinationSpace();
-        }
-      }
-
-      if (msgTimer > 0) {
-        msgTimer -= deltaMs;
-        if (msgTimer <= 0) {
-          messageNode.textContent = '';
-        }
-      }
+      const combatMessage = combatState.messages[0]?.text;
+      messageNode.textContent = overlayMessage || combatMessage || '';
 
       if (!keys[' ']) {
         input.fire = false;
@@ -823,12 +679,6 @@ export function TravelScreen() {
       }
 
       updateHud();
-    };
-
-    const loop = (timestamp: number) => {
-      const delta = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
-      lastTimestamp = timestamp;
-      update(delta);
       draw();
       animationFrameId = window.requestAnimationFrame(loop);
     };
@@ -848,7 +698,7 @@ export function TravelScreen() {
       unbindJumpButton();
       unbindFireButton();
     };
-  }, [cancelTravel, completeTravel, navigate, session]);
+  }, [cancelTravel, commander, completeTravel, navigate, session]);
 
   if (!session) {
     return <Navigate to="/star-map" replace />;
@@ -867,6 +717,8 @@ export function TravelScreen() {
           <div className="travel-screen__hud-line">Score: <span ref={scoreRef}>0</span></div>
           <div className="travel-screen__hud-line">Shields: <span ref={shieldsRef}>100</span>%</div>
           <div className="travel-screen__hud-line">Jump Drive: <span ref={jumpRef}>READY</span></div>
+          <div className="travel-screen__hud-line">Legal: <span ref={legalRef}>clean 0</span></div>
+          <div className="travel-screen__hud-line">Threat: <span ref={threatRef}>F- / 0</span></div>
         </div>
 
         <div ref={messageRef} className="travel-screen__message" />
@@ -889,6 +741,8 @@ export function TravelScreen() {
           Space: Fire
           <br />
           J: Jump
+          <br />
+          Laser CNT: {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} / {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
         </div>
 
         <div className="travel-screen__actions">

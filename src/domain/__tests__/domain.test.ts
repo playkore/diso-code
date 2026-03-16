@@ -15,7 +15,7 @@ import {
   hasMissionFlag,
   TP_MISSION_FLAGS
 } from '../missions';
-import { createDefaultCommander } from '../commander';
+import { applyLegalFloor, createDefaultCommander, getCargoBadness, getLegalStatus, normalizeCommanderState } from '../commander';
 import { getJumpFuelCost, getJumpFuelUnits, getRefuelCost } from '../fuel';
 import {
   decodeCommanderBinary256,
@@ -24,6 +24,16 @@ import {
   serializeCommanderJson
 } from '../commanderPersistence';
 import { loadGameJson, serializeGameJson } from '../gamePersistence';
+import {
+  canEnemyLaserFireByCnt,
+  canEnemyLaserHitByCnt,
+  createDeterministicRandomSource,
+  createTravelCombatState,
+  getBlueprintAvailability,
+  getAvailablePackHunters,
+  selectBlueprintFile,
+  stepTravelCombat
+} from '../travelCombat';
 
 describe('universe generation', () => {
   it('keeps canonical base seed', () => {
@@ -94,6 +104,24 @@ describe('market generation', () => {
 });
 
 describe('missions and commander persistence', () => {
+  it('computes contraband badness and legal labels from numeric values', () => {
+    expect(getCargoBadness({ slaves: 2, narcotics: 3, firearms: 5 })).toBe(15);
+    expect(getLegalStatus(0)).toBe('clean');
+    expect(getLegalStatus(10)).toBe('offender');
+    expect(getLegalStatus(50)).toBe('fugitive');
+  });
+
+  it('applies contraband floor when normalizing commander state', () => {
+    const normalized = normalizeCommanderState({
+      ...createDefaultCommander(),
+      legalValue: 0,
+      cargo: { firearms: 8 }
+    });
+
+    expect(normalized.legalValue).toBe(8);
+    expect(applyLegalFloor(3, { slaves: 4 })).toBe(8);
+  });
+
   it('advances TP flags from external events', () => {
     const progressed = applyMissionExternalEvent(
       { tp: 0, variant: 'classic' },
@@ -190,5 +218,156 @@ describe('missions and commander persistence', () => {
     expect(getJumpFuelCost(4.04)).toBe(4);
     expect(getJumpFuelUnits(4.04)).toBe(40);
     expect(getRefuelCost(10)).toBe(20);
+  });
+});
+
+describe('travel combat rules', () => {
+  it('selects blueprint files from system danger and mission state', () => {
+    expect(selectBlueprintFile({ government: 0, techLevel: 7, missionTP: 0, witchspace: false, randomByte: 0 })).toBe('E');
+    expect(selectBlueprintFile({ government: 7, techLevel: 12, missionTP: 0, witchspace: false, randomByte: 6 })).toBe('L');
+    expect(selectBlueprintFile({ government: 4, techLevel: 8, missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed, witchspace: false, randomByte: 1 })).toBe('D');
+  });
+
+  it('keeps pack-hunter availability tied to the active blueprint file', () => {
+    expect(getBlueprintAvailability('E')).toContain('cobra-mk3-pirate');
+    expect(getAvailablePackHunters('A')).toEqual(['sidewinder', 'mamba']);
+  });
+
+  it('uses EV gating to delay dangerous spawns until the rare timer expires', () => {
+    const rng = createDeterministicRandomSource([0, 255, 255, 255, 255, 255]);
+    const state = createTravelCombatState(
+      { legalValue: 0, government: 0, techLevel: 7, missionTP: 0, missionVariant: 'classic' },
+      rng
+    );
+    state.encounter.ev = 1;
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
+    expect(state.enemies).toHaveLength(0);
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
+    expect(state.enemies.length).toBeGreaterThan(0);
+  });
+
+  it('spawns cops more readily when cargo badness is present', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0]);
+    const state = createTravelCombatState(
+      { legalValue: 0, government: 7, techLevel: 12, missionTP: 0, missionVariant: 'classic' },
+      rng
+    );
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', { narcotics: 10 }, rng);
+    expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(true);
+  });
+
+  it('turns bounty hunters hostile at FIST 40 and suppresses pirate aggression in safe zones', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0]);
+    const state = createTravelCombatState(
+      { legalValue: 40, government: 7, techLevel: 12, missionTP: 0, missionVariant: 'classic' },
+      rng
+    );
+
+    state.enemies.push({
+      id: 99,
+      kind: 'ship',
+      blueprintId: 'asp-mk2',
+      label: 'Asp Mk II',
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 100,
+      maxEnergy: 150,
+      laserPower: 5,
+      missiles: 1,
+      targetableArea: 280,
+      laserRange: 380,
+      topSpeed: 6,
+      acceleration: 0.12,
+      turnRate: 0.06,
+      roles: { bountyHunter: true },
+      aggression: 20,
+      baseAggression: 20,
+      fireCooldown: 0,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+    state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    state.enemies.push({
+      id: 100,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      x: 120,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 50,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { pirate: true, hostile: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 0,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'ARRIVED', {}, rng);
+    expect(state.enemies[0].roles.hostile).toBe(true);
+    expect(state.enemies[1].aggression).toBe(0);
+  });
+
+  it('uses documented CNT thresholds for enemy laser fire and hit gating', () => {
+    expect(canEnemyLaserFireByCnt(-32)).toBe(true);
+    expect(canEnemyLaserFireByCnt(-31)).toBe(false);
+    expect(canEnemyLaserHitByCnt(-35)).toBe(true);
+    expect(canEnemyLaserHitByCnt(-34)).toBe(false);
+  });
+
+  it('spawns thargons instead of missiles for thargoids', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
+    const state = createTravelCombatState(
+      { legalValue: 0, government: 0, techLevel: 7, missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed, missionVariant: 'classic' },
+      rng
+    );
+    state.enemies.push({
+      id: 5,
+      kind: 'ship',
+      blueprintId: 'thargoid',
+      label: 'Thargoid',
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 180,
+      maxEnergy: 180,
+      laserPower: 4,
+      missiles: 6,
+      targetableArea: 330,
+      laserRange: 380,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.055,
+      roles: { hostile: true },
+      aggression: 58,
+      baseAggression: 58,
+      fireCooldown: 999,
+      missileCooldown: 0,
+      isFiringLaser: false,
+      missionTag: 'thargoid-plans'
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+    expect(state.enemies.some((enemy) => enemy.kind === 'thargon')).toBe(true);
+    expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
   });
 });

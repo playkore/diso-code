@@ -1,4 +1,4 @@
-import type { CommanderState } from './commander';
+import { normalizeCommanderState, type CommanderState } from './commander';
 
 export const COMMANDER_SCHEMA_VERSION = 1;
 
@@ -18,11 +18,12 @@ function fnv1a32(input: string): number {
 }
 
 export function buildCommanderSave(commander: CommanderState): CommanderSaveFile {
-  const commanderJson = JSON.stringify(commander);
+  const normalized = normalizeCommanderState(commander);
+  const commanderJson = JSON.stringify(normalized);
   return {
     version: COMMANDER_SCHEMA_VERSION,
     checksum: fnv1a32(`${COMMANDER_SCHEMA_VERSION}:${commanderJson}`),
-    commander
+    commander: normalized
   };
 }
 
@@ -37,30 +38,32 @@ export function loadCommanderJson(jsonText: string): CommanderState {
     throw new Error(`Unsupported commander save version: ${parsed.version}`);
   }
 
-  const expectedChecksum = buildCommanderSave(parsed.commander).checksum;
+  const commander = normalizeCommanderState(parsed.commander);
+  const expectedChecksum = buildCommanderSave(commander).checksum;
   if (expectedChecksum !== parsed.checksum) {
     throw new Error('Commander save checksum mismatch');
   }
 
-  return parsed.commander;
+  return commander;
 }
 
 export function encodeCommanderBinary256(commander: CommanderState): Uint8Array {
+  const normalized = normalizeCommanderState(commander);
   const bytes = new Uint8Array(256);
   const view = new DataView(bytes.buffer);
 
   view.setUint32(0, COMMANDER_SCHEMA_VERSION, true);
-  view.setUint32(4, commander.cash, true);
-  view.setFloat32(8, commander.fuel, true);
-  view.setUint8(12, commander.missionTP & 0xff);
-  view.setUint16(13, commander.tally & 0xffff, true);
+  view.setUint32(4, normalized.cash, true);
+  view.setFloat32(8, normalized.fuel, true);
+  view.setUint8(12, normalized.missionTP & 0xff);
+  view.setUint16(13, normalized.tally & 0xffff, true);
 
-  const name = commander.name.slice(0, 20);
+  const name = normalized.name.slice(0, 20);
   for (let i = 0; i < name.length; i += 1) {
     view.setUint8(16 + i, name.charCodeAt(i) & 0xff);
   }
 
-  const payload = JSON.stringify(commander).slice(0, 220);
+  const payload = JSON.stringify(normalized).slice(0, 220);
   for (let i = 0; i < payload.length; i += 1) {
     view.setUint8(36 + i, payload.charCodeAt(i) & 0xff);
   }
@@ -93,5 +96,5 @@ export function decodeCommanderBinary256(bytes: Uint8Array): CommanderState {
     payloadChars.push(String.fromCharCode(code));
   }
 
-  return JSON.parse(payloadChars.join('')) as CommanderState;
+  return normalizeCommanderState(JSON.parse(payloadChars.join('')) as CommanderState);
 }
