@@ -29,6 +29,13 @@ export interface MissionsState {
   missionLog: MissionMessage[];
 }
 
+export interface TravelState {
+  originSystem: string;
+  destinationSystem: string;
+  fuelCost: number;
+  fuelUnits: number;
+}
+
 export interface UiState {
   activeTab: AppTab;
   compactMode: boolean;

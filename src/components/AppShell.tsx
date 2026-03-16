@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
@@ -90,12 +90,24 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
 ];
 
 export function AppShell() {
+  const location = useLocation();
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const missionLog = useGameStore((state) => state.missions.missionLog);
   const latestMessage = missionLog[0];
   const cargoUsed = cargoUsedTonnes(commander.cargo);
+  const isTravelRoute = location.pathname === '/travel';
+
+  if (isTravelRoute) {
+    return (
+      <div className="app-shell app-shell--travel">
+        <main>
+          <Outlet />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="app-shell">

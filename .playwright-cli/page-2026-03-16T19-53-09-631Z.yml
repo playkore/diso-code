@@ -1,0 +1,60 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "DISO Commander Console" [level=1] [ref=e5]
+    - generic "Commander status" [ref=e6]:
+      - generic [ref=e7]:
+        - term [ref=e8]: Credits
+        - definition [ref=e9]: 100.0 Cr
+      - generic [ref=e10]:
+        - term [ref=e11]: Cargo
+        - definition [ref=e12]: 0 / 20 t
+      - generic [ref=e13]:
+        - term [ref=e14]: System
+        - definition [ref=e15]: Lave
+  - main [ref=e16]:
+    - generic [ref=e17]:
+      - heading "Local Star Map" [level=2] [ref=e18]
+      - paragraph [ref=e19]: Select a nearby system, then confirm travel. Jumps consume fuel equal to distance travelled.
+      - img "Map of stars around Lave" [ref=e20]:
+        - img [ref=e21]:
+          - generic [ref=e26]: Lave
+          - generic [ref=e30] [cursor=pointer]: Quator
+          - generic [ref=e34] [cursor=pointer]: Reorte
+          - generic [ref=e38] [cursor=pointer]: Riedquat
+          - generic [ref=e42] [cursor=pointer]: Aesbion
+          - generic [ref=e46] [cursor=pointer]: Leesti
+          - generic [ref=e50] [cursor=pointer]: Ra
+          - generic [ref=e54] [cursor=pointer]: Tionisla
+          - generic [ref=e58] [cursor=pointer]: Zaonce
+          - generic [ref=e62] [cursor=pointer]: Diso
+          - generic [ref=e66] [cursor=pointer]: Uszaa
+          - generic [ref=e70] [cursor=pointer]: Relaes
+          - generic [ref=e74] [cursor=pointer]: Orrere
+          - generic [ref=e78] [cursor=pointer]: Oresqu
+          - generic [ref=e82] [cursor=pointer]: Qutiri
+          - generic [ref=e86] [cursor=pointer]: Orerve
+  - navigation "Primary" [ref=e87]:
+    - link "Market" [ref=e88] [cursor=pointer]:
+      - /url: /
+      - img [ref=e89]
+      - generic [ref=e92]: Market
+    - link "Inventory" [ref=e93] [cursor=pointer]:
+      - /url: /inventory
+      - img [ref=e94]
+      - generic [ref=e96]: Inventory
+    - link "System" [ref=e97] [cursor=pointer]:
+      - /url: /system-data
+      - img [ref=e98]
+      - generic [ref=e101]: System
+    - link "Star Map" [ref=e102] [cursor=pointer]:
+      - /url: /star-map
+      - img [ref=e103]
+      - generic [ref=e109]: Star Map
+    - link "Missions" [ref=e110] [cursor=pointer]:
+      - /url: /missions
+      - img [ref=e111]
+      - generic [ref=e113]: Missions
+    - link "Save/Load" [ref=e114] [cursor=pointer]:
+      - /url: /save-load
+      - img [ref=e115]
+      - generic [ref=e118]: Save/Load

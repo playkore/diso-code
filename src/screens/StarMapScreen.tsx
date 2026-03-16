@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getSystemByName, getSystemDistance, getVisibleSystems } from '../domain/galaxyCatalog';
 import { getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { useGameStore } from '../store/useGameStore';
@@ -32,9 +33,10 @@ function getRelativePoint(currentSystem: string, targetSystem: string, available
 }
 
 export function StarMapScreen() {
+  const navigate = useNavigate();
   const universe = useGameStore((state) => state.universe);
   const currentFuel = useGameStore((state) => state.commander.fuel);
-  const dockAtSystem = useGameStore((state) => state.dockAtSystem);
+  const beginTravel = useGameStore((state) => state.beginTravel);
   const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,7 +93,11 @@ export function StarMapScreen() {
           <button
             type="button"
             disabled={!selectedPoint.inRange}
-            onClick={() => dockAtSystem(selectedSystem)}
+            onClick={() => {
+              if (beginTravel(selectedSystem)) {
+                navigate('/travel');
+              }
+            }}
           >
             Travel to {selectedSystem}
           </button>
