@@ -306,6 +306,24 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.missilesInstalled).toBe(1);
   });
 
+  it('adds debug credits from settings helpers', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Lave',
+        cash: 100
+      }),
+      universe: {
+        ...state.universe,
+        currentSystem: 'Lave'
+      }
+    }));
+
+    useGameStore.getState().grantDebugCredits(100000);
+    expect(useGameStore.getState().commander.cash).toBe(100100);
+  });
+
   it('rejects low-tech and duplicate outfitting purchases', () => {
     useGameStore.setState((state) => ({
       ...state,

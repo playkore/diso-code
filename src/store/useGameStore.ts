@@ -53,6 +53,7 @@ interface GameStore {
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
+  grantDebugCredits: (amount: number) => void;
   beginTravel: (systemName: string) => boolean;
   cancelTravel: () => void;
   completeTravel: (report?: TravelCompletionReport) => void;
@@ -329,6 +330,24 @@ export const useGameStore = create<GameStore>((set, get) => {
               enabled ? 'Instant travel enabled' : 'Space travel enabled',
               enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
             )
+          )
+        };
+      }),
+    grantDebugCredits: (amount) =>
+      set((state) => {
+        const credits = Math.max(0, Math.trunc(amount));
+        if (credits < 1) {
+          return state;
+        }
+
+        return {
+          commander: {
+            ...state.commander,
+            cash: state.commander.cash + credits
+          },
+          ui: withUiMessage(
+            state.ui,
+            createUiMessage('success', 'Debug credits added', `${formatCredits(credits)} credited for debugging.`)
           )
         };
       }),

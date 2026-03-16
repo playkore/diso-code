@@ -12,6 +12,7 @@ export function SaveLoadScreen() {
   const startNewGame = useGameStore((state) => state.startNewGame);
   const instantTravelEnabled = useGameStore((state) => state.ui.instantTravelEnabled);
   const setInstantTravelEnabled = useGameStore((state) => state.setInstantTravelEnabled);
+  const grantDebugCredits = useGameStore((state) => state.grantDebugCredits);
   const saveStates = useGameStore((state) => state.saveStates);
   const commander = useGameStore((state) => state.commander);
   const universe = useGameStore((state) => state.universe);
@@ -156,6 +157,12 @@ export function SaveLoadScreen() {
           <span>Bypass space travel arcade segment</span>
         </label>
         <p className="muted">When enabled, travelling from the star map docks instantly at the destination.</p>
+        <div className="save-panel__actions">
+          <button type="button" onClick={() => grantDebugCredits(100000)}>
+            Add 10000 Cr
+          </button>
+        </div>
+        <p className="muted">Debug helper for quickly funding outfitting and trading tests.</p>
       </section>
     </section>
   );
