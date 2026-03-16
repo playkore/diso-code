@@ -6,6 +6,7 @@ import { MissionsScreen } from './screens/MissionsScreen';
 import { SaveLoadScreen } from './screens/SaveLoadScreen';
 import { SystemDataScreen } from './screens/SystemDataScreen';
 import { StarMapScreen } from './screens/StarMapScreen';
+import { TravelScreen } from './screens/TravelScreen';
 
 const router = createBrowserRouter([
   {
@@ -17,6 +18,7 @@ const router = createBrowserRouter([
       { path: 'galaxy', element: <Navigate to="/star-map" replace /> },
       { path: 'system-data', element: <SystemDataScreen /> },
       { path: 'star-map', element: <StarMapScreen /> },
+      { path: 'travel', element: <TravelScreen /> },
       { path: 'missions', element: <MissionsScreen /> },
       { path: 'save-load', element: <SaveLoadScreen /> },
       { path: '*', element: <Navigate to="/" replace /> }
