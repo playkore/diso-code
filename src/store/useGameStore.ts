@@ -34,9 +34,16 @@ interface SaveState {
 type SaveSlotId = 1 | 2 | 3;
 
 interface TravelCompletionReport {
+  outcome?: 'arrived' | 'rescued';
+  dockSystemName?: string;
+  spendJumpFuel?: boolean;
   legalValue?: number;
   tallyDelta?: number;
   missionEvents?: MissionExternalEvent[];
+  cargo?: Record<string, number>;
+  fuelDelta?: number;
+  installedEquipment?: CommanderState['installedEquipment'];
+  missilesInstalled?: number;
 }
 
 const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
@@ -144,18 +151,23 @@ function getCurrentTechLevel(systemName: string): number {
   return getSystemByName(systemName)?.data.techLevel ?? 0;
 }
 
-function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
+function createDockedState(
+  state: Pick<GameStore, 'universe' | 'commander' | 'ui'>,
+  systemName: string,
+  options: { spendJumpFuel: boolean; title: string; body: string; stardateDelta?: number }
+) {
   const distance = getSystemDistance(state.universe.currentSystem, systemName);
-  const jumpFuelCost = getJumpFuelCost(distance);
   const jumpFuelUnits = getJumpFuelUnits(distance);
   const availableFuelUnits = getFuelUnits(state.commander.fuel);
 
-  if (!Number.isFinite(distance) || jumpFuelUnits <= 0 || jumpFuelUnits > availableFuelUnits) {
+  if (options.spendJumpFuel && (!Number.isFinite(distance) || jumpFuelUnits <= 0 || jumpFuelUnits > availableFuelUnits)) {
     return null;
   }
 
   const nextCommander = normalizeCommanderState({ ...state.commander, currentSystem: systemName });
-  nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
+  if (options.spendJumpFuel) {
+    nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
+  }
   nextCommander.legalValue = applyLegalFloor(nextCommander.legalValue, nextCommander.cargo);
   const progress = applyDockingMissionState({ tp: nextCommander.missionTP, variant: nextCommander.missionVariant });
   nextCommander.missionTP = progress.tp;
@@ -163,12 +175,6 @@ function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'u
   const nextEconomy = nextSystem?.data.economy ?? state.universe.economy;
   const fluctuation = (state.universe.stardate + systemName.length) & 0xff;
   const nextMarket = createMarketState(systemName, nextEconomy, fluctuation);
-  const cheapest = getCheapestCommodity(nextMarket.session);
-  const arrivalMessage = createUiMessage(
-    'info',
-    `Docked at ${systemName}`,
-    `Jumped ${formatLightYears(jumpFuelCost)}. Fuel now ${formatLightYears(nextCommander.fuel)}. Cheapest local price: ${cheapest.name} at ${formatCredits(cheapest.price)}.`
-  );
 
   return {
     universe: {
@@ -177,15 +183,39 @@ function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'u
       nearbySystems: getNearbySystemNames(systemName),
       economy: nextEconomy,
       marketFluctuation: fluctuation,
-      stardate: state.universe.stardate + 1
+      stardate: state.universe.stardate + (options.stardateDelta ?? 1)
     },
     commander: nextCommander,
     market: nextMarket,
     missions: {
       missionLog: getMissionMessagesForDocking(progress)
     },
-    ui: withUiMessage(state.ui, arrivalMessage)
+    ui: withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
   };
+}
+
+function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
+  const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName));
+  const nextState = createDockedState(state, systemName, {
+    spendJumpFuel: true,
+    title: `Docked at ${systemName}`,
+    body: '',
+    stardateDelta: 1
+  });
+  if (!nextState) {
+    return null;
+  }
+
+  const cheapest = getCheapestCommodity(nextState.market.session);
+  nextState.ui = withUiMessage(
+    state.ui,
+    createUiMessage(
+      'info',
+      `Docked at ${systemName}`,
+      `Jumped ${formatLightYears(jumpFuelCost)}. Fuel now ${formatLightYears(nextState.commander.fuel)}. Cheapest local price: ${cheapest.name} at ${formatCredits(cheapest.price)}.`
+    )
+  );
+  return nextState;
 }
 
 function restoreSnapshot(snapshot: GameSnapshot) {
@@ -412,10 +442,21 @@ export const useGameStore = create<GameStore>((set, get) => {
           return state;
         }
 
+        const mergedCargo = report?.outcome === 'rescued' ? {} : { ...state.commander.cargo };
+        for (const [commodityKey, amount] of Object.entries(report?.cargo ?? {})) {
+          mergedCargo[commodityKey] = (mergedCargo[commodityKey] ?? 0) + Math.max(0, Math.trunc(amount));
+        }
+        const insurancePenalty = report?.outcome === 'rescued' ? Math.min(state.commander.cash, Math.max(250, Math.trunc(state.commander.cash * 0.1))) : 0;
+
         let commander = normalizeCommanderState({
           ...state.commander,
+          cash: state.commander.cash - insurancePenalty,
           legalValue: report?.legalValue ?? state.commander.legalValue,
-          tally: state.commander.tally + (report?.tallyDelta ?? 0)
+          tally: state.commander.tally + (report?.tallyDelta ?? 0),
+          cargo: mergedCargo,
+          fuel: clampFuel(state.commander.fuel + (report?.fuelDelta ?? 0)),
+          installedEquipment: report?.installedEquipment ?? state.commander.installedEquipment,
+          missilesInstalled: report?.missilesInstalled ?? state.commander.missilesInstalled
         });
 
         if (report?.missionEvents?.length) {
@@ -429,13 +470,29 @@ export const useGameStore = create<GameStore>((set, get) => {
           });
         }
 
-        const nextState = createArrivalState(
-          {
-            ...state,
-            commander
-          },
-          state.travelSession.destinationSystem
-        );
+        const dockSystemName = report?.dockSystemName ?? state.travelSession.destinationSystem;
+        const nextState =
+          report?.outcome === 'rescued'
+            ? createDockedState(
+                {
+                  ...state,
+                  commander
+                },
+                dockSystemName,
+                {
+                  spendJumpFuel: report.spendJumpFuel === true,
+                  title: `Recovered at ${dockSystemName}`,
+                  body: `Escape pod recovery complete. Insurance docked you at ${dockSystemName} with cargo losses applied.`,
+                  stardateDelta: 1
+                }
+              )
+            : createArrivalState(
+                {
+                  ...state,
+                  commander
+                },
+                dockSystemName
+              );
         if (!nextState) {
           return {
             ...state,

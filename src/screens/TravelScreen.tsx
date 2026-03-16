@@ -6,9 +6,11 @@ import {
   assessDockingApproach,
   canEnemyLaserFireByCnt,
   canEnemyLaserHitByCnt,
+  consumeEscapePod,
   createMathRandomSource,
   createTravelCombatState,
   enterArrivalSpace,
+  getPlayerCombatSnapshot,
   setCombatSystemContext,
   stepTravelCombat,
   type CombatProjectile,
@@ -111,9 +113,13 @@ export function TravelScreen() {
   const jumpRef = useRef<HTMLSpanElement | null>(null);
   const legalRef = useRef<HTMLSpanElement | null>(null);
   const threatRef = useRef<HTMLSpanElement | null>(null);
+  const arcRef = useRef<HTMLSpanElement | null>(null);
   const knobRef = useRef<HTMLDivElement | null>(null);
   const jumpButtonRef = useRef<HTMLButtonElement | null>(null);
   const fireButtonRef = useRef<HTMLButtonElement | null>(null);
+  const ecmButtonRef = useRef<HTMLButtonElement | null>(null);
+  const bombButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dockButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -134,11 +140,15 @@ export function TravelScreen() {
     const jumpNode = jumpRef.current;
     const legalNode = legalRef.current;
     const threatNode = threatRef.current;
+    const arcNode = arcRef.current;
     const knobNode = knobRef.current;
     const jumpButton = jumpButtonRef.current;
     const fireButton = fireButtonRef.current;
+    const ecmButton = ecmButtonRef.current;
+    const bombButton = bombButtonRef.current;
+    const dockButton = dockButtonRef.current;
 
-    if (!canvas || !viewport || !messageNode || !scoreNode || !shieldsNode || !jumpNode || !legalNode || !threatNode || !knobNode || !jumpButton || !fireButton) {
+    if (!canvas || !viewport || !messageNode || !scoreNode || !shieldsNode || !jumpNode || !legalNode || !threatNode || !arcNode || !knobNode || !jumpButton || !fireButton || !ecmButton || !bombButton || !dockButton) {
       return undefined;
     }
 
@@ -154,7 +164,10 @@ export function TravelScreen() {
         government: originSystem.government,
         techLevel: originSystem.techLevel,
         missionTP: commander.missionTP,
-        missionVariant: commander.missionVariant
+        missionVariant: commander.missionVariant,
+        laserMounts: commander.laserMounts,
+        installedEquipment: commander.installedEquipment,
+        missilesInstalled: commander.missilesInstalled
       },
       random
     );
@@ -167,8 +180,8 @@ export function TravelScreen() {
     };
     resize();
 
-    const input = { turn: 0, thrust: 0, fire: false, jump: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
-    const keys: Record<string, boolean> = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ' ': false, j: false, J: false };
+    const input = { turn: 0, thrust: 0, fire: false, jump: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
+    const keys: Record<string, boolean> = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ' ': false, j: false, J: false, e: false, E: false, b: false, B: false, d: false, D: false };
     let flightState: FlightPhase = 'READY';
     let jumpTimer = 0;
     let animationFrameId = 0;
@@ -217,6 +230,8 @@ export function TravelScreen() {
       const hostileCount = combatState.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
       threatNode.textContent = `F${combatState.encounter.activeBlueprintFile} / ${hostileCount}`;
       threatNode.style.color = hostileCount > 0 ? CGA_RED : CGA_GREEN;
+      arcNode.textContent = `${combatState.lastPlayerArc.toUpperCase()} ${combatState.encounter.ecmTimer > 0 ? ' ECM' : ''}${combatState.playerLoadout.installedEquipment.energy_bomb ? ' BOMB' : ''}`;
+      arcNode.style.color = combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED;
     };
 
     const startJump = () => {
@@ -239,7 +254,10 @@ export function TravelScreen() {
           government: originSystem.government,
           techLevel: originSystem.techLevel,
           missionTP: commander.missionTP,
-          missionVariant: commander.missionVariant
+          missionVariant: commander.missionVariant,
+          laserMounts: commander.laserMounts,
+          installedEquipment: commander.installedEquipment,
+          missilesInstalled: commander.missilesInstalled
         },
         random
       );
@@ -351,8 +369,21 @@ export function TravelScreen() {
       };
     };
 
+    const bindTapButton = (button: HTMLButtonElement, key: 'activateEcm' | 'triggerEnergyBomb' | 'autoDock') => {
+      const onPointerDown = () => {
+        input[key] = true;
+      };
+      button.addEventListener('pointerdown', onPointerDown);
+      return () => {
+        button.removeEventListener('pointerdown', onPointerDown);
+      };
+    };
+
     const unbindJumpButton = bindPressButton(jumpButton, 'jump');
     const unbindFireButton = bindPressButton(fireButton, 'fire');
+    const unbindEcmButton = bindTapButton(ecmButton, 'activateEcm');
+    const unbindBombButton = bindTapButton(bombButton, 'triggerEnergyBomb');
+    const unbindDockButton = bindTapButton(dockButton, 'autoDock');
 
     const drawWireframe = (
       points: readonly (readonly [number, number])[],
@@ -601,6 +632,9 @@ export function TravelScreen() {
 
       input.fire = keys[' '] || input.fire;
       input.jump = keys.j || keys.J || input.jump;
+      input.activateEcm = keys.e || keys.E || input.activateEcm;
+      input.triggerEnergyBomb = keys.b || keys.B || input.triggerEnergyBomb;
+      input.autoDock = keys.d || keys.D || input.autoDock;
 
       if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || input.thrust > 0 || Math.abs(input.turn) > 0.1)) {
         flightState = 'PLAYING';
@@ -615,13 +649,31 @@ export function TravelScreen() {
         {
           thrust: flightState === 'JUMPING' ? 0 : input.thrust,
           turn: flightState === 'JUMPING' ? 0 : input.turn,
-          fire: flightState === 'JUMPING' ? false : input.fire
+          fire: flightState === 'JUMPING' ? false : input.fire,
+          activateEcm: flightState === 'JUMPING' ? false : input.activateEcm,
+          triggerEnergyBomb: flightState === 'JUMPING' ? false : input.triggerEnergyBomb,
+          autoDock: flightState === 'JUMPING' ? false : input.autoDock
         },
         dt,
         flightState,
         commander.cargo,
         random
       );
+
+      if (result.autoDocked && flightState === 'ARRIVED') {
+        const snapshot = getPlayerCombatSnapshot(combatState);
+        completeTravel({
+          legalValue: combatState.legalValue,
+          tallyDelta: combatState.player.tallyKills,
+          missionEvents: combatState.missionEvents,
+          cargo: snapshot.cargo,
+          fuelDelta: snapshot.fuel,
+          installedEquipment: snapshot.installedEquipment,
+          missilesInstalled: snapshot.missilesInstalled
+        });
+        navigate('/', { replace: true });
+        return;
+      }
 
       if ((flightState === 'READY' || flightState === 'PLAYING') && input.jump) {
         startJump();
@@ -653,13 +705,18 @@ export function TravelScreen() {
           } else if (docking.isInDockingGap && docking.distance < combatState.station.radius - 18) {
             if (docking.canDock) {
               const missionEvents = [...combatState.missionEvents];
+              const snapshot = getPlayerCombatSnapshot(combatState);
               if (hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
                 missionEvents.push({ type: 'combat:thargoid-plans-delivered' });
               }
               completeTravel({
                 legalValue: combatState.legalValue,
                 tallyDelta: combatState.player.tallyKills,
-                missionEvents
+                missionEvents,
+                cargo: snapshot.cargo,
+                fuelDelta: snapshot.fuel,
+                installedEquipment: snapshot.installedEquipment,
+                missilesInstalled: snapshot.missilesInstalled
               });
               navigate('/', { replace: true });
               return;
@@ -675,6 +732,25 @@ export function TravelScreen() {
       if (result.playerDestroyed) {
         flightState = 'GAMEOVER';
         showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
+      }
+
+      if (result.playerEscaped) {
+        consumeEscapePod(combatState);
+        const snapshot = getPlayerCombatSnapshot(combatState);
+        completeTravel({
+          outcome: 'rescued',
+          dockSystemName: flightState === 'ARRIVED' ? session.destinationSystem : session.originSystem,
+          spendJumpFuel: flightState === 'ARRIVED',
+          legalValue: combatState.legalValue,
+          tallyDelta: combatState.player.tallyKills,
+          missionEvents: combatState.missionEvents,
+          cargo: snapshot.cargo,
+          fuelDelta: snapshot.fuel,
+          installedEquipment: snapshot.installedEquipment,
+          missilesInstalled: snapshot.missilesInstalled
+        });
+        navigate('/', { replace: true });
+        return;
       }
 
       if (flightState === 'ARRIVED' && Math.hypot(combatState.player.vx, combatState.player.vy) < 0.05) {
@@ -703,6 +779,15 @@ export function TravelScreen() {
       if (!keys.j && !keys.J) {
         input.jump = false;
       }
+      if (!keys.e && !keys.E) {
+        input.activateEcm = false;
+      }
+      if (!keys.b && !keys.B) {
+        input.triggerEnergyBomb = false;
+      }
+      if (!keys.d && !keys.D) {
+        input.autoDock = false;
+      }
 
       updateHud();
       draw();
@@ -723,6 +808,9 @@ export function TravelScreen() {
       joystickArea?.removeEventListener('pointercancel', onJoyPointerUp);
       unbindJumpButton();
       unbindFireButton();
+      unbindEcmButton();
+      unbindBombButton();
+      unbindDockButton();
     };
   }, [cancelTravel, commander, completeTravel, navigate, session]);
 
@@ -745,6 +833,7 @@ export function TravelScreen() {
           <div className="travel-screen__hud-line">Jump Drive: <span ref={jumpRef}>READY</span></div>
           <div className="travel-screen__hud-line">Legal: <span ref={legalRef}>clean 0</span></div>
           <div className="travel-screen__hud-line">Threat: <span ref={threatRef}>F- / 0</span></div>
+          <div className="travel-screen__hud-line">Arc: <span ref={arcRef}>FRONT</span></div>
         </div>
 
         <div ref={messageRef} className="travel-screen__message" />
@@ -758,6 +847,15 @@ export function TravelScreen() {
           </button>
           <button ref={fireButtonRef} type="button" className="travel-screen__button travel-screen__button--fire">
             FIRE
+          </button>
+          <button ref={ecmButtonRef} type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--ecm">
+            ECM
+          </button>
+          <button ref={bombButtonRef} type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--bomb">
+            BOMB
+          </button>
+          <button ref={dockButtonRef} type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--dock">
+            DOCK
           </button>
         </div>
 

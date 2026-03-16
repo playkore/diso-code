@@ -615,6 +615,25 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.travel-screen__button--aux {
+  right: 8rem;
+  width: 3.8rem;
+  height: 3.8rem;
+  font-size: 0.72rem;
+}
+
+.travel-screen__button--ecm {
+  bottom: 1.8rem;
+}
+
+.travel-screen__button--bomb {
+  bottom: 6rem;
+}
+
+.travel-screen__button--dock {
+  bottom: 10.2rem;
+}
+
 .travel-screen__joystick {
   position: absolute;
   left: 1.8rem;

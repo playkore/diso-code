@@ -9,7 +9,7 @@ import {
   getSessionMarketItems,
   applyLocalMarketTrade
 } from '../market';
-import { getAvailableEquipmentForSystem, getLaserOffersForSystem, isMissileAvailableAtTechLevel } from '../outfitting';
+import { getLaserOffersForSystem, isMissileAvailableAtTechLevel } from '../outfitting';
 import {
   applyMissionExternalEvent,
   getMissionMessagesForDocking,
@@ -32,14 +32,37 @@ import {
   assessDockingApproach,
   canEnemyLaserFireByCnt,
   canEnemyLaserHitByCnt,
+  consumeEscapePod,
   createDeterministicRandomSource,
   createTravelCombatState,
+  getPlayerCombatSnapshot,
   getBlueprintAvailability,
   getAvailablePackHunters,
   getStationSlotAngle,
   selectBlueprintFile,
   stepTravelCombat
 } from '../travelCombat';
+
+function createCombatState(
+  bytes: number[],
+  overrides: Partial<Parameters<typeof createTravelCombatState>[0]> = {}
+) {
+  const commander = createDefaultCommander();
+  return createTravelCombatState(
+    {
+      legalValue: 0,
+      government: 0,
+      techLevel: 7,
+      missionTP: 0,
+      missionVariant: 'classic',
+      laserMounts: commander.laserMounts,
+      installedEquipment: commander.installedEquipment,
+      missilesInstalled: commander.missilesInstalled,
+      ...overrides
+    },
+    createDeterministicRandomSource(bytes)
+  );
+}
 
 describe('universe generation', () => {
   it('keeps canonical base seed', () => {
@@ -364,14 +387,11 @@ describe('travel combat rules', () => {
 
   it('uses EV gating to delay dangerous spawns until the rare timer expires', () => {
     const rng = createDeterministicRandomSource([0, 255, 255, 255, 255, 255]);
-    const state = createTravelCombatState(
-      { legalValue: 0, government: 0, techLevel: 7, missionTP: 0, missionVariant: 'classic' },
-      rng
-    );
+    const state = createCombatState([0, 255, 255, 255, 255, 255]);
     state.encounter.ev = 1;
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
-    expect(state.enemies).toHaveLength(0);
+    expect(state.enemies.some((enemy) => enemy.roles.hostile || enemy.roles.pirate || enemy.missionTag)).toBe(false);
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
     expect(state.enemies.length).toBeGreaterThan(0);
@@ -379,10 +399,7 @@ describe('travel combat rules', () => {
 
   it('spawns cops more readily when cargo badness is present', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0]);
-    const state = createTravelCombatState(
-      { legalValue: 0, government: 7, techLevel: 12, missionTP: 0, missionVariant: 'classic' },
-      rng
-    );
+    const state = createCombatState([0, 0, 0, 0, 0, 0], { government: 7, techLevel: 12 });
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', { narcotics: 10 }, rng);
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(true);
@@ -390,10 +407,7 @@ describe('travel combat rules', () => {
 
   it('turns bounty hunters hostile at FIST 40 and suppresses pirate aggression in safe zones', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
-    const state = createTravelCombatState(
-      { legalValue: 40, government: 7, techLevel: 12, missionTP: 0, missionVariant: 'classic' },
-      rng
-    );
+    const state = createCombatState([0, 0, 0, 0], { legalValue: 40, government: 7, techLevel: 12 });
 
     state.enemies.push({
       id: 99,
@@ -463,10 +477,7 @@ describe('travel combat rules', () => {
 
   it('spawns thargons instead of missiles for thargoids', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
-    const state = createTravelCombatState(
-      { legalValue: 0, government: 0, techLevel: 7, missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed, missionVariant: 'classic' },
-      rng
-    );
+    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed });
     state.enemies.push({
       id: 5,
       kind: 'ship',
@@ -498,6 +509,193 @@ describe('travel combat rules', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.kind === 'thargon')).toBe(true);
     expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
+  });
+
+  it('fires the installed laser in the active arc and respects empty arcs', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.laserMounts.left = 'beam_laser';
+    const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
+    state.enemies.push({
+      id: 1,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      x: -120,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI / 2,
+      energy: 70,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, rng);
+    expect(state.lastPlayerArc).toBe('left');
+    expect(state.projectiles[0]?.damage).toBe(16);
+
+    state.projectiles = [];
+    state.player.fireCooldown = 0;
+    state.enemies[0].x = 120;
+    state.enemies[0].y = 0;
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, rng);
+    expect(state.lastPlayerArc).toBe('right');
+    expect(state.projectiles).toHaveLength(0);
+  });
+
+  it('uses ECM to clear missiles and suppresses further launches while active', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.ecm = true;
+    const state = createCombatState([0, 0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
+    state.projectiles.push({ id: 5, kind: 'missile', owner: 'enemy', x: 20, y: 0, vx: 0, vy: 0, damage: 22, life: 20 });
+    state.enemies.push({
+      id: 9,
+      kind: 'ship',
+      blueprintId: 'mamba',
+      label: 'Mamba',
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 90,
+      maxEnergy: 90,
+      laserPower: 2,
+      missiles: 2,
+      targetableArea: 220,
+      laserRange: 320,
+      topSpeed: 6,
+      acceleration: 0.12,
+      turnRate: 0.055,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 0,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, activateEcm: true }, 1, 'PLAYING', {}, rng);
+    expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
+    expect(state.encounter.ecmTimer).toBeGreaterThan(0);
+  });
+
+  it('boosts shield recharge with the extra energy unit', () => {
+    const commander = createDefaultCommander();
+    commander.installedEquipment.extra_energy_unit = true;
+    const boosted = createCombatState([0], { installedEquipment: commander.installedEquipment });
+    const baseline = createCombatState([0]);
+    boosted.player.shields = 50;
+    baseline.player.shields = 50;
+
+    stepTravelCombat(boosted, { thrust: 0, turn: 0, fire: false }, 10, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    stepTravelCombat(baseline, { thrust: 0, turn: 0, fire: false }, 10, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(boosted.player.shields).toBeGreaterThan(baseline.player.shields);
+    expect(boosted.player.maxShields).toBe(100);
+  });
+
+  it('consumes energy bombs and preserves mission enemies', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.energy_bomb = true;
+    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
+    state.enemies.push({
+      id: 3,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 70,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+    state.enemies.push({
+      id: 4,
+      kind: 'ship',
+      blueprintId: 'constrictor',
+      label: 'Constrictor',
+      x: 110,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 220,
+      maxEnergy: 220,
+      laserPower: 5,
+      missiles: 4,
+      targetableArea: 300,
+      laserRange: 420,
+      topSpeed: 7,
+      acceleration: 0.15,
+      turnRate: 0.065,
+      roles: { hostile: true, pirate: true },
+      aggression: 56,
+      baseAggression: 56,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false,
+      missionTag: 'constrictor'
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, rng);
+    expect(state.playerLoadout.installedEquipment.energy_bomb).toBe(false);
+    expect(state.enemies.some((enemy) => enemy.blueprintId === 'sidewinder')).toBe(false);
+    expect(state.enemies.some((enemy) => enemy.missionTag === 'constrictor')).toBe(true);
+  });
+
+  it('spawns pirate pressure from valuable legal cargo without cops', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { government: 0, techLevel: 12 });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', { luxuries: 12, computers: 8 }, rng);
+    expect(state.enemies.some((enemy) => enemy.roles.pirate || enemy.roles.hostile)).toBe(true);
+    expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(false);
+  });
+
+  it('uses the escape pod recovery flow and preserves consumable state', () => {
+    const commander = createDefaultCommander();
+    commander.installedEquipment.escape_pod = true;
+    commander.installedEquipment.energy_bomb = true;
+    const state = createCombatState([0], { installedEquipment: commander.installedEquipment });
+    state.player.shields = 2;
+
+    const result = stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    state.player.shields = 0;
+    const escaped = stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(result.state.playerLoadout.installedEquipment.energy_bomb).toBe(false);
+    expect(escaped.playerEscaped).toBe(true);
+    consumeEscapePod(state);
+    expect(getPlayerCombatSnapshot(state).installedEquipment.escape_pod).toBe(false);
   });
 
   it('treats the visible station split as open for docking', () => {

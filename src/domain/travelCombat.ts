@@ -1,6 +1,8 @@
-import { getLegalStatus, type LegalStatus } from './commander';
+import { getLegalStatus, type InstalledEquipmentState, type LaserMountState, type LegalStatus } from './commander';
 import { getCargoBadness } from './legal';
+import { COMMODITIES, cargoSpaceRequired } from './market';
 import { hasMissionFlag, type MissionExternalEvent, type MissionVariant } from './missions';
+import { type LaserId, type LaserMountPosition } from './shipCatalog';
 
 export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'GAMEOVER';
 export type BlueprintId =
@@ -113,9 +115,11 @@ export interface CombatPlayer {
   angle: number;
   radius: number;
   shields: number;
+  maxShields: number;
   maxSpeed: number;
   fireCooldown: number;
   tallyKills: number;
+  rechargeRate: number;
 }
 
 export interface CombatStation {
@@ -147,6 +151,7 @@ export interface CombatMessage {
 
 export interface TravelCombatState {
   player: CombatPlayer;
+  playerLoadout: CombatPlayerLoadout;
   enemies: CombatEnemy[];
   projectiles: CombatProjectile[];
   particles: CombatParticle[];
@@ -165,6 +170,9 @@ export interface TravelCombatState {
   constrictorSpawned: boolean;
   messages: CombatMessage[];
   missionEvents: MissionExternalEvent[];
+  salvageCargo: Record<string, number>;
+  salvageFuel: number;
+  lastPlayerArc: LaserMountPosition;
 }
 
 export interface TravelCombatInit {
@@ -173,17 +181,31 @@ export interface TravelCombatInit {
   techLevel: number;
   missionTP: number;
   missionVariant: MissionVariant;
+  laserMounts: LaserMountState;
+  installedEquipment: InstalledEquipmentState;
+  missilesInstalled: number;
 }
 
 export interface CombatInput {
   thrust: number;
   turn: number;
   fire: boolean;
+  activateEcm?: boolean;
+  triggerEnergyBomb?: boolean;
+  autoDock?: boolean;
 }
 
 export interface CombatTickResult {
   state: TravelCombatState;
   playerDestroyed: boolean;
+  playerEscaped: boolean;
+  autoDocked: boolean;
+}
+
+export interface CombatPlayerLoadout {
+  laserMounts: LaserMountState;
+  installedEquipment: InstalledEquipmentState;
+  missilesInstalled: number;
 }
 
 export interface DockingAssessment {
@@ -243,6 +265,14 @@ const LONE_BOUNTY_SEQUENCE: BlueprintId[] = ['cobra-mk3-pirate', 'asp-mk2', 'pyt
 
 function clampAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function clampByte(value: number): number {
+  return Math.max(0, Math.min(255, Math.trunc(value)));
+}
+
+function clampShields(value: number, maxShields: number): number {
+  return Math.max(0, Math.min(maxShields, value));
 }
 
 export function getStationSlotAngle(stationAngle: number): number {
@@ -351,9 +381,16 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       angle: -Math.PI / 2,
       radius: 12,
       shields: 100,
+      maxShields: 100,
       maxSpeed: 8,
       fireCooldown: 0,
-      tallyKills: 0
+      tallyKills: 0,
+      rechargeRate: init.installedEquipment.extra_energy_unit ? 0.2 : 0.09
+    },
+    playerLoadout: {
+      laserMounts: { ...init.laserMounts },
+      installedEquipment: { ...init.installedEquipment },
+      missilesInstalled: init.missilesInstalled
     },
     enemies: [],
     projectiles: [],
@@ -382,7 +419,10 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
     thargoidContactTriggered: false,
     constrictorSpawned: false,
     messages: [],
-    missionEvents: []
+    missionEvents: [],
+    salvageCargo: {},
+    salvageFuel: 0,
+    lastPlayerArc: 'front'
   };
 }
 
@@ -559,6 +599,16 @@ function tryRareEncounter(state: TravelCombatState, random: RandomSource, cargo:
     }
   }
 
+  const pirateInterest = getCargoPirateInterest(cargo);
+  if (pirateInterest > 0 && state.enemies.filter((enemy) => enemy.roles.pirate || enemy.roles.hostile).length < 2 && random.nextByte() < pirateInterest) {
+    if (random.nextByte() >= 96) {
+      spawnPackPirates(state, random);
+    } else {
+      spawnLoneBounty(state, random);
+    }
+    return;
+  }
+
   if (random.nextByte() >= 100) {
     spawnPackPirates(state, random);
   } else {
@@ -644,18 +694,184 @@ function spawnEnemyMissile(state: TravelCombatState, enemy: CombatEnemy) {
   pushMessage(state, `INCOMING MISSILE: ${enemy.label.toUpperCase()}`, 1000);
 }
 
-function spawnPlayerLaser(state: TravelCombatState) {
+function getLaserProjectileProfile(laserId: LaserId) {
+  switch (laserId) {
+    case 'pulse_laser':
+      return { damage: 10, cooldown: 10, speed: 18, life: 28 };
+    case 'beam_laser':
+      return { damage: 16, cooldown: 13, speed: 20, life: 32 };
+    case 'military_laser':
+      return { damage: 26, cooldown: 13, speed: 22, life: 34 };
+    case 'mining_laser':
+      return { damage: 22, cooldown: 20, speed: 16, life: 20 };
+  }
+}
+
+function getCargoPirateInterest(cargo: Record<string, number>): number {
+  let weightedValue = 0;
+  for (const commodity of COMMODITIES) {
+    const amount = Math.max(0, Number(cargo[commodity.key] ?? 0));
+    if (amount <= 0) {
+      continue;
+    }
+    const tonnes = cargoSpaceRequired(commodity.unit, amount);
+    const scalar = commodity.unit === 't' ? 1 : commodity.unit === 'kg' ? 0.08 : 0.01;
+    weightedValue += commodity.basePrice * Math.max(tonnes, amount * scalar);
+  }
+  return clampByte(weightedValue / 28);
+}
+
+function getClosestEnemy(state: TravelCombatState): CombatEnemy | null {
+  let closest: CombatEnemy | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+  for (const enemy of state.enemies) {
+    const distance = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closest = enemy;
+    }
+  }
+  return closest;
+}
+
+function getMountAngle(playerAngle: number, mount: LaserMountPosition): number {
+  switch (mount) {
+    case 'rear':
+      return playerAngle + Math.PI;
+    case 'left':
+      return playerAngle - Math.PI / 2;
+    case 'right':
+      return playerAngle + Math.PI / 2;
+    default:
+      return playerAngle;
+  }
+}
+
+function determinePlayerArc(state: TravelCombatState): LaserMountPosition {
+  const enemy = getClosestEnemy(state);
+  if (!enemy) {
+    return 'front';
+  }
+
+  const bearing = Math.atan2(enemy.y - state.player.y, enemy.x - state.player.x);
+  const diff = clampAngle(bearing - state.player.angle);
+  if (Math.abs(diff) <= Math.PI / 4) {
+    return 'front';
+  }
+  if (Math.abs(diff) >= (3 * Math.PI) / 4) {
+    return 'rear';
+  }
+  return diff < 0 ? 'left' : 'right';
+}
+
+function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId) {
+  const projectile = getLaserProjectileProfile(laserId);
+  const angle = getMountAngle(state.player.angle, mount);
   state.projectiles.push({
     id: projectileId(state),
     kind: 'laser',
     owner: 'player',
-    x: state.player.x + Math.cos(state.player.angle) * 15,
-    y: state.player.y + Math.sin(state.player.angle) * 15,
-    vx: state.player.vx + Math.cos(state.player.angle) * 15,
-    vy: state.player.vy + Math.sin(state.player.angle) * 15,
-    damage: 10,
-    life: 60
+    x: state.player.x + Math.cos(angle) * 15,
+    y: state.player.y + Math.sin(angle) * 15,
+    vx: state.player.vx + Math.cos(angle) * projectile.speed,
+    vy: state.player.vy + Math.sin(angle) * projectile.speed,
+    damage: projectile.damage,
+    life: projectile.life
   });
+  state.player.fireCooldown = projectile.cooldown;
+  state.lastPlayerArc = mount;
+}
+
+function clearEnemyMissiles(state: TravelCombatState) {
+  for (let index = state.projectiles.length - 1; index >= 0; index -= 1) {
+    const projectile = state.projectiles[index];
+    if (projectile.kind === 'missile' && projectile.owner === 'enemy') {
+      spawnParticles(state, projectile.x, projectile.y, '#ffff55');
+      state.projectiles.splice(index, 1);
+    }
+  }
+}
+
+function activatePlayerEcm(state: TravelCombatState) {
+  if (!state.playerLoadout.installedEquipment.ecm || state.encounter.ecmTimer > 0 || state.player.shields < 12) {
+    return;
+  }
+
+  state.player.shields = clampShields(state.player.shields - 12, state.player.maxShields);
+  state.encounter.ecmTimer = 90;
+  clearEnemyMissiles(state);
+  pushMessage(state, 'E.C.M. ACTIVE', 1000);
+}
+
+function recordKill(state: TravelCombatState, enemy: CombatEnemy) {
+  if (enemy.roles.innocent) {
+    state.legalValue = getLegalValueAfterCombat(state.legalValue, 24);
+    updateLegalStatus(state);
+  }
+  if (enemy.missionTag === 'constrictor') {
+    state.missionEvents.push({ type: 'combat:constrictor-destroyed' });
+  }
+  state.player.tallyKills += 1;
+  state.score += enemy.missionTag ? 400 : 100;
+  spawnParticles(state, enemy.x, enemy.y, '#ff5555');
+}
+
+function maybeScoopSalvage(state: TravelCombatState, enemy: CombatEnemy, random: RandomSource) {
+  if (!state.playerLoadout.installedEquipment.fuel_scoops) {
+    return;
+  }
+
+  const distance = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
+  if (distance > 180) {
+    return;
+  }
+
+  if ((random.nextByte() & 1) === 0) {
+    const salvageKeys = ['alloys', 'machinery', 'radioactives', 'gold'];
+    const commodityKey = salvageKeys[random.nextByte() % salvageKeys.length] ?? 'alloys';
+    state.salvageCargo[commodityKey] = (state.salvageCargo[commodityKey] ?? 0) + 1;
+    pushMessage(state, `SALVAGE SCOOPED: ${commodityKey.toUpperCase()}`, 900);
+    return;
+  }
+
+  state.salvageFuel = Math.min(1.5, state.salvageFuel + 0.2);
+  pushMessage(state, 'FUEL SCOOPED', 900);
+}
+
+function destroyEnemy(state: TravelCombatState, enemyIndex: number, random: RandomSource) {
+  const enemy = state.enemies[enemyIndex];
+  if (!enemy) {
+    return;
+  }
+  maybeScoopSalvage(state, enemy, random);
+  recordKill(state, enemy);
+  state.enemies.splice(enemyIndex, 1);
+}
+
+function triggerEnergyBomb(state: TravelCombatState, random: RandomSource) {
+  if (!state.playerLoadout.installedEquipment.energy_bomb) {
+    return;
+  }
+
+  state.playerLoadout.installedEquipment.energy_bomb = false;
+  clearEnemyMissiles(state);
+  let kills = 0;
+
+  for (let index = state.enemies.length - 1; index >= 0; index -= 1) {
+    const enemy = state.enemies[index];
+    if (enemy.missionTag) {
+      enemy.energy = Math.max(1, enemy.energy - 50);
+      continue;
+    }
+    if (Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y) > 920) {
+      continue;
+    }
+    destroyEnemy(state, index, random);
+    kills += 1;
+  }
+
+  state.player.shields = clampShields(state.player.shields - 20, state.player.maxShields);
+  pushMessage(state, kills > 0 ? `ENERGY BOMB DETONATED: ${kills}` : 'ENERGY BOMB DETONATED', 1200);
 }
 
 function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, random: RandomSource) {
@@ -738,13 +954,13 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
     return;
   }
 
-  state.player.shields -= enemy.laserPower;
+  state.player.shields = clampShields(state.player.shields - enemy.laserPower, state.player.maxShields);
   enemy.vx *= 0.5;
   enemy.vy *= 0.5;
   spawnParticles(state, state.player.x, state.player.y, '#ff5555');
 }
 
-function moveProjectiles(state: TravelCombatState, dt: number) {
+function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
     const projectile = state.projectiles[i];
     if (projectile.kind === 'missile' && projectile.owner === 'enemy') {
@@ -776,23 +992,13 @@ function moveProjectiles(state: TravelCombatState, dt: number) {
           }
 
           if (enemy.energy <= 0) {
-            if (enemy.roles.innocent) {
-              state.legalValue = getLegalValueAfterCombat(state.legalValue, 24);
-              updateLegalStatus(state);
-            }
-            if (enemy.missionTag === 'constrictor') {
-              state.missionEvents.push({ type: 'combat:constrictor-destroyed' });
-            }
-            state.enemies.splice(j, 1);
-            state.player.tallyKills += 1;
-            state.score += enemy.missionTag ? 400 : 100;
-            spawnParticles(state, enemy.x, enemy.y, '#ff5555');
+            destroyEnemy(state, j, random);
           }
           break;
         }
       }
     } else if (Math.hypot(projectile.x - state.player.x, projectile.y - state.player.y) < state.player.radius + (projectile.kind === 'missile' ? 6 : 0)) {
-      state.player.shields -= projectile.damage;
+      state.player.shields = clampShields(state.player.shields - projectile.damage, state.player.maxShields);
       hit = true;
       spawnParticles(state, projectile.x, projectile.y, '#ff5555');
       if (projectile.kind === 'missile' && state.player.shields > 0) {
@@ -827,10 +1033,18 @@ export function stepTravelCombat(
   random: RandomSource
 ): CombatTickResult {
   if (phase === 'GAMEOVER') {
-    return { state, playerDestroyed: true };
+    return { state, playerDestroyed: true, playerEscaped: false, autoDocked: false };
   }
 
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
+  state.player.shields = clampShields(state.player.shields + state.player.rechargeRate * dt, state.player.maxShields);
+
+  if (input.activateEcm) {
+    activatePlayerEcm(state);
+  }
+  if (input.triggerEnergyBomb) {
+    triggerEnergyBomb(state, random);
+  }
 
   if (state.station) {
     state.station.angle += state.station.rotSpeed * dt;
@@ -866,8 +1080,13 @@ export function stepTravelCombat(
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
     if (input.fire && state.player.fireCooldown <= 0) {
-      spawnPlayerLaser(state);
-      state.player.fireCooldown = 15;
+      const mount = determinePlayerArc(state);
+      const laserId = state.playerLoadout.laserMounts[mount];
+      if (laserId) {
+        spawnPlayerLaser(state, mount, laserId);
+      } else {
+        state.lastPlayerArc = mount;
+      }
     }
   }
 
@@ -888,7 +1107,7 @@ export function stepTravelCombat(
   }
 
   state.encounter.copsNearby = state.enemies.filter((enemy) => enemy.roles.cop).length;
-  moveProjectiles(state, dt);
+  moveProjectiles(state, dt, random);
   stepParticles(state, dt);
   updateLegalStatus(state);
 
@@ -901,6 +1120,30 @@ export function stepTravelCombat(
 
   return {
     state,
-    playerDestroyed: state.player.shields <= 0
+    playerDestroyed: state.player.shields <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
+    playerEscaped: state.player.shields <= 0 && state.playerLoadout.installedEquipment.escape_pod,
+    autoDocked: Boolean(
+      input.autoDock &&
+      state.playerLoadout.installedEquipment.docking_computer &&
+      state.station &&
+      state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length === 0 &&
+      assessDockingApproach(state.station, state.player).distance <= state.station.safeZoneRadius
+    )
+  };
+}
+
+export function consumeEscapePod(state: TravelCombatState) {
+  if (!state.playerLoadout.installedEquipment.escape_pod) {
+    return;
+  }
+  state.playerLoadout.installedEquipment.escape_pod = false;
+}
+
+export function getPlayerCombatSnapshot(state: TravelCombatState) {
+  return {
+    cargo: { ...state.salvageCargo },
+    fuel: state.salvageFuel,
+    installedEquipment: { ...state.playerLoadout.installedEquipment },
+    missilesInstalled: state.playerLoadout.missilesInstalled
   };
 }
