@@ -25,12 +25,14 @@ import {
 } from '../commanderPersistence';
 import { loadGameJson, serializeGameJson } from '../gamePersistence';
 import {
+  assessDockingApproach,
   canEnemyLaserFireByCnt,
   canEnemyLaserHitByCnt,
   createDeterministicRandomSource,
   createTravelCombatState,
   getBlueprintAvailability,
   getAvailablePackHunters,
+  getStationSlotAngle,
   selectBlueprintFile,
   stepTravelCombat
 } from '../travelCombat';
@@ -369,5 +371,56 @@ describe('travel combat rules', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.kind === 'thargon')).toBe(true);
     expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
+  });
+
+  it('treats the visible station split as open for docking', () => {
+    const station = {
+      x: 0,
+      y: 0,
+      radius: 80,
+      angle: 0,
+      rotSpeed: 0,
+      safeZoneRadius: 360
+    };
+    const slotAngle = getStationSlotAngle(station.angle);
+    const player = {
+      x: Math.cos(slotAngle) * 60,
+      y: Math.sin(slotAngle) * 60,
+      vx: 0.5,
+      vy: 0.5,
+      angle: slotAngle + Math.PI
+    };
+
+    const docking = assessDockingApproach(station, player);
+
+    expect(docking.isInsideSlot).toBe(true);
+    expect(docking.isInDockingGap).toBe(true);
+    expect(docking.collidesWithHull).toBe(false);
+    expect(docking.canDock).toBe(true);
+  });
+
+  it('collides when crossing the ring away from the visible split', () => {
+    const station = {
+      x: 0,
+      y: 0,
+      radius: 80,
+      angle: 0,
+      rotSpeed: 0,
+      safeZoneRadius: 360
+    };
+    const slotAngle = getStationSlotAngle(station.angle);
+    const player = {
+      x: Math.cos(slotAngle + Math.PI / 2) * 70,
+      y: Math.sin(slotAngle + Math.PI / 2) * 70,
+      vx: 0.5,
+      vy: 0.5,
+      angle: slotAngle + Math.PI
+    };
+
+    const docking = assessDockingApproach(station, player);
+
+    expect(docking.isInsideSlot).toBe(false);
+    expect(docking.collidesWithHull).toBe(true);
+    expect(docking.canDock).toBe(false);
   });
 });

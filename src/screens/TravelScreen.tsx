@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { getSystemByName } from '../domain/galaxyCatalog';
 import { applyLegalFloor, getLegalStatus } from '../domain/commander';
 import {
+  assessDockingApproach,
   canEnemyLaserFireByCnt,
   canEnemyLaserHitByCnt,
   createMathRandomSource,
@@ -379,15 +380,44 @@ export function TravelScreen() {
       ctx.restore();
     };
 
+    const drawStationWithSplit = (x: number, y: number, angle: number) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.scale(1.8, 1.8);
+      ctx.strokeStyle = CGA_YELLOW;
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = CGA_YELLOW;
+
+      ctx.beginPath();
+      ctx.moveTo(SHAPE_STATION[0][0], SHAPE_STATION[0][1]);
+      ctx.lineTo(SHAPE_STATION[1][0], SHAPE_STATION[1][1]);
+      ctx.lineTo(SHAPE_STATION[2][0], SHAPE_STATION[2][1]);
+      ctx.lineTo(SHAPE_STATION[3][0], SHAPE_STATION[3][1]);
+      ctx.lineTo(SHAPE_STATION[4][0], SHAPE_STATION[4][1]);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(SHAPE_STATION[5][0], SHAPE_STATION[5][1]);
+      ctx.lineTo(SHAPE_STATION[0][0], SHAPE_STATION[0][1]);
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
     const drawStation = (camX: number, camY: number) => {
       if (!combatState.station) {
         return;
       }
 
-      drawWireframe(SHAPE_STATION, combatState.station.x - camX, combatState.station.y - camY, combatState.station.angle, CGA_YELLOW, 1.8);
+      const stationX = combatState.station.x - camX;
+      const stationY = combatState.station.y - camY;
+
+      drawStationWithSplit(stationX, stationY, combatState.station.angle);
       ctx.save();
-      ctx.translate(combatState.station.x - camX, combatState.station.y - camY);
-      ctx.strokeStyle = combatState.encounter.safeZone ? CGA_CYAN : '#444444';
+      ctx.translate(stationX, stationY);
+      ctx.strokeStyle = combatState.encounter.safeZone ? CGA_GREEN : '#444444';
       ctx.setLineDash([6, 8]);
       ctx.beginPath();
       ctx.arc(0, 0, combatState.station.safeZoneRadius, 0, Math.PI * 2);
@@ -612,19 +642,16 @@ export function TravelScreen() {
       }
 
       if (combatState.station && flightState === 'ARRIVED') {
-        const distToStation = Math.hypot(combatState.player.x - combatState.station.x, combatState.player.y - combatState.station.y);
-        const speed = Math.hypot(combatState.player.vx, combatState.player.vy);
+        const docking = assessDockingApproach(combatState.station, combatState.player);
 
-        if (distToStation < combatState.station.radius + 15) {
-          const relativeAngle = Math.atan2(combatState.player.y - combatState.station.y, combatState.player.x - combatState.station.x);
-          const slotAngle = combatState.station.angle + Math.PI / 8;
-          const slotOffset = Math.atan2(Math.sin(relativeAngle - slotAngle), Math.cos(relativeAngle - slotAngle));
-          const noseAlignment = Math.atan2(Math.sin(combatState.player.angle - (slotAngle + Math.PI)), Math.cos(combatState.player.angle - (slotAngle + Math.PI)));
-          const isInsideSlot = Math.abs(slotOffset) < Math.PI / 7;
-          const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
-
-          if (distToStation < combatState.station.radius - 5) {
-            if (isInsideSlot && isFacingHangar && speed < 3.6) {
+        if (docking.distance < combatState.station.radius + 15) {
+          if (docking.collidesWithHull) {
+            combatState.player.shields -= 20;
+            combatState.player.vx *= -1.5;
+            combatState.player.vy *= -1.5;
+            showMessage('COLLISION WARNING', 1000);
+          } else if (docking.isInDockingGap && docking.distance < combatState.station.radius - 18) {
+            if (docking.canDock) {
               const missionEvents = [...combatState.missionEvents];
               if (hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
                 missionEvents.push({ type: 'combat:thargoid-plans-delivered' });
@@ -638,10 +665,9 @@ export function TravelScreen() {
               return;
             }
 
-            combatState.player.shields -= 20;
-            combatState.player.vx *= -1.5;
-            combatState.player.vy *= -1.5;
-            showMessage('COLLISION WARNING', 1000);
+            if (!docking.isFacingHangar || docking.speed >= 3.6) {
+              showMessage('ENTER SLOT NOSE-IN AT LOW SPEED', 1000);
+            }
           }
         }
       }
@@ -654,7 +680,7 @@ export function TravelScreen() {
       if (flightState === 'ARRIVED' && Math.hypot(combatState.player.vx, combatState.player.vy) < 0.05) {
         stationaryTicks += 1;
         if (stationaryTicks > 120) {
-          showMessage('USE THRUST TO LINE UP WITH THE STATION SLOT', 1400);
+          showMessage('LINE UP WITH THE SPLIT IN THE STATION RING', 1400);
           stationaryTicks = 0;
         }
       } else {

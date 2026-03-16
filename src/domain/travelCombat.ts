@@ -186,6 +186,19 @@ export interface CombatTickResult {
   playerDestroyed: boolean;
 }
 
+export interface DockingAssessment {
+  slotAngle: number;
+  slotOffset: number;
+  noseAlignment: number;
+  distance: number;
+  speed: number;
+  isInsideSlot: boolean;
+  isFacingHangar: boolean;
+  isInDockingGap: boolean;
+  collidesWithHull: boolean;
+  canDock: boolean;
+}
+
 const BLUEPRINTS: Record<BlueprintId, CombatBlueprint> = {
   sidewinder: { id: 'sidewinder', label: 'Sidewinder', maxEnergy: 70, laserPower: 2, missiles: 0, targetableArea: 210, laserRange: 290, topSpeed: 6.2, acceleration: 0.11, turnRate: 0.05, roles: { pirate: true, hostile: true }, packHunter: true },
   mamba: { id: 'mamba', label: 'Mamba', maxEnergy: 90, laserPower: 2, missiles: 2, targetableArea: 220, laserRange: 320, topSpeed: 6.7, acceleration: 0.12, turnRate: 0.055, roles: { pirate: true, hostile: true }, packHunter: true },
@@ -230,6 +243,40 @@ const LONE_BOUNTY_SEQUENCE: BlueprintId[] = ['cobra-mk3-pirate', 'asp-mk2', 'pyt
 
 function clampAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+export function getStationSlotAngle(stationAngle: number): number {
+  return stationAngle + Math.PI / 2;
+}
+
+export function assessDockingApproach(
+  station: CombatStation,
+  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>
+): DockingAssessment {
+  const distance = Math.hypot(player.x - station.x, player.y - station.y);
+  const speed = Math.hypot(player.vx, player.vy);
+  const slotAngle = getStationSlotAngle(station.angle);
+  const relativeAngle = Math.atan2(player.y - station.y, player.x - station.x);
+  const slotOffset = clampAngle(relativeAngle - slotAngle);
+  const noseAlignment = clampAngle(player.angle - (slotAngle + Math.PI));
+  const isInsideSlot = Math.abs(slotOffset) < Math.PI / 7;
+  const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
+  const isInDockingGap = distance < station.radius + 6 && isInsideSlot;
+  const collidesWithHull = distance < station.radius - 5 && !isInDockingGap;
+  const canDock = distance < station.radius - 18 && isInDockingGap && isFacingHangar && speed < 3.6;
+
+  return {
+    slotAngle,
+    slotOffset,
+    noseAlignment,
+    distance,
+    speed,
+    isInsideSlot,
+    isFacingHangar,
+    isInDockingGap,
+    collidesWithHull,
+    canDock
+  };
 }
 
 function projectileId(state: TravelCombatState): number {
