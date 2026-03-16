@@ -656,10 +656,14 @@ export function TravelScreen() {
 
           if (distToStation < station.radius + 15) {
             const relativeAngle = Math.atan2(player.y - station.y, player.x - station.x);
-            const angleDiff = Math.atan2(Math.sin(relativeAngle - station.angle), Math.cos(relativeAngle - station.angle));
+            const slotAngle = station.angle + Math.PI / 8;
+            const slotOffset = Math.atan2(Math.sin(relativeAngle - slotAngle), Math.cos(relativeAngle - slotAngle));
+            const noseAlignment = Math.atan2(Math.sin(player.angle - (slotAngle + Math.PI)), Math.cos(player.angle - (slotAngle + Math.PI)));
+            const isInsideSlot = Math.abs(slotOffset) < Math.PI / 7;
+            const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
 
             if (distToStation < station.radius - 5) {
-              if (Math.abs(angleDiff) < Math.PI / 8 && speed < 3) {
+              if (isInsideSlot && isFacingHangar && speed < 3.6) {
                 score += 500;
                 updateHud();
                 showMessage(`DOCKED AT ${session.destinationSystem.toUpperCase()}`, 800);
