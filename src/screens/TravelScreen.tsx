@@ -269,6 +269,9 @@ export function TravelScreen() {
       updateHud();
     };
 
+    const JOYSTICK_RADIUS = 60;
+    const JOYSTICK_MAX_DIST = 40;
+
     const setKnob = (dx: number, dy: number) => {
       knobNode.style.left = `${dx + 40}px`;
       knobNode.style.top = `${dy + 40}px`;
@@ -277,17 +280,16 @@ export function TravelScreen() {
     const handleJoystick = (clientX: number, clientY: number) => {
       let dx = clientX - joyCenter.x;
       let dy = clientY - joyCenter.y;
-      const maxDist = 40;
       const dist = Math.hypot(dx, dy);
 
-      if (dist > maxDist) {
-        dx = (dx / dist) * maxDist;
-        dy = (dy / dist) * maxDist;
+      if (dist > JOYSTICK_MAX_DIST) {
+        dx = (dx / dist) * JOYSTICK_MAX_DIST;
+        dy = (dy / dist) * JOYSTICK_MAX_DIST;
       }
 
       setKnob(dx, dy);
-      input.vectorX = dx / maxDist;
-      input.vectorY = dy / maxDist;
+      input.vectorX = dx / JOYSTICK_MAX_DIST;
+      input.vectorY = dy / JOYSTICK_MAX_DIST;
       input.vectorStrength = Math.min(1, Math.hypot(input.vectorX, input.vectorY));
       input.turn = input.vectorX;
       input.thrust = input.vectorStrength;
@@ -314,15 +316,39 @@ export function TravelScreen() {
     window.addEventListener('keyup', onKeyUp);
 
     const joystickArea = viewport.querySelector('.travel-screen__joystick') as HTMLDivElement | null;
-    const onJoyPointerDown = (event: PointerEvent) => {
+    const resetJoystickPosition = () => {
       if (!joystickArea) {
+        return;
+      }
+      joystickArea.style.left = '1.8rem';
+      joystickArea.style.bottom = '1.8rem';
+      joystickArea.style.top = 'auto';
+    };
+    const placeJoystickAt = (clientX: number, clientY: number) => {
+      if (!joystickArea) {
+        return;
+      }
+      const viewportRect = viewport.getBoundingClientRect();
+      const left = clientX - viewportRect.left - JOYSTICK_RADIUS;
+      const top = clientY - viewportRect.top - JOYSTICK_RADIUS;
+      joystickArea.style.left = `${left}px`;
+      joystickArea.style.top = `${top}px`;
+      joystickArea.style.bottom = 'auto';
+    };
+    const onJoyPointerDown = (event: PointerEvent) => {
+      if (!joystickArea || event.button !== 0) {
+        return;
+      }
+      const target = event.target as Element | null;
+      if (target?.closest('.travel-screen__button, .travel-screen__actions button')) {
         return;
       }
       joyActive = true;
       joyPointerId = event.pointerId;
+      placeJoystickAt(event.clientX, event.clientY);
       const rect = joystickArea.getBoundingClientRect();
       joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-      joystickArea.setPointerCapture(event.pointerId);
+      viewport.setPointerCapture(event.pointerId);
       handleJoystick(event.clientX, event.clientY);
     };
     const onJoyPointerMove = (event: PointerEvent) => {
@@ -343,12 +369,14 @@ export function TravelScreen() {
       input.vectorY = 0;
       input.vectorStrength = 0;
       setKnob(0, 0);
+      resetJoystickPosition();
     };
 
-    joystickArea?.addEventListener('pointerdown', onJoyPointerDown);
-    joystickArea?.addEventListener('pointermove', onJoyPointerMove);
-    joystickArea?.addEventListener('pointerup', onJoyPointerUp);
-    joystickArea?.addEventListener('pointercancel', onJoyPointerUp);
+    resetJoystickPosition();
+    viewport.addEventListener('pointerdown', onJoyPointerDown);
+    viewport.addEventListener('pointermove', onJoyPointerMove);
+    viewport.addEventListener('pointerup', onJoyPointerUp);
+    viewport.addEventListener('pointercancel', onJoyPointerUp);
 
     const bindPressButton = (button: HTMLButtonElement, key: 'fire' | 'jump') => {
       const onPointerDown = () => {
@@ -802,10 +830,10 @@ export function TravelScreen() {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
-      joystickArea?.removeEventListener('pointerdown', onJoyPointerDown);
-      joystickArea?.removeEventListener('pointermove', onJoyPointerMove);
-      joystickArea?.removeEventListener('pointerup', onJoyPointerUp);
-      joystickArea?.removeEventListener('pointercancel', onJoyPointerUp);
+      viewport.removeEventListener('pointerdown', onJoyPointerDown);
+      viewport.removeEventListener('pointermove', onJoyPointerMove);
+      viewport.removeEventListener('pointerup', onJoyPointerUp);
+      viewport.removeEventListener('pointercancel', onJoyPointerUp);
       unbindJumpButton();
       unbindFireButton();
       unbindEcmButton();
