@@ -594,6 +594,39 @@ describe('travel combat rules', () => {
     expect(state.encounter.ecmTimer).toBeGreaterThan(0);
   });
 
+  it('destroys enemy missiles at the station safe-zone edge while the player is inside', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0]);
+    const state = createCombatState([0, 0, 0]);
+    state.station = {
+      x: 0,
+      y: 0,
+      radius: 80,
+      angle: 0,
+      rotSpeed: 0,
+      safeZoneRadius: 360
+    };
+    state.player.x = 0;
+    state.player.y = 0;
+    state.player.shields = 70;
+    state.player.rechargeRate = 0;
+    state.projectiles.push({
+      id: 7,
+      kind: 'missile',
+      owner: 'enemy',
+      x: 361,
+      y: 0,
+      vx: -5,
+      vy: 0,
+      damage: 22,
+      life: 100
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+
+    expect(state.projectiles.some((projectile) => projectile.kind === 'missile' && projectile.owner === 'enemy')).toBe(false);
+    expect(state.player.shields).toBe(70);
+  });
+
   it('boosts shield recharge with the extra energy unit', () => {
     const commander = createDefaultCommander();
     commander.installedEquipment.extra_energy_unit = true;
