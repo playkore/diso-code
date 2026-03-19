@@ -963,6 +963,8 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
 function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
     const projectile = state.projectiles[i];
+    const previousX = projectile.x;
+    const previousY = projectile.y;
     if (projectile.kind === 'missile' && projectile.owner === 'enemy') {
       const dx = state.player.x - projectile.x;
       const dy = state.player.y - projectile.y;
@@ -1003,6 +1005,15 @@ function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSou
       spawnParticles(state, projectile.x, projectile.y, '#ff5555');
       if (projectile.kind === 'missile' && state.player.shields > 0) {
         pushMessage(state, 'MISSILE IMPACT', 900);
+      }
+    }
+
+    if (!hit && projectile.kind === 'missile' && projectile.owner === 'enemy' && state.station && state.encounter.safeZone) {
+      const previousDistanceFromStation = Math.hypot(previousX - state.station.x, previousY - state.station.y);
+      const currentDistanceFromStation = Math.hypot(projectile.x - state.station.x, projectile.y - state.station.y);
+      if (previousDistanceFromStation > state.station.safeZoneRadius && currentDistanceFromStation <= state.station.safeZoneRadius) {
+        hit = true;
+        spawnParticles(state, projectile.x, projectile.y, '#ffff55');
       }
     }
 
