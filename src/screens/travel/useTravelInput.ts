@@ -26,6 +26,7 @@ export interface TravelInputState {
   thrust: number;
   fire: boolean;
   jump: boolean;
+  hyperspace: boolean;
   activateEcm: boolean;
   triggerEnergyBomb: boolean;
   autoDock: boolean;
@@ -38,7 +39,7 @@ export interface TravelInputState {
  * Creates the default "no input" state.
  */
 export function createTravelInput(): TravelInputState {
-  return { turn: 0, thrust: 0, fire: false, jump: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
+  return { turn: 0, thrust: 0, fire: false, jump: false, hyperspace: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
 }
 
 /**
@@ -54,6 +55,7 @@ export function bindTravelInput(params: {
   viewport: HTMLDivElement;
   knobNode: HTMLDivElement;
   jumpButton: HTMLButtonElement;
+  hyperspaceButton: HTMLButtonElement;
   fireButton: HTMLButtonElement;
   ecmButton: HTMLButtonElement;
   bombButton: HTMLButtonElement;
@@ -62,7 +64,7 @@ export function bindTravelInput(params: {
   keys: Record<string, boolean>;
   joyActiveRef: MutableRefObject<boolean>;
 }) {
-  const { viewport, knobNode, jumpButton, fireButton, ecmButton, bombButton, dockButton, input, keys, joyActiveRef } = params;
+  const { viewport, knobNode, jumpButton, hyperspaceButton, fireButton, ecmButton, bombButton, dockButton, input, keys, joyActiveRef } = params;
   const joystickArea = viewport.querySelector('.travel-screen__joystick') as HTMLDivElement | null;
 
   // These values define the physical feel of the virtual joystick.
@@ -233,7 +235,7 @@ export function bindTravelInput(params: {
    * Binds a tap-style action button. These are latched once and later cleared
    * by the frame loop after it consumes the action.
    */
-  const bindTapButton = (button: HTMLButtonElement, key: 'activateEcm' | 'triggerEnergyBomb' | 'autoDock') => {
+  const bindTapButton = (button: HTMLButtonElement, key: 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock') => {
     const onPointerDown = () => {
       input[key] = true;
     };
@@ -251,6 +253,7 @@ export function bindTravelInput(params: {
   viewport.addEventListener('pointercancel', onJoyPointerUp);
 
   const unbindJumpButton = bindPressButton(jumpButton, 'jump');
+  const unbindHyperspaceButton = bindTapButton(hyperspaceButton, 'hyperspace');
   const unbindFireButton = bindPressButton(fireButton, 'fire');
   const unbindEcmButton = bindTapButton(ecmButton, 'activateEcm');
   const unbindBombButton = bindTapButton(bombButton, 'triggerEnergyBomb');
@@ -267,6 +270,7 @@ export function bindTravelInput(params: {
     viewport.removeEventListener('pointerup', onJoyPointerUp);
     viewport.removeEventListener('pointercancel', onJoyPointerUp);
     unbindJumpButton();
+    unbindHyperspaceButton();
     unbindFireButton();
     unbindEcmButton();
     unbindBombButton();

@@ -615,6 +615,19 @@ button:disabled {
   font-size: 0.82rem;
 }
 
+.travel-screen__button--hyperspace {
+  right: 1.4rem;
+  bottom: 12.2rem;
+  width: 5.6rem;
+  height: 3.5rem;
+  font-size: 0.74rem;
+  border-radius: 0;
+}
+
+.travel-screen__button--hidden {
+  display: none;
+}
+
 .travel-screen__button--aux {
   right: 8rem;
   width: 3.8rem;

@@ -1,3 +1,4 @@
+import type { FlightPhase } from '../../../domain/travelCombat';
 import { CGA_YELLOW } from './constants';
 
 export interface StarPoint {
@@ -21,7 +22,7 @@ export function createStars() {
 export function drawStars(
   ctx: CanvasRenderingContext2D,
   stars: StarPoint[],
-  flightState: 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'GAMEOVER',
+  flightState: FlightPhase,
   cw: number,
   ch: number,
   player: { x: number; y: number; vx: number; vy: number }
@@ -35,7 +36,15 @@ export function drawStars(
     const sx = ((star.x - player.x * star.z) % cw + cw) % cw;
     const sy = ((star.y - player.y * star.z) % ch + ch) % ch;
 
-    if (flightState === 'JUMPING') {
+    if (flightState === 'HYPERSPACE') {
+      const dx = sx - cw / 2;
+      const dy = sy - ch / 2;
+      const scale = 0.28 + star.z * 0.85;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + dx * scale, sy + dy * scale);
+      ctx.stroke();
+    } else if (flightState === 'JUMPING') {
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(sx - player.vx * star.z * 2, sy - player.vy * star.z * 2);

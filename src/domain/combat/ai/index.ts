@@ -8,7 +8,6 @@ import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
 export function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, random: RandomSource): boolean {
   applyEnemyHostility(state, enemy);
-  enemy.energy = Math.min(enemy.maxEnergy, enemy.energy + 0.08 * dt);
 
   const dx = state.player.x - enemy.x;
   const dy = state.player.y - enemy.y;

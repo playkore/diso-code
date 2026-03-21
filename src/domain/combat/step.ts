@@ -1,4 +1,5 @@
 import { tryRareEncounter } from './encounters/spawnRules';
+import { LOCAL_JUMP_SPEED_MULTIPLIER } from './navigation';
 import { stepEnemy } from './ai';
 import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
@@ -39,7 +40,7 @@ export function stepTravelCombat(
     state.encounter.safeZone = false;
   }
 
-  if (phase === 'PLAYING' || phase === 'ARRIVED' || phase === 'READY') {
+  if (phase === 'PLAYING' || phase === 'ARRIVED' || phase === 'READY' || phase === 'JUMPING') {
     state.player.angle += input.turn * 0.08 * dt;
     if (input.thrust > 0) {
       state.player.vx += Math.cos(state.player.angle) * input.thrust * 0.2 * dt;
@@ -56,10 +57,22 @@ export function stepTravelCombat(
 
     state.player.vx *= 0.99;
     state.player.vy *= 0.99;
+    if (input.jump) {
+      const jumpSpeed = state.player.maxSpeed * LOCAL_JUMP_SPEED_MULTIPLIER;
+      const currentSpeed = Math.hypot(state.player.vx, state.player.vy);
+      if (currentSpeed <= 0.01) {
+        state.player.vx = Math.cos(state.player.angle) * jumpSpeed;
+        state.player.vy = Math.sin(state.player.angle) * jumpSpeed;
+      } else if (currentSpeed < jumpSpeed) {
+        state.player.vx = (state.player.vx / currentSpeed) * jumpSpeed;
+        state.player.vy = (state.player.vy / currentSpeed) * jumpSpeed;
+      }
+    }
     const speed = Math.hypot(state.player.vx, state.player.vy);
-    if (speed > state.player.maxSpeed) {
-      state.player.vx = (state.player.vx / speed) * state.player.maxSpeed;
-      state.player.vy = (state.player.vy / speed) * state.player.maxSpeed;
+    const speedLimit = state.player.maxSpeed * (input.jump ? LOCAL_JUMP_SPEED_MULTIPLIER : 1);
+    if (speed > speedLimit) {
+      state.player.vx = (state.player.vx / speed) * speedLimit;
+      state.player.vy = (state.player.vy / speed) * speedLimit;
     }
 
     state.player.x += state.player.vx * dt;
@@ -76,7 +89,7 @@ export function stepTravelCombat(
     }
   }
 
-  if (phase !== 'JUMPING') {
+  if (phase !== 'HYPERSPACE') {
     state.encounter.rareTimer += dt;
     if (state.encounter.rareTimer >= 256) {
       state.encounter.rareTimer -= 256;

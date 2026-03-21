@@ -25,11 +25,12 @@ import type { LaserMountPosition } from '../shipCatalog';
  * The UI, renderer and simulation all key off this value:
  * - `READY`: launched but not yet moving
  * - `PLAYING`: normal manual flight
- * - `JUMPING`: hyperspace tunnel transition
- * - `ARRIVED`: post-jump local space near the destination
+ * - `JUMPING`: local in-system jump cruise
+ * - `ARRIVED`: post-hyperspace local space near the destination
+ * - `HYPERSPACE`: inter-system tunnel transition
  * - `GAMEOVER`: destruction/reset state
  */
-export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'GAMEOVER';
+export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'HYPERSPACE' | 'GAMEOVER';
 
 /**
  * Stable identifier for every NPC ship archetype used in encounter space.
@@ -313,6 +314,8 @@ export interface CombatInput {
   thrust: number;
   turn: number;
   fire: boolean;
+  jump?: boolean;
+  hyperspace?: boolean;
   activateEcm?: boolean;
   triggerEnergyBomb?: boolean;
   autoDock?: boolean;

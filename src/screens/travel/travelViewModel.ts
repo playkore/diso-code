@@ -1,27 +1,30 @@
 import { getLegalStatus, type CommanderState } from '../../domain/commander';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 
-export function getJumpStatus(flightState: FlightPhase) {
-  switch (flightState) {
-    case 'READY':
-      return 'READY';
-    case 'PLAYING':
-      return 'CHARGED';
-    case 'JUMPING':
-      return 'ENGAGED';
-    case 'ARRIVED':
-      return 'COMPLETE';
-    default:
-      return 'OFFLINE';
-  }
+export interface TravelDriveStatus {
+  jump: string;
+  hyperspace: string;
 }
 
-export function getHudState(state: TravelCombatState, flightState: FlightPhase) {
+export function getDriveStatus(flightState: FlightPhase, options: { jumpBlocked: boolean; hyperspaceBlocked: boolean; jumpCompleted: boolean }): TravelDriveStatus {
+  const jump = flightState === 'JUMPING' ? 'ENGAGED' : options.jumpBlocked ? 'MASS LOCK' : 'READY';
+  const hyperspace =
+    options.jumpCompleted ? 'COMPLETE' : flightState === 'HYPERSPACE' ? 'ENGAGED' : options.hyperspaceBlocked ? 'SAFE ZONE' : 'READY';
+  return { jump, hyperspace };
+}
+
+export function getHudState(
+  state: TravelCombatState,
+  flightState: FlightPhase,
+  options: { jumpBlocked: boolean; hyperspaceBlocked: boolean; jumpCompleted: boolean }
+) {
   const hostileCount = state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
+  const drives = getDriveStatus(flightState, options);
   return {
     score: String(state.score),
     shields: String(Math.max(0, Math.round(state.player.shields))),
-    jump: getJumpStatus(flightState),
+    jump: drives.jump,
+    hyperspace: drives.hyperspace,
     legal: `${getLegalStatus(state.legalValue)} ${state.legalValue}`,
     hostileCount,
     threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount}`,

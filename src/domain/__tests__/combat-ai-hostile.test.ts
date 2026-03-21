@@ -144,4 +144,40 @@ describe('travel combat hostile AI', () => {
     expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(377.5);
     expect(state.enemies[0].isFiringLaser).toBe(false);
   });
+
+  it('does not restore enemy energy over time after they take damage', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0]);
+    state.enemies.push({
+      id: 10,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      behavior: 'hostile',
+      x: 140,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 37,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 10, 'PLAYING', {}, rng);
+
+    expect(state.enemies[0].energy).toBe(37);
+  });
 });

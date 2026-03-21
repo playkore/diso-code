@@ -9,6 +9,8 @@ import {
   enterArrivalSpace,
   enterStationSpace,
   getPlayerCombatSnapshot,
+  isMassNearby,
+  isPlayerInStationSafeZone,
   setCombatSystemContext,
   stepTravelCombat,
   type FlightPhase
@@ -54,11 +56,13 @@ interface TravelRefs {
   scoreRef: React.RefObject<HTMLSpanElement | null>;
   shieldsRef: React.RefObject<HTMLSpanElement | null>;
   jumpRef: React.RefObject<HTMLSpanElement | null>;
+  hyperspaceRef: React.RefObject<HTMLSpanElement | null>;
   legalRef: React.RefObject<HTMLSpanElement | null>;
   threatRef: React.RefObject<HTMLSpanElement | null>;
   arcRef: React.RefObject<HTMLSpanElement | null>;
   knobRef: React.RefObject<HTMLDivElement | null>;
   jumpButtonRef: React.RefObject<HTMLButtonElement | null>;
+  hyperspaceButtonRef: React.RefObject<HTMLButtonElement | null>;
   fireButtonRef: React.RefObject<HTMLButtonElement | null>;
   ecmButtonRef: React.RefObject<HTMLButtonElement | null>;
   bombButtonRef: React.RefObject<HTMLButtonElement | null>;
@@ -106,18 +110,38 @@ export function useTravelSession(
     const scoreNode = refs.scoreRef.current;
     const shieldsNode = refs.shieldsRef.current;
     const jumpNode = refs.jumpRef.current;
+    const hyperspaceNode = refs.hyperspaceRef.current;
     const legalNode = refs.legalRef.current;
     const threatNode = refs.threatRef.current;
     const arcNode = refs.arcRef.current;
     const knobNode = refs.knobRef.current;
     const jumpButton = refs.jumpButtonRef.current;
+    const hyperspaceButton = refs.hyperspaceButtonRef.current;
     const fireButton = refs.fireButtonRef.current;
     const ecmButton = refs.ecmButtonRef.current;
     const bombButton = refs.bombButtonRef.current;
     const dockButton = refs.dockButtonRef.current;
     // The travel screen is fully imperative once mounted. If any required DOM
     // node is missing, we abort the session rather than run partially.
-    if (!canvas || !viewport || !messageNode || !scoreNode || !shieldsNode || !jumpNode || !legalNode || !threatNode || !arcNode || !knobNode || !jumpButton || !fireButton || !ecmButton || !bombButton || !dockButton) {
+    if (
+      !canvas ||
+      !viewport ||
+      !messageNode ||
+      !scoreNode ||
+      !shieldsNode ||
+      !jumpNode ||
+      !hyperspaceNode ||
+      !legalNode ||
+      !threatNode ||
+      !arcNode ||
+      !knobNode ||
+      !jumpButton ||
+      !hyperspaceButton ||
+      !fireButton ||
+      !ecmButton ||
+      !bombButton ||
+      !dockButton
+    ) {
       return undefined;
     }
 
@@ -157,12 +181,27 @@ export function useTravelSession(
     // `input` is the normalized control object consumed by the simulation.
     // Browser-specific event handling mutates this object, not React state.
     const input = createTravelInput();
-    const keys: Record<string, boolean> = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ' ': false, j: false, J: false, e: false, E: false, b: false, B: false, d: false, D: false };
+    const keys: Record<string, boolean> = {
+      ArrowLeft: false,
+      ArrowRight: false,
+      ArrowUp: false,
+      ' ': false,
+      j: false,
+      J: false,
+      h: false,
+      H: false,
+      e: false,
+      E: false,
+      b: false,
+      B: false,
+      d: false,
+      D: false
+    };
 
     // This local phase machine sits above the domain simulation. It models UI
     // flow such as the hyperspace transition and game-over reset behavior.
     let flightState: FlightPhase = 'READY';
-    let jumpTimer = 0;
+    let hyperspaceTimer = 0;
     let animationFrameId = 0;
     let lastTimestamp = 0;
     let stationaryTicks = 0;
@@ -171,12 +210,20 @@ export function useTravelSession(
     let overlayTimer = 0;
     let jumpCompleted = false;
 
+    const getManualFlightState = (): FlightPhase => {
+      if (jumpCompleted) {
+        return 'ARRIVED';
+      }
+      return flightState === 'READY' ? 'READY' : 'PLAYING';
+    };
+
     const onResize = () => resize();
     window.addEventListener('resize', onResize);
     const unbindInput = bindTravelInput({
       viewport,
       knobNode,
       jumpButton,
+      hyperspaceButton,
       fireButton,
       ecmButton,
       bombButton,
@@ -201,17 +248,23 @@ export function useTravelSession(
      * does not re-render through React on every animation frame.
      */
     const updateHud = () => {
-      const hud = getHudState(combatState, flightState);
+      const jumpBlocked = isMassNearby(combatState);
+      const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
+      const hud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
       scoreNode.textContent = hud.score;
       shieldsNode.textContent = hud.shields;
       shieldsNode.style.color = combatState.player.shields <= 30 ? CGA_RED : CGA_GREEN;
       jumpNode.textContent = hud.jump;
+      jumpNode.style.color = hud.jump === 'MASS LOCK' ? CGA_RED : hud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN;
+      hyperspaceNode.textContent = hud.hyperspace;
+      hyperspaceNode.style.color = hud.hyperspace === 'SAFE ZONE' ? CGA_RED : hud.hyperspace === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN;
       legalNode.textContent = hud.legal;
       legalNode.style.color = combatState.legalValue >= 50 ? CGA_RED : combatState.legalValue >= 1 ? CGA_YELLOW : CGA_GREEN;
       threatNode.textContent = hud.threat;
       threatNode.style.color = hud.hostileCount > 0 ? CGA_RED : CGA_GREEN;
       arcNode.textContent = hud.arc;
       arcNode.style.color = combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED;
+      hyperspaceButton.classList.toggle('travel-screen__button--hidden', jumpCompleted);
     };
 
     /**
@@ -244,19 +297,37 @@ export function useTravelSession(
       navigate('/', { replace: true });
     };
 
-    /**
-     * Enters the hyperspace tunnel phase from manual flight.
-     */
-    const startJump = () => {
-      if (flightState !== 'READY' && flightState !== 'PLAYING') {
+    const startLocalJump = () => {
+      if (flightState === 'HYPERSPACE' || flightState === 'GAMEOVER') {
+        return;
+      }
+      if (isMassNearby(combatState)) {
+        showMessage('MASS LOCK', 900);
+        input.jump = false;
+        flightState = getManualFlightState();
+        updateHud();
         return;
       }
       flightState = 'JUMPING';
-      jumpTimer = 100;
+      showMessage('JUMP ENGAGED', 900);
+      updateHud();
+    };
+
+    const startHyperspace = () => {
+      if (flightState === 'HYPERSPACE' || flightState === 'GAMEOVER' || jumpCompleted) {
+        return;
+      }
+      if (isPlayerInStationSafeZone(combatState)) {
+        showMessage('SAFE ZONE', 900);
+        input.hyperspace = false;
+        updateHud();
+        return;
+      }
+      flightState = 'HYPERSPACE';
+      hyperspaceTimer = 100;
       showMessage(`HYPERSPACE TO ${session.destinationSystem.toUpperCase()}`, 2000);
       combatState.player.vx = Math.cos(combatState.player.angle) * 5;
       combatState.player.vy = Math.sin(combatState.player.angle) * 5;
-      input.jump = false;
       updateHud();
     };
 
@@ -336,6 +407,7 @@ export function useTravelSession(
 
       input.fire = keys[' '] || input.fire;
       input.jump = keys.j || keys.J || input.jump;
+      input.hyperspace = keys.h || keys.H || input.hyperspace;
       input.activateEcm = keys.e || keys.E || input.activateEcm;
       input.triggerEnergyBomb = keys.b || keys.B || input.triggerEnergyBomb;
       input.autoDock = keys.d || keys.D || input.autoDock;
@@ -347,8 +419,16 @@ export function useTravelSession(
       }
 
       // On touch/joystick input the ship points directly at the stick vector.
-      if (joyActiveRef.current && input.vectorStrength > 0.08 && flightState !== 'JUMPING') {
+      if (joyActiveRef.current && input.vectorStrength > 0.08 && flightState !== 'HYPERSPACE') {
         combatState.player.angle = Math.atan2(input.vectorY, input.vectorX);
+      }
+
+      const jumpBlocked = isMassNearby(combatState);
+      if (flightState === 'JUMPING' && (!input.jump || jumpBlocked)) {
+        flightState = getManualFlightState();
+        if (jumpBlocked) {
+          showMessage('MASS LOCK', 900);
+        }
       }
 
       // The domain layer handles combat rules. The UI layer only gates controls
@@ -356,12 +436,14 @@ export function useTravelSession(
       const result = stepTravelCombat(
         combatState,
         {
-          thrust: flightState === 'JUMPING' ? 0 : input.thrust,
-          turn: flightState === 'JUMPING' ? 0 : input.turn,
-          fire: flightState === 'JUMPING' ? false : input.fire,
-          activateEcm: flightState === 'JUMPING' ? false : input.activateEcm,
-          triggerEnergyBomb: flightState === 'JUMPING' ? false : input.triggerEnergyBomb,
-          autoDock: flightState === 'JUMPING' ? false : input.autoDock
+          thrust: flightState === 'HYPERSPACE' ? 0 : input.thrust,
+          turn: flightState === 'HYPERSPACE' ? 0 : input.turn,
+          fire: flightState === 'HYPERSPACE' ? false : input.fire,
+          jump: flightState === 'JUMPING' && !jumpBlocked,
+          hyperspace: flightState === 'HYPERSPACE',
+          activateEcm: flightState === 'HYPERSPACE' ? false : input.activateEcm,
+          triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : input.triggerEnergyBomb,
+          autoDock: flightState === 'HYPERSPACE' ? false : input.autoDock
         },
         dt,
         flightState,
@@ -374,20 +456,24 @@ export function useTravelSession(
         return;
       }
 
-      if ((flightState === 'READY' || flightState === 'PLAYING') && input.jump) {
-        startJump();
+      if ((flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') && input.jump) {
+        startLocalJump();
+      }
+
+      if ((flightState === 'READY' || flightState === 'PLAYING') && input.hyperspace) {
+        startHyperspace();
       }
 
       // Hyperspace travel is still partially a UI concern because the tunnel
       // pacing and destination handoff are route-flow behavior rather than pure
       // dogfight simulation.
-      if (flightState === 'JUMPING') {
+      if (flightState === 'HYPERSPACE') {
         combatState.player.vx *= 1.05;
         combatState.player.vy *= 1.05;
         combatState.player.x += combatState.player.vx * dt;
         combatState.player.y += combatState.player.vy * dt;
-        jumpTimer -= dt;
-        if (jumpTimer <= 0) {
+        hyperspaceTimer -= dt;
+        if (hyperspaceTimer <= 0) {
           setCombatSystemContext(combatState, { government: destinationSystem.government, techLevel: destinationSystem.techLevel, witchspace: false }, random);
           enterArrivalSpace(combatState, random);
           jumpCompleted = true;
@@ -398,7 +484,7 @@ export function useTravelSession(
 
       // Manual docking/collision handling sits here because it needs to react
       // immediately with navigation and player guidance messages.
-      if (combatState.station && flightState !== 'JUMPING') {
+      if (combatState.station && flightState !== 'HYPERSPACE') {
         const docking = assessDockingApproach(combatState.station, combatState.player);
         if (docking.distance < combatState.station.radius + 15) {
           if (docking.collidesWithHull) {
@@ -474,6 +560,9 @@ export function useTravelSession(
       }
       if (!keys.j && !keys.J) {
         input.jump = false;
+      }
+      if (!keys.h && !keys.H) {
+        input.hyperspace = false;
       }
       if (!keys.e && !keys.E) {
         input.activateEcm = false;

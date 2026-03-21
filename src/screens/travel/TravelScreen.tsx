@@ -31,11 +31,13 @@ export function TravelScreen() {
     scoreRef: useRef<HTMLSpanElement | null>(null),
     shieldsRef: useRef<HTMLSpanElement | null>(null),
     jumpRef: useRef<HTMLSpanElement | null>(null),
+    hyperspaceRef: useRef<HTMLSpanElement | null>(null),
     legalRef: useRef<HTMLSpanElement | null>(null),
     threatRef: useRef<HTMLSpanElement | null>(null),
     arcRef: useRef<HTMLSpanElement | null>(null),
     knobRef: useRef<HTMLDivElement | null>(null),
     jumpButtonRef: useRef<HTMLButtonElement | null>(null),
+    hyperspaceButtonRef: useRef<HTMLButtonElement | null>(null),
     fireButtonRef: useRef<HTMLButtonElement | null>(null),
     ecmButtonRef: useRef<HTMLButtonElement | null>(null),
     bombButtonRef: useRef<HTMLButtonElement | null>(null),
@@ -66,6 +68,7 @@ export function TravelScreen() {
           <div className="travel-screen__hud-line">Score: <span ref={refs.scoreRef}>0</span></div>
           <div className="travel-screen__hud-line">Shields: <span ref={refs.shieldsRef}>100</span>%</div>
           <div className="travel-screen__hud-line">Jump Drive: <span ref={refs.jumpRef}>READY</span></div>
+          <div className="travel-screen__hud-line">Hyperspace: <span ref={refs.hyperspaceRef}>SAFE ZONE</span></div>
           <div className="travel-screen__hud-line">Legal: <span ref={refs.legalRef}>clean 0</span></div>
           <div className="travel-screen__hud-line">Threat: <span ref={refs.threatRef}>F- / 0</span></div>
           <div className="travel-screen__hud-line">Arc: <span ref={refs.arcRef}>FRONT</span></div>
@@ -80,6 +83,9 @@ export function TravelScreen() {
           </div>
           <button ref={refs.jumpButtonRef} type="button" className="travel-screen__button travel-screen__button--jump">
             JUMP
+          </button>
+          <button ref={refs.hyperspaceButtonRef} type="button" className="travel-screen__button travel-screen__button--hyperspace">
+            HYPER
           </button>
           <button ref={refs.fireButtonRef} type="button" className="travel-screen__button travel-screen__button--fire">
             FIRE
@@ -102,6 +108,8 @@ export function TravelScreen() {
           Space: Fire
           <br />
           J: Jump
+          <br />
+          H: Hyperspace
           <br />
           Laser CNT: {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} / {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
         </div>

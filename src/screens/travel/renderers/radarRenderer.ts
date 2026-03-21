@@ -1,4 +1,4 @@
-import type { TravelCombatState } from '../../../domain/travelCombat';
+import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type TravelCombatState } from '../../../domain/travelCombat';
 import { CGA_BLACK, CGA_GREEN, CGA_YELLOW } from './constants';
 import { getEnemyColor } from './shipsRenderer';
 
@@ -72,7 +72,7 @@ export function drawRadar(
     ctx.fill();
   }
 
-  for (const enemy of state.enemies) {
+  for (const enemy of getVisibleRadarContacts(state, RADAR_SHIP_RANGE)) {
     const dx = enemy.x - state.player.x;
     const dy = enemy.y - state.player.y;
     const distance = Math.hypot(dx, dy);
