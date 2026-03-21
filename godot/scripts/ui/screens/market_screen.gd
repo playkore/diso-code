@@ -8,8 +8,9 @@ const MARKET_CATEGORIES := [
 ]
 
 func _init() -> void:
-	screen_title = "Market"
-	screen_subtitle = "Docked commodity exchange and local trade snapshot."
+	screen_title = ""
+	screen_subtitle = ""
+	show_header = false
 	empty_message = "The market will populate from GameState.market once the docked autoload exists."
 
 func _populate_body() -> void:

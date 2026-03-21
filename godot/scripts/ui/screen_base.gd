@@ -4,6 +4,7 @@ class_name UIScreenBase
 @export var screen_title := "Screen"
 @export var screen_subtitle := ""
 @export var empty_message := "No docked data is available yet."
+@export var show_header := true
 
 var _shell_built := false
 var _title_label: Label
@@ -27,6 +28,8 @@ func refresh_from_state() -> void:
 	if _subtitle_label != null:
 		_subtitle_label.text = screen_subtitle
 		UiTheme.style_label(_subtitle_label, UiTheme.CGA_GREEN, 13)
+	_title_label.visible = show_header and screen_title != ""
+	_subtitle_label.visible = show_header and screen_subtitle != ""
 	_clear_body()
 	_populate_body()
 	if _body_column.get_child_count() == 0:
@@ -133,10 +136,10 @@ func _build_shell() -> void:
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 0)
+	margin.add_theme_constant_override("margin_top", 0)
+	margin.add_theme_constant_override("margin_right", 0)
+	margin.add_theme_constant_override("margin_bottom", 0)
 	add_child(margin)
 
 	var panel := PanelContainer.new()
@@ -146,7 +149,7 @@ func _build_shell() -> void:
 
 	var outer := VBoxContainer.new()
 	outer.set_anchors_preset(Control.PRESET_FULL_RECT)
-	outer.add_theme_constant_override("separation", 10)
+	outer.add_theme_constant_override("separation", 8)
 	panel.add_child(outer)
 
 	var header := VBoxContainer.new()
@@ -168,12 +171,14 @@ func _build_shell() -> void:
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	outer.add_child(_scroll)
 
 	_body_column = VBoxContainer.new()
 	_body_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_body_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body_column.add_theme_constant_override("separation", 8)
+	_body_column.add_theme_constant_override("margin_left", 0)
 	_scroll.add_child(_body_column)
 
 func _connect_state_signal() -> void:

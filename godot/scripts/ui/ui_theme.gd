@@ -56,15 +56,16 @@ static func style_button(button: Button, active: bool = false) -> void:
 	button.add_theme_color_override("font_pressed_color", text_color)
 	button.add_theme_color_override("font_focus_color", text_color)
 	button.add_theme_font_size_override("font_size", 14)
+	button.custom_minimum_size = Vector2(0, 40)
 
 static func style_tab_button(button: Button, active: bool = false) -> void:
 	if button == null:
 		return
 	button.flat = false
 	style_button(button, active)
+	button.add_theme_font_size_override("font_size", 12)
 	if active:
 		button.add_theme_color_override("font_color", CGA_BLACK)
 		button.add_theme_color_override("font_hover_color", CGA_BLACK)
 		button.add_theme_color_override("font_pressed_color", CGA_BLACK)
 		button.add_theme_color_override("font_focus_color", CGA_BLACK)
-
