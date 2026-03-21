@@ -10,6 +10,7 @@ import {
   createMathRandomSource,
   createTravelCombatState,
   enterArrivalSpace,
+  enterStationSpace,
   getPlayerCombatSnapshot,
   setCombatSystemContext,
   stepTravelCombat,
@@ -64,17 +65,16 @@ const CGA_BLACK = '#000000';
 const CGA_GREEN = '#55ff55';
 const CGA_RED = '#ff5555';
 const CGA_YELLOW = '#ffff55';
-const CGA_CYAN = '#55ffff';
 
 function getEnemyColor(roles: CombatShipRoles, missionTag?: string) {
   if (missionTag === 'constrictor') {
-    return CGA_CYAN;
+    return CGA_YELLOW;
   }
   if (missionTag === 'thargoid-plans') {
-    return '#ff88ff';
+    return CGA_RED;
   }
   if (roles.cop) {
-    return CGA_CYAN;
+    return CGA_GREEN;
   }
   if (roles.innocent || roles.trader) {
     return CGA_YELLOW;
@@ -193,6 +193,7 @@ export function TravelScreen() {
     let stars: Array<{ x: number; y: number; z: number }> = [];
     let overlayMessage = '';
     let overlayTimer = 0;
+    let jumpCompleted = false;
 
     const initSpace = () => {
       stars = [];
@@ -263,7 +264,9 @@ export function TravelScreen() {
       );
       Object.assign(combatState, fresh);
       setCombatSystemContext(combatState, { government: originSystem.government, techLevel: originSystem.techLevel, witchspace: false }, random);
+      enterStationSpace(combatState, random, { message: 'CLEARED FROM STATION' });
       initSpace();
+      jumpCompleted = false;
       flightState = 'READY';
       showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
       updateHud();
@@ -476,7 +479,7 @@ export function TravelScreen() {
       drawStationWithSplit(stationX, stationY, combatState.station.angle);
       ctx.save();
       ctx.translate(stationX, stationY);
-      ctx.strokeStyle = combatState.encounter.safeZone ? CGA_GREEN : '#444444';
+      ctx.strokeStyle = combatState.encounter.safeZone ? CGA_GREEN : CGA_RED;
       ctx.setLineDash([6, 8]);
       ctx.beginPath();
       ctx.arc(0, 0, combatState.station.safeZoneRadius, 0, Math.PI * 2);
@@ -520,6 +523,7 @@ export function TravelScreen() {
       ctx.fillStyle = CGA_GREEN;
       ctx.font = 'bold 12px "Courier New", monospace';
       ctx.fillText('DOCK RADAR', radarX + 12, radarY + 18);
+      ctx.fillText(jumpCompleted ? session.destinationSystem.toUpperCase() : session.originSystem.toUpperCase(), radarX + 12, radarY + 34);
 
       ctx.save();
       ctx.translate(radarCenterX, radarCenterY);
@@ -688,12 +692,19 @@ export function TravelScreen() {
         random
       );
 
-      if (result.autoDocked && flightState === 'ARRIVED') {
+      if (result.autoDocked) {
         const snapshot = getPlayerCombatSnapshot(combatState);
+        const dockSystemName = jumpCompleted ? session.destinationSystem : session.originSystem;
+        const missionEvents = [...combatState.missionEvents];
+        if (jumpCompleted && hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
+          missionEvents.push({ type: 'combat:thargoid-plans-delivered' });
+        }
         completeTravel({
+          dockSystemName,
+          spendJumpFuel: jumpCompleted,
           legalValue: combatState.legalValue,
           tallyDelta: combatState.player.tallyKills,
-          missionEvents: combatState.missionEvents,
+          missionEvents,
           cargo: snapshot.cargo,
           fuelDelta: snapshot.fuel,
           installedEquipment: snapshot.installedEquipment,
@@ -716,12 +727,13 @@ export function TravelScreen() {
         if (jumpTimer <= 0) {
           setCombatSystemContext(combatState, { government: destinationSystem.government, techLevel: destinationSystem.techLevel, witchspace: false }, random);
           enterArrivalSpace(combatState, random);
+          jumpCompleted = true;
           flightState = 'ARRIVED';
           showMessage(`SYSTEM REACHED: ${session.destinationSystem.toUpperCase()}`, 1800);
         }
       }
 
-      if (combatState.station && flightState === 'ARRIVED') {
+      if (combatState.station && flightState !== 'JUMPING') {
         const docking = assessDockingApproach(combatState.station, combatState.player);
 
         if (docking.distance < combatState.station.radius + 15) {
@@ -734,10 +746,13 @@ export function TravelScreen() {
             if (docking.canDock) {
               const missionEvents = [...combatState.missionEvents];
               const snapshot = getPlayerCombatSnapshot(combatState);
-              if (hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
+              const dockSystemName = jumpCompleted ? session.destinationSystem : session.originSystem;
+              if (jumpCompleted && hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
                 missionEvents.push({ type: 'combat:thargoid-plans-delivered' });
               }
               completeTravel({
+                dockSystemName,
+                spendJumpFuel: jumpCompleted,
                 legalValue: combatState.legalValue,
                 tallyDelta: combatState.player.tallyKills,
                 missionEvents,
@@ -767,8 +782,8 @@ export function TravelScreen() {
         const snapshot = getPlayerCombatSnapshot(combatState);
         completeTravel({
           outcome: 'rescued',
-          dockSystemName: flightState === 'ARRIVED' ? session.destinationSystem : session.originSystem,
-          spendJumpFuel: flightState === 'ARRIVED',
+          dockSystemName: jumpCompleted ? session.destinationSystem : session.originSystem,
+          spendJumpFuel: jumpCompleted,
           legalValue: combatState.legalValue,
           tallyDelta: combatState.player.tallyKills,
           missionEvents: combatState.missionEvents,

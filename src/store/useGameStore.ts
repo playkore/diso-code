@@ -471,6 +471,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         }
 
         const dockSystemName = report?.dockSystemName ?? state.travelSession.destinationSystem;
+        const spendJumpFuel = report?.spendJumpFuel ?? dockSystemName === state.travelSession.destinationSystem;
         const nextState =
           report?.outcome === 'rescued'
             ? createDockedState(
@@ -480,19 +481,33 @@ export const useGameStore = create<GameStore>((set, get) => {
                 },
                 dockSystemName,
                 {
-                  spendJumpFuel: report.spendJumpFuel === true,
+                  spendJumpFuel,
                   title: `Recovered at ${dockSystemName}`,
                   body: `Escape pod recovery complete. Insurance docked you at ${dockSystemName} with cargo losses applied.`,
                   stardateDelta: 1
                 }
               )
-            : createArrivalState(
-                {
-                  ...state,
-                  commander
-                },
-                dockSystemName
-              );
+            : spendJumpFuel
+              ? createArrivalState(
+                  {
+                    ...state,
+                    commander
+                  },
+                  dockSystemName
+                )
+              : createDockedState(
+                  {
+                    ...state,
+                    commander
+                  },
+                  dockSystemName,
+                  {
+                    spendJumpFuel: false,
+                    title: `Docked at ${dockSystemName}`,
+                    body: `Returned to ${dockSystemName} station without jumping. Fuel remains ${formatLightYears(commander.fuel)}.`,
+                    stardateDelta: 0
+                  }
+                );
         if (!nextState) {
           return {
             ...state,

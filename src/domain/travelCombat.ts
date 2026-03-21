@@ -262,6 +262,8 @@ const BLUEPRINT_FILES: Record<BlueprintFileId, BlueprintId[]> = {
 
 const PACK_SEQUENCE: BlueprintId[] = ['sidewinder', 'mamba', 'krait', 'adder', 'gecko', 'cobra-mk1', 'worm', 'cobra-mk3-pirate'];
 const LONE_BOUNTY_SEQUENCE: BlueprintId[] = ['cobra-mk3-pirate', 'asp-mk2', 'python-pirate', 'fer-de-lance'];
+const SAFE_ZONE_ENEMY_MARGIN = 18;
+const SAFE_ZONE_AVOIDANCE_DISTANCE = 96;
 
 function clampAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -273,6 +275,23 @@ function clampByte(value: number): number {
 
 function clampShields(value: number, maxShields: number): number {
   return Math.max(0, Math.min(maxShields, value));
+}
+
+function isEnemyExcludedFromSafeZone(enemy: CombatEnemy): boolean {
+  return !enemy.roles.cop && (enemy.roles.hostile || enemy.kind === 'thargon' || Boolean(enemy.missionTag));
+}
+
+function getDistanceFromStation(station: CombatStation, x: number, y: number): number {
+  return Math.hypot(x - station.x, y - station.y);
+}
+
+function getSafeZoneEscapeAngle(station: CombatStation, enemy: CombatEnemy): number {
+  const dx = enemy.x - station.x;
+  const dy = enemy.y - station.y;
+  if (dx === 0 && dy === 0) {
+    return enemy.angle;
+  }
+  return Math.atan2(dy, dx);
 }
 
 export function getStationSlotAngle(stationAngle: number): number {
@@ -633,20 +652,37 @@ export function setCombatSystemContext(
   });
 }
 
-export function enterArrivalSpace(state: TravelCombatState, random: RandomSource) {
+export function enterStationSpace(
+  state: TravelCombatState,
+  random: RandomSource,
+  options: { rewardScore?: boolean; message?: string } = {}
+) {
   state.station = {
-    x: random.nextFloat() * 1000,
-    y: -550 + random.nextFloat() * 180,
+    x: Math.round((random.nextFloat() - 0.5) * 120),
+    y: -320 - Math.round(random.nextFloat() * 60),
     radius: 80,
     angle: 0,
     rotSpeed: 0.005,
     safeZoneRadius: 360
   };
+  state.player.x = state.station.x;
+  state.player.y = state.station.y + 240;
+  state.player.vx = 0;
+  state.player.vy = 0;
+  state.player.angle = -Math.PI / 2;
   state.enemies = state.enemies.filter((enemy) => enemy.roles.cop || enemy.missionTag);
   state.projectiles = [];
   state.encounter.safeZone = false;
-  state.score += 250;
-  pushMessage(state, 'SYSTEM REACHED', 1800);
+  if (options.rewardScore) {
+    state.score += 250;
+  }
+  if (options.message) {
+    pushMessage(state, options.message, 1800);
+  }
+}
+
+export function enterArrivalSpace(state: TravelCombatState, random: RandomSource) {
+  enterStationSpace(state, random, { rewardScore: true, message: 'SYSTEM REACHED' });
 }
 
 function estimateCnt(angleDiff: number): number {
@@ -881,19 +917,27 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   const dx = state.player.x - enemy.x;
   const dy = state.player.y - enemy.y;
   const dist = Math.hypot(dx, dy);
-  const targetAngle = Math.atan2(dy, dx);
+  const station = state.station;
+  const safeZoneBoundary = station ? station.safeZoneRadius + SAFE_ZONE_ENEMY_MARGIN : 0;
+  const enemyExcludedFromSafeZone = station ? isEnemyExcludedFromSafeZone(enemy) : false;
+  const distanceFromStation = station ? getDistanceFromStation(station, enemy.x, enemy.y) : Number.POSITIVE_INFINITY;
+  const mustAvoidSafeZone = enemyExcludedFromSafeZone && distanceFromStation <= safeZoneBoundary + SAFE_ZONE_AVOIDANCE_DISTANCE;
+  const targetAngle = mustAvoidSafeZone && station ? getSafeZoneEscapeAngle(station, enemy) : Math.atan2(dy, dx);
   const angleDiff = clampAngle(targetAngle - enemy.angle);
 
   enemy.angle += Math.sign(angleDiff) * enemy.turnRate * dt * (enemy.aggression > 0 ? 1 : 0.4);
   enemy.isFiringLaser = false;
 
-  if (enemy.roles.hostile || enemy.missionTag || enemy.kind === 'thargon') {
+  if (mustAvoidSafeZone && station) {
+    enemy.vx += Math.cos(enemy.angle) * enemy.acceleration * dt * 1.25;
+    enemy.vy += Math.sin(enemy.angle) * enemy.acceleration * dt * 1.25;
+  } else if (enemy.roles.hostile || enemy.missionTag || enemy.kind === 'thargon') {
     if (dist > 110) {
       enemy.vx += Math.cos(enemy.angle) * enemy.acceleration * dt;
       enemy.vy += Math.sin(enemy.angle) * enemy.acceleration * dt;
     }
-  } else if (state.station) {
-    const toStation = Math.atan2(state.station.y - enemy.y, state.station.x - enemy.x);
+  } else if (station) {
+    const toStation = Math.atan2(station.y - enemy.y, station.x - enemy.x);
     enemy.angle += Math.sign(clampAngle(toStation - enemy.angle)) * enemy.turnRate * 0.4 * dt;
     enemy.vx += Math.cos(enemy.angle) * enemy.acceleration * 0.4 * dt;
     enemy.vy += Math.sin(enemy.angle) * enemy.acceleration * 0.4 * dt;
@@ -913,8 +957,28 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   enemy.x += enemy.vx * dt;
   enemy.y += enemy.vy * dt;
 
+  if (enemyExcludedFromSafeZone && station) {
+    const newDistanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
+    if (newDistanceFromStation < safeZoneBoundary) {
+      const escapeAngle = getSafeZoneEscapeAngle(station, enemy);
+      enemy.x = station.x + Math.cos(escapeAngle) * safeZoneBoundary;
+      enemy.y = station.y + Math.sin(escapeAngle) * safeZoneBoundary;
+      const outwardSpeed = Math.max(enemy.acceleration * 24, Math.hypot(enemy.vx, enemy.vy));
+      enemy.vx = Math.cos(escapeAngle) * outwardSpeed;
+      enemy.vy = Math.sin(escapeAngle) * outwardSpeed;
+      enemy.angle = escapeAngle;
+    }
+  }
+
   enemy.fireCooldown = Math.max(0, enemy.fireCooldown - dt);
   enemy.missileCooldown = Math.max(0, enemy.missileCooldown - dt);
+
+  if (enemyExcludedFromSafeZone && station) {
+    const finalDistanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
+    if (state.encounter.safeZone || finalDistanceFromStation <= safeZoneBoundary + SAFE_ZONE_ENEMY_MARGIN) {
+      return;
+    }
+  }
 
   if (!(enemy.roles.hostile || enemy.kind === 'thargon')) {
     return;
