@@ -12,6 +12,7 @@ describe('travel combat station rules', () => {
     expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeGreaterThanOrEqual(10_000);
     expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeLessThanOrEqual(20_000);
     expect(state.player.angle).toBe(Math.PI / 3);
+    expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(state.player.maxSpeed);
     expect(state.encounter.safeZone).toBe(false);
   });
 

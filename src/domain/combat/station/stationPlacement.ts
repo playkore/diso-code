@@ -45,5 +45,7 @@ export function enterArrivalSpace(state: TravelCombatState, random: RandomSource
     HYPERSPACE_ARRIVAL_MIN_DISTANCE +
     Math.round(random.nextFloat() * (HYPERSPACE_ARRIVAL_MAX_DISTANCE - HYPERSPACE_ARRIVAL_MIN_DISTANCE));
   state.player.y = state.station.y + arrivalDistance;
+  state.player.vx = Math.cos(state.player.angle) * state.player.maxSpeed;
+  state.player.vy = Math.sin(state.player.angle) * state.player.maxSpeed;
   state.encounter.safeZone = false;
 }
