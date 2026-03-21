@@ -1,6 +1,12 @@
 import { getLegalStatus, type CommanderState } from '../../domain/commander';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 
+/**
+ * Maps combat simulation data into HUD-friendly strings.
+ *
+ * Keeping this translation separate lets the simulation stay numeric while the
+ * UI decides how to present drive states, threat counts, and weapon cues.
+ */
 export interface TravelDriveStatus {
   jump: string;
   hyperspace: string;

@@ -1,3 +1,9 @@
+/**
+ * Mission progression is stored in the legacy-style `tp` bitfield. Docking
+ * flows and external gameplay events both contribute flags, but they do so in
+ * different places so the UI can show new briefings only after the commander
+ * safely reaches a station.
+ */
 export const TP_MISSION_FLAGS = {
   constrictorBriefed: 1 << 0,
   constrictorCompleted: 1 << 1,
@@ -50,6 +56,8 @@ export function getMissionMessagesForDocking(progress: MissionProgress): Mission
   const nextTp = progress.tp;
   const messages: MissionMessage[] = [];
 
+  // Docking briefings are derived from the already-applied mission state so the
+  // caller can decide when to persist the underlying flag changes.
   if (supportsConstrictor(progress.variant) && !hasMissionFlag(nextTp, 'constrictorBriefed')) {
     messages.push({
       id: 'constrictor-briefing',
@@ -108,6 +116,8 @@ export function applyMissionExternalEvent(progress: MissionProgress, event: Miss
       }
       break;
     case 'travel:thargoid-contact-system':
+      // Contact with the route system unlocks the delivery leg even before the
+      // commander returns to a station for the next briefing text.
       tp = withMissionFlag(tp, 'thargoidPlansBriefed');
       break;
     case 'combat:thargoid-plans-delivered':
@@ -134,6 +144,8 @@ export function applyMissionExternalEvent(progress: MissionProgress, event: Miss
 export function applyDockingMissionState(progress: MissionProgress): MissionProgress {
   let tp = progress.tp;
 
+  // Some classic missions advance automatically once the commander docks, even
+  // if no separate combat/travel event fired during the trip.
   if (supportsConstrictor(progress.variant) && !hasMissionFlag(tp, 'constrictorBriefed')) {
     tp = withMissionFlag(tp, 'constrictorBriefed');
   }

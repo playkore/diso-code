@@ -1,6 +1,14 @@
 import { clampAngle } from '../state';
 import type { CombatPlayer, CombatStation, DockingAssessment } from '../types';
 
+/**
+ * Docking geometry helpers.
+ *
+ * Successful docking requires the ship to approach through the rotating slot,
+ * face back toward the hangar opening, and slow below the allowed entry speed.
+ * Anything that reaches the station hull outside that gap is treated as a
+ * collision instead.
+ */
 export function getStationSlotAngle(stationAngle: number): number {
   return stationAngle + Math.PI / 2;
 }

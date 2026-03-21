@@ -24,6 +24,7 @@ export function SaveLoadScreen() {
     <section className="screen">
       <h2>Save / Load</h2>
       <div className="save-panels">
+        {/* Current commander summary and destructive new-game entry point. */}
         <section className="save-panel">
           <p className="dialog-kicker">Current Commander</p>
           <dl className="detail-grid">
@@ -55,6 +56,7 @@ export function SaveLoadScreen() {
           const savedCargo = savedCommander ? cargoUsedTonnes(savedCommander.cargo) : 0;
 
           return (
+            // Each slot shows the saved snapshot summary plus direct save/load actions.
             <section key={slotId} className="save-panel">
               <div className="save-slot__header">
                 <p className="dialog-kicker">Slot {slotId}</p>
@@ -95,6 +97,7 @@ export function SaveLoadScreen() {
         })}
       </div>
       {isConfirmingReset ? (
+        // New game is gated behind a modal because it discards the in-memory run.
         <div className="dialog-backdrop" role="presentation">
           <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="new-game-title">
             <p className="dialog-kicker">New Commander</p>
@@ -121,6 +124,7 @@ export function SaveLoadScreen() {
         </div>
       ) : null}
       {pendingLoadSlotId ? (
+        // Loading is confirmed separately so accidental taps do not overwrite the current run.
         <div className="dialog-backdrop" role="presentation">
           <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="load-game-title">
             <p className="dialog-kicker">Load Commander</p>
@@ -147,6 +151,7 @@ export function SaveLoadScreen() {
         </div>
       ) : null}
       <section className="save-panel save-panel--settings">
+        {/* Settings/debug helpers live here because they affect the broader run rather than a slot. */}
         <p className="dialog-kicker">Settings</p>
         <label className="settings-toggle">
           <input

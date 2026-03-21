@@ -1,3 +1,10 @@
+/**
+ * Procedural galaxy seed helpers.
+ *
+ * The original-style universe is defined by a three-word seed. Each system is
+ * generated from the current seed, then the seed advances four times before the
+ * next system. Rotating all seed bytes yields the next galaxy.
+ */
 export interface SeedTriplet {
   w0: number;
   w1: number;
@@ -66,6 +73,7 @@ export function generateGalaxy(galaxyIndex: number): GalaxySystemSeed[] {
       seed: { ...seed }
     });
 
+    // Downstream naming/system-data code expects this exact four-step stride.
     for (let step = 0; step < 4; step += 1) {
       seed = advanceSeed(seed);
     }

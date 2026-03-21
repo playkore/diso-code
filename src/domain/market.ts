@@ -1,5 +1,11 @@
 export type CommodityUnit = 't' | 'kg' | 'g';
 
+/**
+ * Local market generation follows the original byte-oriented economy model:
+ * each commodity combines a fixed base value, an economy gradient, and a masked
+ * fluctuation byte. Docked sessions keep that baseline immutable and only track
+ * per-commodity quantity deltas as the player trades.
+ */
 export interface Commodity {
   key: string;
   name: string;
@@ -83,6 +89,8 @@ export function createDockedMarketSession(
   fluctuation: number
 ): DockedMarketSession {
   const baseline = generateMarket(economy, fluctuation);
+  // Session quantities start from the generated baseline, then diverge locally
+  // as the player buys and sells without regenerating prices mid-visit.
   const localQuantities = Object.fromEntries(baseline.map((item) => [item.key, item.quantity]));
 
   return {
@@ -111,6 +119,8 @@ export function applyLocalMarketTrade(
 
   return {
     ...session,
+    // Trades only mutate the quantity overlay. Baseline prices remain stable
+    // until a new docked session is created for another visit.
     localQuantities: {
       ...session.localQuantities,
       [commodityKey]: next

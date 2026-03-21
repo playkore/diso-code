@@ -1,6 +1,17 @@
 import type { MissionVariant } from './missions';
 import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, type ShipType } from './shipCatalog';
 
+/**
+ * Canonical commander-state model and normalization rules.
+ *
+ * All save/load, outfitting, and store flows should pass partial or legacy
+ * commander objects through `normalizeCommanderState` before persisting them.
+ * That function is the authority for:
+ * - default values for missing fields
+ * - migration from legacy `legalStatus` and `equipment` shapes
+ * - minimum legal-value enforcement based on illegal cargo
+ * - equipment-derived capacity defaults such as the cargo bay upgrade
+ */
 export type LegalStatus = 'clean' | 'offender' | 'fugitive';
 
 export type LaserMountState = Record<LaserMountPosition, LaserId | null>;
@@ -125,6 +136,8 @@ function legacyLegalValue(status?: string): number {
   return 0;
 }
 
+// Older save formats stored equipment as ad-hoc camelCase strings. They are
+// translated once here so the rest of the app can stay on typed catalog ids.
 function mapLegacyEquipment(legacyEquipment: string[]): EquipmentId[] {
   return legacyEquipment.flatMap((entry) => {
     switch (entry) {
@@ -151,6 +164,8 @@ function mapLegacyEquipment(legacyEquipment: string[]): EquipmentId[] {
 export function normalizeCommanderState(
   commander: CommanderState | (Partial<CommanderState> & { legalStatus?: string; equipment?: string[] })
 ): CommanderState {
+  // Legacy saves may only carry a status label, but modern flows treat the
+  // numeric legal value as the source of truth because cargo can raise it.
   const legacyStatus = 'legalStatus' in commander ? commander.legalStatus : undefined;
   const legalValue = applyLegalFloor(
     typeof commander.legalValue === 'number' ? commander.legalValue : legacyLegalValue(legacyStatus),
@@ -158,6 +173,8 @@ export function normalizeCommanderState(
   );
   const legacyEquipment = 'equipment' in commander && Array.isArray(commander.equipment) ? commander.equipment : [];
   const installedEquipment = commander.installedEquipment ?? createInstalledEquipmentState(mapLegacyEquipment(legacyEquipment));
+  // Cargo capacity defaults from installed equipment unless a caller already
+  // provided an explicit capacity, which lets restored saves keep custom values.
   const cargoCapacity =
     commander.cargoCapacity ??
     (installedEquipment.large_cargo_bay ? PLAYER_SHIP.maxCargoCapacity : PLAYER_SHIP.baseCargoCapacity);

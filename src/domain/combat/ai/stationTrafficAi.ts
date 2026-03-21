@@ -3,6 +3,11 @@ import { getStationSlotAngle } from '../station/docking';
 import { getDistanceFromStation } from '../station/safeZone';
 import type { CombatEnemy, CombatStation } from '../types';
 
+/**
+ * Station traffic follows a simple two-stage approach:
+ * first queue at a hold point in front of the slot, then commit to the slot
+ * once alignment and distance are good enough to finish the docking run.
+ */
 const STATION_TRAFFIC_HOLD_DISTANCE = 148;
 const STATION_TRAFFIC_SLOT_DISTANCE = 30;
 const STATION_TRAFFIC_DOCKING_RADIUS = 96;
@@ -25,6 +30,8 @@ export function stepStationTraffic(enemy: CombatEnemy, station: CombatStation, d
   const relativeAngle = Math.atan2(enemy.y - station.y, enemy.x - station.x);
   const slotOffset = clampAngle(relativeAngle - slotAngle);
   const alignedForDocking = Math.abs(slotOffset) < Math.PI / 7;
+  // Traffic can skip straight to docking if it is already near the slot and
+  // roughly aligned, which keeps loops from orbiting the station forever.
   const shouldDock = holdDistance < 42 || (distanceFromStation < STATION_TRAFFIC_HOLD_DISTANCE + 8 && alignedForDocking);
 
   const targetX = shouldDock ? station.x + Math.cos(slotAngle) * STATION_TRAFFIC_SLOT_DISTANCE : holdX;

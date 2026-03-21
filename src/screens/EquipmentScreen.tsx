@@ -33,6 +33,7 @@ export function EquipmentScreen() {
       </p>
 
       <section className="subpanel">
+        {/* Ship summary gives context for purchase constraints such as fuel, rack capacity, and installed gear. */}
         <p className="dialog-kicker">Ship</p>
         <dl className="detail-grid">
           <dt>Hull</dt>
@@ -64,6 +65,7 @@ export function EquipmentScreen() {
       </section>
 
       <section className="subpanel">
+        {/* Weapons are split from general equipment because lasers are priced per mount and missiles use rack capacity. */}
         <div className="section-heading">
           <div>
             <p className="dialog-kicker">Weapons</p>
@@ -109,6 +111,7 @@ export function EquipmentScreen() {
       </section>
 
       <section className="subpanel">
+        {/* General equipment offers are prefiltered by the outfitting domain helpers for this tech level. */}
         <p className="dialog-kicker">Equipment Market</p>
         <ul className="card-list">
           {equipmentOffers.map((equipment) => (

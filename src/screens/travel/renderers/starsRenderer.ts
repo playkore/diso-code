@@ -1,6 +1,13 @@
 import type { FlightPhase } from '../../../domain/travelCombat';
 import { CGA_RED, CGA_YELLOW } from './constants';
 
+/**
+ * Starfield renderer.
+ *
+ * Normal flight uses static parallax dots. Local jump and hyperspace reuse the
+ * same stars as streaks, changing only color and velocity emphasis to signal
+ * the current drive mode without leaving the CGA palette.
+ */
 export interface StarPoint {
   x: number;
   y: number;

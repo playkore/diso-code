@@ -114,6 +114,8 @@ export function AppShell() {
   const isTravelRoute = location.pathname === '/travel';
 
   if (isTravelRoute) {
+    // The travel route owns its own full-screen chrome, so the shell strips
+    // everything back to an outlet container while the arcade segment is active.
     return (
       <div className="app-shell app-shell--travel">
         <main>
@@ -126,6 +128,8 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <header>
+        {/* The header surfaces docked-state information only. Travel HUD data is
+            rendered by the travel screen itself to avoid duplicated status bars. */}
         <dl className="hud-grid" aria-label="Commander status">
           <div>
             <dt>Credits</dt>

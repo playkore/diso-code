@@ -17,6 +17,8 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           ui: withUiMessage(state.ui, createUiMessage('error', `Cannot buy ${equipment.name}`, check.reason ?? 'The outfitting terminal rejected the order.'))
         };
       }
+      // Equipment purchases can affect derived commander fields such as cargo
+      // capacity, so the result is always re-normalized before storing it.
       const nextCommander = normalizeCommanderState({
         ...state.commander,
         cash: state.commander.cash - equipment.price,
@@ -45,6 +47,8 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
         };
       }
       const previous = state.commander.laserMounts[mount];
+      // Laser fitting only changes a single mount, but normalization keeps the
+      // commander shape consistent with any future compatibility rules.
       const nextCommander = normalizeCommanderState({
         ...state.commander,
         cash: state.commander.cash - laser.price,
@@ -71,6 +75,8 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           ui: withUiMessage(state.ui, createUiMessage('error', 'Cannot buy missile', check.reason ?? 'The rack cannot accept another missile.'))
         };
       }
+      // Missiles consume rack capacity rather than a named equipment flag, so
+      // they use their own purchase path even though the UX is similar.
       const nextCommander = normalizeCommanderState({
         ...state.commander,
         cash: state.commander.cash - MISSILE_CATALOG.price,

@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
+/**
+ * Travel input adapter.
+ *
+ * The travel loop reads a single mutable input object every frame. This hook
+ * merges keyboard state, pointer-captured hold buttons, and the virtual
+ * joystick into that object while exposing only the renderable joystick state
+ * through React.
+ */
 export interface TravelInputState {
   turn: number;
   thrust: number;
@@ -137,6 +145,8 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
       return;
     }
 
+    // The joystick claims pointer capture so drags continue to steer even if
+    // the pointer leaves the viewport element.
     const viewportRect = viewport.getBoundingClientRect();
     const left = `${event.clientX - viewportRect.left - JOYSTICK_RADIUS}px`;
     const top = `${event.clientY - viewportRect.top - JOYSTICK_RADIUS}px`;
@@ -174,6 +184,8 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   };
 
   useEffect(() => {
+    // Keyboard handlers only update refs; the animation loop decides how those
+    // latched inputs interact with touch controls each frame.
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key in keysRef.current) {
         keysRef.current[event.key] = true;
@@ -198,6 +210,7 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   }, []);
 
   const createPressHandlers = (key: 'fire' | 'jump', activePointerIdRef: MutableRefObject<number | null>): TravelPressHandlers => {
+    // Hold actions stay active until the same pointer releases or capture is lost.
     const release = (event?: ReactPointerEvent<HTMLButtonElement>) => {
       if (event && activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
         return;
@@ -229,6 +242,8 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   };
 
   const createTapHandlers = (key: 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock'): TravelTapHandlers => ({
+    // Tap actions are single-frame latches. The session loop clears them after
+    // consuming the request.
     onPointerDown: (event) => {
       event.preventDefault();
       inputRef.current[key] = true;
@@ -255,6 +270,7 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   const dockButtonHandlers = useMemo(() => createTapHandlers('autoDock'), []);
   const resetInput = useMemo(
     () => () => {
+      // Reset clears both transient button latches and joystick-derived axes.
       Object.assign(inputRef.current, createTravelInput());
       Object.keys(keysRef.current).forEach((key) => {
         keysRef.current[key] = false;

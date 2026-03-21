@@ -4,6 +4,12 @@ import { getLegalValueAfterCombat, updateLegalStatus } from '../scoring/legalSta
 import { clampShields, pushMessage, spawnParticles } from '../state';
 import type { RandomSource, TravelCombatState } from '../types';
 
+/**
+ * Projectile simulation and collision side effects.
+ *
+ * This pass owns all transient projectile state after firing: homing missiles,
+ * hit detection, station safe-zone penalties, shield damage, and cleanup.
+ */
 export function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
     const projectile = state.projectiles[i];
@@ -19,6 +25,8 @@ export function moveProjectiles(state: TravelCombatState, dt: number, random: Ra
 
     let hit = false;
     if (projectile.owner === 'player') {
+      // Player shots resolve against enemies first because friendly-fire
+      // consequences depend on which target was struck inside the safe zone.
       for (let j = state.enemies.length - 1; j >= 0; j -= 1) {
         const enemy = state.enemies[j];
         const distanceSq = (projectile.x - enemy.x) ** 2 + (projectile.y - enemy.y) ** 2;
@@ -48,6 +56,8 @@ export function moveProjectiles(state: TravelCombatState, dt: number, random: Ra
     }
 
     if (!hit && projectile.kind === 'missile' && projectile.owner === 'enemy' && state.station && state.encounter.safeZone) {
+      // Station defenses treat missiles crossing into the safe zone as neutralized
+      // even if they have not yet reached the player.
       const previousDistanceFromStation = Math.hypot(previousX - state.station.x, previousY - state.station.y);
       const currentDistanceFromStation = Math.hypot(projectile.x - state.station.x, projectile.y - state.station.y);
       if (previousDistanceFromStation > state.station.safeZoneRadius && currentDistanceFromStation <= state.station.safeZoneRadius) {

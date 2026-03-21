@@ -3,6 +3,14 @@ import { spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
 import { clampShields } from '../state';
 import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
+/**
+ * Enemy weapon and hostility rules.
+ *
+ * This module keeps the combat-specific legacy heuristics in one place:
+ * hostility escalation from legal state, the CNT alignment thresholds for
+ * laser fire/hits, and the special Thargoid missile behavior that spawns
+ * Thargons instead of a normal projectile.
+ */
 export function estimateCnt(angleDiff: number): number {
   const alignment = Math.max(0, Math.cos(Math.abs(angleDiff)));
   return -Math.round(alignment * 36);
@@ -17,6 +25,8 @@ export function canEnemyLaserHitByCnt(cnt: number): boolean {
 }
 
 export function applyEnemyHostility(state: TravelCombatState, enemy: CombatEnemy) {
+  // Bounty hunters and station cops can become hostile without changing their
+  // base role definitions, so hostility is recalculated every frame.
   if (enemy.roles.bountyHunter && state.legalValue >= 40) {
     enemy.roles.hostile = true;
   }
@@ -57,6 +67,7 @@ export function tryEnemyMissileLaunch(state: TravelCombatState, enemy: CombatEne
   enemy.missiles -= 1;
   enemy.missileCooldown = 150;
   if (enemy.blueprintId === 'thargoid') {
+    // Thargoids deploy autonomous escorts in place of conventional missiles.
     spawnEnemyFromBlueprint(state, 'thargon', random, {
       kind: 'thargon',
       x: enemy.x + Math.cos(enemy.angle) * 24,
@@ -76,6 +87,8 @@ export function tryEnemyLaserAttack(state: TravelCombatState, enemy: CombatEnemy
   }
 
   const cnt = estimateCnt(angleDiff);
+  // Firing and hitting use slightly different CNT thresholds so enemies can
+  // visibly shoot even when the shot is not precise enough to connect.
   if (!canEnemyLaserFireByCnt(cnt) || enemy.laserPower <= 0) {
     return;
   }

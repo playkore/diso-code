@@ -2,6 +2,13 @@ import type { CombatEnemy, TravelCombatState } from '../../../domain/travelComba
 import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW } from './constants';
 import { getEnemyColor, getEnemyShape, getProjectileColor, drawWireframe } from './shipsRenderer';
 
+/**
+ * Enemy/projectile overlay renderer.
+ *
+ * Ship wireframes are rendered here instead of in `shipsRenderer` because the
+ * travel screen wants a single pass that keeps enemy hulls, health bars,
+ * projectiles, and particles visually grouped above the background layers.
+ */
 export interface EnemyHealthBarState {
   ratio: number;
   fillColor: string;

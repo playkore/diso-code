@@ -16,6 +16,8 @@ interface StarPoint {
 const MAP_SCALE = 4;
 const MAX_JUMP_RANGE = (7 / 0.4) * MAP_SCALE;
 
+// The map is centered on the current system. Y is halved to mimic the classic
+// chart aspect ratio used by the original short-range star map.
 function getRelativePoint(currentSystem: string, targetSystem: string, availableFuel: number): StarPoint {
   const current = getSystemByName(currentSystem)?.data;
   const target = getSystemByName(targetSystem)?.data;
@@ -59,6 +61,7 @@ export function StarMapScreen() {
       <h2>Local Star Map</h2>
       <div className="star-map" role="img" aria-label={`Map of stars around ${universe.currentSystem}`}>
         <svg viewBox="-110 -110 220 220" aria-hidden="true">
+          {/* The inner ring reflects current jump fuel, while the outer ring shows the ship's theoretical maximum range. */}
           <circle className="star-map__range" cx="0" cy="0" r={(currentFuel / 0.4) * MAP_SCALE} />
           <circle className="star-map__range star-map__range--max" cx="0" cy="0" r={MAX_JUMP_RANGE} />
           {starPoints.map((star) => (
@@ -93,6 +96,7 @@ export function StarMapScreen() {
       </div>
       {selectedSystem && selectedPoint ? (
         <div className="star-map__actions">
+          {/* Selection is explicit: the player chooses a destination first, then commits to travel from the details panel. */}
           <p>
             Selected destination: <strong>{selectedSystem}</strong>
           </p>

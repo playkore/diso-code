@@ -2,6 +2,13 @@ import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type TravelCombatState } fro
 import { CGA_BLACK, CGA_GREEN, CGA_YELLOW } from './constants';
 import { getEnemyColor } from './shipsRenderer';
 
+/**
+ * Renders the compact docking radar.
+ *
+ * The radar stays player-centered in world space. Station blips use a slightly
+ * larger scale than ships so the player can still track the station while
+ * enemies cluster near the origin during close-range combat.
+ */
 export function drawRadar(
   ctx: CanvasRenderingContext2D,
   state: TravelCombatState,

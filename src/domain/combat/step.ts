@@ -11,6 +11,20 @@ import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
 import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCombatState } from './types';
 
+/**
+ * Advances one real-time combat frame.
+ *
+ * The frame order is deliberate:
+ * 1. recharge timers and player-only instant actions
+ * 2. update station state and safe-zone flags
+ * 3. apply player steering/thrust/fire for manual-flight phases
+ * 4. roll ambient encounters and station police reactions
+ * 5. step enemies, projectiles, particles, and legal-state fallout
+ * 6. age transient UI messages and compute exit conditions
+ *
+ * Most systems mutate `state` in place so callers can keep a single simulation
+ * object alive across frames without rebuilding references for the renderer.
+ */
 export function stepTravelCombat(
   state: TravelCombatState,
   input: CombatInput,
@@ -40,6 +54,8 @@ export function stepTravelCombat(
     state.encounter.safeZone = false;
   }
 
+  // READY, PLAYING, ARRIVED, and JUMPING all share the same low-level flight
+  // model; only the caller decides which controls are allowed in each phase.
   if (phase === 'PLAYING' || phase === 'ARRIVED' || phase === 'READY' || phase === 'JUMPING') {
     const jumpActive = Boolean(input.jump);
     if (!jumpActive) {
@@ -129,6 +145,9 @@ export function stepTravelCombat(
     playerDestroyed: state.player.shields <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
     playerEscaped: state.player.shields <= 0 && state.playerLoadout.installedEquipment.escape_pod,
     autoDocked: Boolean(
+      // Auto-dock is intentionally conservative: the docking computer only
+      // resolves the final approach after the player requests it, owns the
+      // equipment, is near the station, and has cleared all hostile traffic.
       input.autoDock &&
       state.playerLoadout.installedEquipment.docking_computer &&
       state.station &&

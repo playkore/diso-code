@@ -6,6 +6,14 @@ import { isStationTrafficDocked, stepStationTraffic } from './stationTrafficAi';
 import { applyEnemyHostility, tryEnemyLaserAttack, tryEnemyMissileLaunch } from '../weapons/enemyWeapons';
 import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
+/**
+ * Main enemy-behavior dispatcher.
+ *
+ * Each frame routes an enemy through exactly one movement policy:
+ * station traffic, police pursuit, hostile pursuit, or civilian cruise. Safe
+ * zone helpers can override that movement by steering ships away from the
+ * station, but weapon logic still runs afterward for hostile-capable enemies.
+ */
 export function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, random: RandomSource): boolean {
   applyEnemyHostility(state, enemy);
 
@@ -70,6 +78,8 @@ export function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: numb
     return false;
   }
 
+  // Weapons are evaluated after movement so range/alignment checks use the
+  // enemy's final position for this frame.
   tryEnemyMissileLaunch(state, enemy, random);
   tryEnemyLaserAttack(state, enemy, dist, angleDiff);
   return false;

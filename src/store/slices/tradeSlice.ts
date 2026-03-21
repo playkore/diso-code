@@ -67,6 +67,8 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           ui: withUiMessage(state.ui, createUiMessage('error', `Not enough credits for ${item.name}`, `You need ${formatCredits(spent)} but only have ${formatCredits(state.commander.cash)}.`))
         };
       }
+      // Buying always updates commander cargo/cash and the docked market
+      // session together so inventory and station stock never drift apart.
       const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, -units);
       const nextCash = state.commander.cash - spent;
       return {
@@ -95,6 +97,8 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           ui: withUiMessage(state.ui, createUiMessage('error', `Cannot sell ${item.name}`, 'You do not have any units of this commodity.'))
         };
       }
+      // Selling uses the same lockstep rule in reverse: increase local station
+      // stock, decrease commander cargo, then report the completed trade once.
       const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, units);
       const earnings = units * item.price;
       const nextCash = state.commander.cash + earnings;

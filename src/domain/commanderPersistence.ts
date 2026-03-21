@@ -2,6 +2,16 @@ import { normalizeCommanderState, type CommanderState } from './commander';
 import type { MissionVariant } from './missions';
 import type { LaserId } from './shipCatalog';
 
+/**
+ * Persistence adapters for commander saves.
+ *
+ * The game keeps two wire formats in parallel:
+ * - a readable JSON wrapper used by browser storage and export/import flows
+ * - a fixed 256-byte binary image that mimics classic compact save files
+ *
+ * Both formats normalize commander state before encoding so legacy inputs are
+ * upgraded once at the boundary, then protected with checksums on readback.
+ */
 export const COMMANDER_SCHEMA_VERSION = 2;
 
 export interface CommanderSaveFile {
@@ -42,6 +52,11 @@ type CompactCommanderPayload = [
   MissionVariant
 ];
 
+/**
+ * The compact payload packs boolean equipment flags into a single integer so
+ * the JSON string stored inside the binary format stays below the 216-byte
+ * payload budget.
+ */
 function encodeInstalledEquipmentBits(commander: CommanderState): number {
   return (
     (commander.installedEquipment.fuel_scoops ? 1 << 0 : 0) |
@@ -161,17 +176,23 @@ export function encodeCommanderBinary256(commander: CommanderState): Uint8Array 
   const bytes = new Uint8Array(256);
   const view = new DataView(bytes.buffer);
 
+  // Offsets 0-15 are reserved for fixed-width header fields that are cheap to
+  // inspect without decoding the trailing JSON payload.
   view.setUint32(0, COMMANDER_SCHEMA_VERSION, true);
   view.setUint32(4, normalized.cash, true);
   view.setFloat32(8, normalized.fuel, true);
   view.setUint8(12, normalized.missionTP & 0xff);
   view.setUint16(13, normalized.tally & 0xffff, true);
 
+  // The visible commander name gets its own ASCII slot so old tooling can read
+  // it even if it ignores the compact payload entirely.
   const name = normalized.name.slice(0, 20);
   for (let i = 0; i < name.length; i += 1) {
     view.setUint8(16 + i, name.charCodeAt(i) & 0xff);
   }
 
+  // Offsets 36-251 hold the compact JSON payload. The serializer relies on the
+  // tuple layout above staying append-only compatible with future readers.
   const payload = JSON.stringify(toCompactPayload(normalized));
   if (payload.length > 216) {
     throw new Error('Commander payload exceeds 256-byte binary save capacity');
@@ -180,6 +201,7 @@ export function encodeCommanderBinary256(commander: CommanderState): Uint8Array 
     view.setUint8(36 + i, payload.charCodeAt(i) & 0xff);
   }
 
+  // The checksum covers every byte except the checksum field itself at 252-255.
   const checksum = fnv1a32(Array.from(bytes.slice(0, 252)).join(','));
   view.setUint32(252, checksum, true);
 
@@ -200,6 +222,7 @@ export function decodeCommanderBinary256(bytes: Uint8Array): CommanderState {
   }
 
   const payloadChars: string[] = [];
+  // Payload bytes are null-padded, so decoding stops at the first zero byte.
   for (let i = 36; i < 252; i += 1) {
     const code = view.getUint8(i);
     if (code === 0) {

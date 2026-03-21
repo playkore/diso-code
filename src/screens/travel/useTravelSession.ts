@@ -23,6 +23,16 @@ import { createStars } from './renderers/starsRenderer';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 
+/**
+ * Owns the real-time travel session that bridges React UI and the mutable
+ * combat simulation.
+ *
+ * React state here is intentionally limited to data that affects rendering and
+ * must trigger re-renders: HUD text/colors, overlay messages, and joystick UI.
+ * The combat state, phase machine, timers, and star field remain mutable locals
+ * inside the effect so the animation loop can advance them every frame without
+ * paying React reconciliation costs.
+ */
 const HYPERSPACE_DURATION = 160;
 
 const INITIAL_HUD = {
@@ -118,6 +128,8 @@ export function useTravelSession(
       return undefined;
     }
 
+    // Resolve all fixed session dependencies up front. If any of them are
+    // missing, the travel view bails out instead of running a partial loop.
     const originSystem = getSystemByName(session.originSystem)?.data;
     const destinationSystem = getSystemByName(session.destinationSystem)?.data;
     if (!originSystem || !destinationSystem) {
@@ -204,6 +216,8 @@ export function useTravelSession(
       setMessageState(text);
     };
 
+    // All successful exits funnel through this helper so the store receives the
+    // same snapshot shape whether docking happens manually or via auto-dock.
     const completeDocking = (dockSystemName: string, spendJumpFuel: boolean, missionEvents = [...combatState.missionEvents]) => {
       const snapshot = getPlayerCombatSnapshot(combatState);
       if (jumpCompleted && hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
@@ -240,6 +254,8 @@ export function useTravelSession(
       updateHud();
     };
 
+    // Hyperspace is a separate cinematic phase. Once engaged, normal combat
+    // systems stop consuming player actions until the arrival context is seeded.
     const startHyperspace = () => {
       if (flightState === 'HYPERSPACE' || flightState === 'GAMEOVER' || jumpCompleted) {
         return;
@@ -258,6 +274,8 @@ export function useTravelSession(
       updateHud();
     };
 
+    // Reset builds a fresh mutable simulation object while keeping the same
+    // effect-scoped references and React bindings alive for the next loop.
     const resetPrototype = () => {
       const fresh = createTravelCombatState(
         {
@@ -286,6 +304,9 @@ export function useTravelSession(
     const onResize = () => resize();
     window.addEventListener('resize', onResize);
 
+    // The frame loop is the authoritative owner of mutable session state. It
+    // folds together keyboard/touch input, advances the simulation, resolves
+    // travel outcomes, then copies only render-facing state back into React.
     const loop = (timestamp: number) => {
       const deltaMs = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
       lastTimestamp = timestamp;
@@ -379,6 +400,9 @@ export function useTravelSession(
       }
 
       if (flightState === 'HYPERSPACE') {
+        // Hyperspace has its own movement profile instead of using
+        // `stepTravelCombat`, because the player is locked into a scripted
+        // transition until the destination system is activated.
         const progress = 1 - hyperspaceTimer / HYPERSPACE_DURATION;
         const speedFactor = progress < 0.55 ? 1.05 : 0.97;
         combatState.player.vx *= speedFactor;
@@ -396,6 +420,8 @@ export function useTravelSession(
       }
 
       if (combatState.station && flightState !== 'HYPERSPACE') {
+        // Manual docking is resolved outside the combat step so the hook can
+        // decide whether to finish travel, bounce the ship, or show guidance.
         const docking = assessDockingApproach(combatState.station, combatState.player);
         if (docking.distance < combatState.station.radius + 15) {
           if (docking.collidesWithHull) {
@@ -484,6 +510,8 @@ export function useTravelSession(
     resetPrototype();
     animationFrameId = window.requestAnimationFrame(loop);
     return () => {
+      // Pointer/keyboard state is cleared on teardown so a route change cannot
+      // leak held inputs into the next session.
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
       resetInput();
