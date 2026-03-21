@@ -5,103 +5,75 @@ import { useGameStore } from '../../store/useGameStore';
 import { formatLightYears } from '../../utils/distance';
 import { useTravelSession } from './useTravelSession';
 
-/**
- * Declarative shell for the travel screen.
- *
- * This component intentionally stays light:
- * - it selects the minimum store state needed to run a travel session
- * - it creates the refs used by the imperative flight subsystem
- * - it renders the static DOM scaffold that the session hook updates
- *
- * The real-time behavior lives in `useTravelSession`.
- */
 export function TravelScreen() {
   const navigate = useNavigate();
   const session = useGameStore((state) => state.travelSession);
   const commander = useGameStore((state) => state.commander);
   const completeTravel = useGameStore((state) => state.completeTravel);
-  const cancelTravel = useGameStore((state) => state.cancelTravel);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  // The flight UI is ref-driven. The session hook updates HUD nodes and canvas
-  // directly every frame instead of routing every change through React state.
-  const refs = {
-    canvasRef: useRef<HTMLCanvasElement | null>(null),
-    viewportRef: useRef<HTMLDivElement | null>(null),
-    messageRef: useRef<HTMLDivElement | null>(null),
-    scoreRef: useRef<HTMLSpanElement | null>(null),
-    shieldsRef: useRef<HTMLSpanElement | null>(null),
-    jumpRef: useRef<HTMLSpanElement | null>(null),
-    hyperspaceRef: useRef<HTMLSpanElement | null>(null),
-    legalRef: useRef<HTMLSpanElement | null>(null),
-    threatRef: useRef<HTMLSpanElement | null>(null),
-    arcRef: useRef<HTMLSpanElement | null>(null),
-    knobRef: useRef<HTMLDivElement | null>(null),
-    jumpButtonRef: useRef<HTMLButtonElement | null>(null),
-    hyperspaceButtonRef: useRef<HTMLButtonElement | null>(null),
-    fireButtonRef: useRef<HTMLButtonElement | null>(null),
-    ecmButtonRef: useRef<HTMLButtonElement | null>(null),
-    bombButtonRef: useRef<HTMLButtonElement | null>(null),
-    dockButtonRef: useRef<HTMLButtonElement | null>(null)
-  };
+  const travel = useTravelSession({ canvasRef, viewportRef }, session, commander, completeTravel, navigate);
 
-  // Mount the live flight session for the current route.
-  useTravelSession(refs, session, commander, completeTravel, cancelTravel, navigate);
-
-  // If the user opens `/travel` without an active route, bounce back to the
-  // star map where travel can be started properly.
   if (!session) {
     return <Navigate to="/star-map" replace />;
   }
 
   return (
     <section className="travel-screen">
-      {/* The viewport contains the canvas, HUD, overlay messages and touch UI. */}
-      <div className="travel-screen__viewport" ref={refs.viewportRef}>
-        <canvas ref={refs.canvasRef} className="travel-screen__canvas" />
+      <div className="travel-screen__viewport" ref={viewportRef} {...travel.viewportHandlers}>
+        <canvas ref={canvasRef} className="travel-screen__canvas" />
 
-        {/* HUD values are filled imperatively by the session hook. */}
         <div className="travel-screen__hud">
           <div className="travel-screen__hud-line">Route: {session.originSystem} -&gt; {session.destinationSystem}</div>
           <div className="travel-screen__hud-line">
             Fuel: {formatLightYears(session.fuelCost)} <span className="travel-screen__hud-subtle">on arrival jump</span>
           </div>
-          <div className="travel-screen__hud-line">Score: <span ref={refs.scoreRef}>0</span></div>
-          <div className="travel-screen__hud-line">Shields: <span ref={refs.shieldsRef}>100</span>%</div>
-          <div className="travel-screen__hud-line">Jump Drive: <span ref={refs.jumpRef}>READY</span></div>
-          <div className="travel-screen__hud-line">Hyperspace: <span ref={refs.hyperspaceRef}>SAFE ZONE</span></div>
-          <div className="travel-screen__hud-line">Legal: <span ref={refs.legalRef}>clean 0</span></div>
-          <div className="travel-screen__hud-line">Threat: <span ref={refs.threatRef}>F- / 0</span></div>
-          <div className="travel-screen__hud-line">Arc: <span ref={refs.arcRef}>FRONT</span></div>
+          <div className="travel-screen__hud-line">Score: <span>{travel.hud.score}</span></div>
+          <div className="travel-screen__hud-line">Shields: <span style={{ color: travel.hud.shieldsColor }}>{travel.hud.shields}</span>%</div>
+          <div className="travel-screen__hud-line">Jump Drive: <span style={{ color: travel.hud.jumpColor }}>{travel.hud.jump}</span></div>
+          <div className="travel-screen__hud-line">Hyperspace: <span style={{ color: travel.hud.hyperspaceColor }}>{travel.hud.hyperspace}</span></div>
+          <div className="travel-screen__hud-line">Legal: <span style={{ color: travel.hud.legalColor }}>{travel.hud.legal}</span></div>
+          <div className="travel-screen__hud-line">Threat: <span style={{ color: travel.hud.threatColor }}>{travel.hud.threat}</span></div>
+          <div className="travel-screen__hud-line">Arc: <span style={{ color: travel.hud.arcColor }}>{travel.hud.arc}</span></div>
         </div>
 
-        <div ref={refs.messageRef} className="travel-screen__message" />
+        <div className="travel-screen__message">{travel.message}</div>
 
-        {/* On-screen controls are required for touch devices. */}
         <div className="travel-screen__controls">
-          <div className="travel-screen__joystick">
-            <div ref={refs.knobRef} className="travel-screen__joystick-knob" />
+          <div
+            className={`travel-screen__joystick${travel.joystickView.active ? ' travel-screen__joystick--active' : ''}`}
+            style={{ left: travel.joystickView.left, top: travel.joystickView.top, bottom: travel.joystickView.bottom }}
+          >
+            <div
+              className="travel-screen__joystick-knob"
+              style={{ left: travel.joystickView.knobLeft, top: travel.joystickView.knobTop }}
+            />
           </div>
-          <button ref={refs.jumpButtonRef} type="button" className="travel-screen__button travel-screen__button--jump">
+          <button type="button" className="travel-screen__button travel-screen__button--jump" {...travel.jumpButtonHandlers}>
             JUMP
           </button>
-          <button ref={refs.hyperspaceButtonRef} type="button" className="travel-screen__button travel-screen__button--hyperspace">
+          <button
+            type="button"
+            className={`travel-screen__button travel-screen__button--hyperspace${travel.hyperspaceHidden ? ' travel-screen__button--hidden' : ''}`}
+            {...travel.hyperspaceButtonHandlers}
+          >
             HYPER
           </button>
-          <button ref={refs.fireButtonRef} type="button" className="travel-screen__button travel-screen__button--fire">
+          <button type="button" className="travel-screen__button travel-screen__button--fire" {...travel.fireButtonHandlers}>
             FIRE
           </button>
-          <button ref={refs.ecmButtonRef} type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--ecm">
+          <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--ecm" {...travel.ecmButtonHandlers}>
             ECM
           </button>
-          <button ref={refs.bombButtonRef} type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--bomb">
+          <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--bomb" {...travel.bombButtonHandlers}>
             BOMB
           </button>
-          <button ref={refs.dockButtonRef} type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--dock">
+          <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--dock" {...travel.dockButtonHandlers}>
             DOCK
           </button>
         </div>
 
-        {/* Compact reminder of keyboard controls and the current CNT thresholds. */}
         <div className="travel-screen__help">
           Arrow Keys: Turn/Thrust
           <br />
@@ -113,7 +85,6 @@ export function TravelScreen() {
           <br />
           Laser CNT: {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} / {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
         </div>
-
       </div>
     </section>
   );

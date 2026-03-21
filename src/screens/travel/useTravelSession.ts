@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getSystemByName } from '../../domain/galaxyCatalog';
 import { applyLegalFloor, type CommanderState } from '../../domain/commander';
 import {
@@ -18,88 +18,106 @@ import {
 import { hasMissionFlag } from '../../domain/missions';
 import type { TravelState } from '../../store/types';
 import { renderCanvas } from './renderCanvas';
-import { createStars } from './renderers/starsRenderer';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
-import { createTravelInput, bindTravelInput } from './useTravelInput';
+import { createStars } from './renderers/starsRenderer';
 import { getHudState } from './travelViewModel';
+import { useTravelInput } from './useTravelInput';
 
 const HYPERSPACE_DURATION = 160;
 
-/**
- * Travel screen lifecycle overview
- * -------------------------------
- *
- * This hook is the UI-side orchestrator for the real-time flight segment.
- *
- * Responsibilities:
- * - create one combat simulation state for the active route
- * - wire browser input into normalized combat input
- * - run the requestAnimationFrame loop
- * - translate simulation outcomes into store transitions/navigation
- * - keep the HUD and canvas synchronized with the live simulation
- *
- * In other words:
- * - combat rules live in `domain/combat/*`
- * - rendering primitives live in `screens/travel/render*`
- * - this hook is the bridge that turns those pieces into a playable screen
- */
+const INITIAL_HUD = {
+  score: '0',
+  shields: '100',
+  shieldsColor: CGA_GREEN,
+  jump: 'READY',
+  jumpColor: CGA_GREEN,
+  hyperspace: 'SAFE ZONE',
+  hyperspaceColor: CGA_RED,
+  legal: 'clean 0',
+  legalColor: CGA_GREEN,
+  threat: 'F- / 0',
+  threatColor: CGA_GREEN,
+  arc: 'FRONT',
+  arcColor: CGA_RED
+};
 
-/**
- * Collection of imperative refs used by the travel screen.
- *
- * The flight segment is intentionally ref-driven because the screen updates on
- * every animation frame and would be too expensive/noisy to re-render through
- * React state for each HUD change.
- */
 interface TravelRefs {
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  viewportRef: React.RefObject<HTMLDivElement | null>;
-  messageRef: React.RefObject<HTMLDivElement | null>;
-  scoreRef: React.RefObject<HTMLSpanElement | null>;
-  shieldsRef: React.RefObject<HTMLSpanElement | null>;
-  jumpRef: React.RefObject<HTMLSpanElement | null>;
-  hyperspaceRef: React.RefObject<HTMLSpanElement | null>;
-  legalRef: React.RefObject<HTMLSpanElement | null>;
-  threatRef: React.RefObject<HTMLSpanElement | null>;
-  arcRef: React.RefObject<HTMLSpanElement | null>;
-  knobRef: React.RefObject<HTMLDivElement | null>;
-  jumpButtonRef: React.RefObject<HTMLButtonElement | null>;
-  hyperspaceButtonRef: React.RefObject<HTMLButtonElement | null>;
-  fireButtonRef: React.RefObject<HTMLButtonElement | null>;
-  ecmButtonRef: React.RefObject<HTMLButtonElement | null>;
-  bombButtonRef: React.RefObject<HTMLButtonElement | null>;
-  dockButtonRef: React.RefObject<HTMLButtonElement | null>;
+  canvasRef: RefObject<HTMLCanvasElement | null>;
+  viewportRef: RefObject<HTMLDivElement | null>;
 }
 
-/**
- * Runs one full travel session for the current route.
- *
- * A session starts when the component mounts on `/travel` and ends when the
- * player:
- * - docks,
- * - is rescued,
- * - aborts,
- * - or leaves the page.
- */
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
   commander: CommanderState,
   completeTravel: (report?: Parameters<ReturnType<typeof import('../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
-  cancelTravel: () => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
-  // Shared mutable flag that lets keyboard and joystick input coexist cleanly.
-  const joyActiveRef = useRef(false);
+  const [hud, setHud] = useState(INITIAL_HUD);
+  const [message, setMessage] = useState('');
+  const [hyperspaceHidden, setHyperspaceHidden] = useState(false);
+  const hudRef = useRef(hud);
+  const messageRef = useRef(message);
+  const hyperspaceHiddenRef = useRef(hyperspaceHidden);
+  const {
+    inputRef,
+    keysRef,
+    joyActiveRef,
+    joystickView,
+    viewportHandlers,
+    jumpButtonHandlers,
+    fireButtonHandlers,
+    hyperspaceButtonHandlers,
+    ecmButtonHandlers,
+    bombButtonHandlers,
+    dockButtonHandlers,
+    resetInput
+  } = useTravelInput(refs.viewportRef);
+
+  const setHudState = (next: typeof INITIAL_HUD) => {
+    const previous = hudRef.current;
+    if (
+      previous.score === next.score &&
+      previous.shields === next.shields &&
+      previous.shieldsColor === next.shieldsColor &&
+      previous.jump === next.jump &&
+      previous.jumpColor === next.jumpColor &&
+      previous.hyperspace === next.hyperspace &&
+      previous.hyperspaceColor === next.hyperspaceColor &&
+      previous.legal === next.legal &&
+      previous.legalColor === next.legalColor &&
+      previous.threat === next.threat &&
+      previous.threatColor === next.threatColor &&
+      previous.arc === next.arc &&
+      previous.arcColor === next.arcColor
+    ) {
+      return;
+    }
+    hudRef.current = next;
+    setHud(next);
+  };
+
+  const setMessageState = (next: string) => {
+    if (messageRef.current === next) {
+      return;
+    }
+    messageRef.current = next;
+    setMessage(next);
+  };
+
+  const setHyperspaceHiddenState = (next: boolean) => {
+    if (hyperspaceHiddenRef.current === next) {
+      return;
+    }
+    hyperspaceHiddenRef.current = next;
+    setHyperspaceHidden(next);
+  };
 
   useEffect(() => {
-    // No route, no flight session.
     if (!session) {
       return undefined;
     }
 
-    // Resolve both route endpoints up front. The flight screen only makes sense
-    // when both the origin and destination systems are known.
     const originSystem = getSystemByName(session.originSystem)?.data;
     const destinationSystem = getSystemByName(session.destinationSystem)?.data;
     if (!originSystem || !destinationSystem) {
@@ -108,42 +126,7 @@ export function useTravelSession(
 
     const canvas = refs.canvasRef.current;
     const viewport = refs.viewportRef.current;
-    const messageNode = refs.messageRef.current;
-    const scoreNode = refs.scoreRef.current;
-    const shieldsNode = refs.shieldsRef.current;
-    const jumpNode = refs.jumpRef.current;
-    const hyperspaceNode = refs.hyperspaceRef.current;
-    const legalNode = refs.legalRef.current;
-    const threatNode = refs.threatRef.current;
-    const arcNode = refs.arcRef.current;
-    const knobNode = refs.knobRef.current;
-    const jumpButton = refs.jumpButtonRef.current;
-    const hyperspaceButton = refs.hyperspaceButtonRef.current;
-    const fireButton = refs.fireButtonRef.current;
-    const ecmButton = refs.ecmButtonRef.current;
-    const bombButton = refs.bombButtonRef.current;
-    const dockButton = refs.dockButtonRef.current;
-    // The travel screen is fully imperative once mounted. If any required DOM
-    // node is missing, we abort the session rather than run partially.
-    if (
-      !canvas ||
-      !viewport ||
-      !messageNode ||
-      !scoreNode ||
-      !shieldsNode ||
-      !jumpNode ||
-      !hyperspaceNode ||
-      !legalNode ||
-      !threatNode ||
-      !arcNode ||
-      !knobNode ||
-      !jumpButton ||
-      !hyperspaceButton ||
-      !fireButton ||
-      !ecmButton ||
-      !bombButton ||
-      !dockButton
-    ) {
+    if (!canvas || !viewport) {
       return undefined;
     }
 
@@ -152,9 +135,6 @@ export function useTravelSession(
       return undefined;
     }
 
-    // One RNG and one mutable combat state live for the entire mounted session.
-    // The simulation mutates this object in place instead of rebuilding state
-    // every frame.
     const random = createMathRandomSource();
     const combatState = createTravelCombatState(
       {
@@ -172,36 +152,12 @@ export function useTravelSession(
 
     let cw = 0;
     let ch = 0;
-    // Canvas size is kept locked to the viewport so the renderer can work in
-    // actual device pixels rather than CSS guesses.
     const resize = () => {
       cw = canvas.width = viewport.clientWidth;
       ch = canvas.height = viewport.clientHeight;
     };
     resize();
 
-    // `input` is the normalized control object consumed by the simulation.
-    // Browser-specific event handling mutates this object, not React state.
-    const input = createTravelInput();
-    const keys: Record<string, boolean> = {
-      ArrowLeft: false,
-      ArrowRight: false,
-      ArrowUp: false,
-      ' ': false,
-      j: false,
-      J: false,
-      h: false,
-      H: false,
-      e: false,
-      E: false,
-      b: false,
-      B: false,
-      d: false,
-      D: false
-    };
-
-    // This local phase machine sits above the domain simulation. It models UI
-    // flow such as the hyperspace transition and game-over reset behavior.
     let flightState: FlightPhase = 'READY';
     let hyperspaceTimer = 0;
     let jumpActivationFrames = 0;
@@ -220,67 +176,34 @@ export function useTravelSession(
       return flightState === 'READY' ? 'READY' : 'PLAYING';
     };
 
-    const onResize = () => resize();
-    window.addEventListener('resize', onResize);
-    const unbindInput = bindTravelInput({
-      viewport,
-      knobNode,
-      jumpButton,
-      hyperspaceButton,
-      fireButton,
-      ecmButton,
-      bombButton,
-      dockButton,
-      input,
-      keys,
-      joyActiveRef
-    });
-
-    /**
-     * Shows a local overlay message that takes priority over ordinary combat
-     * chatter. Used for route and docking guidance.
-     */
-    const showMessage = (text: string, duration: number) => {
-      overlayMessage = text;
-      overlayTimer = duration;
-      messageNode.textContent = text;
-    };
-
-    /**
-     * Updates the textual HUD. This stays imperative on purpose so the screen
-     * does not re-render through React on every animation frame.
-     */
     const updateHud = () => {
       const jumpBlocked = isMassNearby(combatState);
       const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
-      const hud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
-      scoreNode.textContent = hud.score;
-      shieldsNode.textContent = hud.shields;
-      shieldsNode.style.color = combatState.player.shields <= 30 ? CGA_RED : CGA_GREEN;
-      jumpNode.textContent = hud.jump;
-      jumpNode.style.color = hud.jump === 'MASS LOCK' ? CGA_RED : hud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN;
-      hyperspaceNode.textContent = hud.hyperspace;
-      hyperspaceNode.style.color = hud.hyperspace === 'SAFE ZONE' ? CGA_RED : hud.hyperspace === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN;
-      legalNode.textContent = hud.legal;
-      legalNode.style.color = combatState.legalValue >= 50 ? CGA_RED : combatState.legalValue >= 1 ? CGA_YELLOW : CGA_GREEN;
-      threatNode.textContent = hud.threat;
-      threatNode.style.color = hud.hostileCount > 0 ? CGA_RED : CGA_GREEN;
-      arcNode.textContent = hud.arc;
-      arcNode.style.color = combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED;
-      hyperspaceButton.classList.toggle('travel-screen__button--hidden', jumpCompleted);
+      const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
+      setHudState({
+        score: nextHud.score,
+        shields: nextHud.shields,
+        shieldsColor: combatState.player.shields <= 30 ? CGA_RED : CGA_GREEN,
+        jump: nextHud.jump,
+        jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
+        hyperspace: nextHud.hyperspace,
+        hyperspaceColor: nextHud.hyperspace === 'SAFE ZONE' ? CGA_RED : nextHud.hyperspace === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
+        legal: nextHud.legal,
+        legalColor: combatState.legalValue >= 50 ? CGA_RED : combatState.legalValue >= 1 ? CGA_YELLOW : CGA_GREEN,
+        threat: nextHud.threat,
+        threatColor: nextHud.hostileCount > 0 ? CGA_RED : CGA_GREEN,
+        arc: nextHud.arc,
+        arcColor: combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED
+      });
+      setHyperspaceHiddenState(jumpCompleted);
     };
 
-    /**
-     * Finalizes the route and merges the travel-combat outcome back into the
-     * main game store.
-     *
-     * This is used by both:
-     * - auto-docking
-     * - manual docking through the station slot
-     *
-     * Keeping one shared completion path prevents subtle divergences in fuel,
-     * mission-event or salvage handling.
-     */
+    const showMessage = (text: string, duration: number) => {
+      overlayMessage = text;
+      overlayTimer = duration;
+      setMessageState(text);
+    };
+
     const completeDocking = (dockSystemName: string, spendJumpFuel: boolean, missionEvents = [...combatState.missionEvents]) => {
       const snapshot = getPlayerCombatSnapshot(combatState);
       if (jumpCompleted && hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
@@ -306,7 +229,7 @@ export function useTravelSession(
       }
       if (isMassNearby(combatState)) {
         showMessage('MASS LOCK', 900);
-        input.jump = false;
+        inputRef.current.jump = false;
         flightState = getManualFlightState();
         updateHud();
         return;
@@ -323,7 +246,7 @@ export function useTravelSession(
       }
       if (isPlayerInStationSafeZone(combatState)) {
         showMessage('SAFE ZONE', 900);
-        input.hyperspace = false;
+        inputRef.current.hyperspace = false;
         updateHud();
         return;
       }
@@ -335,12 +258,6 @@ export function useTravelSession(
       updateHud();
     };
 
-    /**
-     * Rebuilds the entire encounter in place after game over.
-     *
-     * This keeps the user on the same route screen while restoring all combat
-     * state, stars and flight phase to a fresh starting point.
-     */
     const resetPrototype = () => {
       const fresh = createTravelCombatState(
         {
@@ -363,27 +280,21 @@ export function useTravelSession(
       flightState = 'READY';
       showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
       updateHud();
+      resetInput();
     };
 
-    /**
-     * Main animation frame loop.
-     *
-     * Loop order:
-     * 1. derive normalized input from keyboard/joystick state
-     * 2. advance the combat simulation
-     * 3. resolve UI-level travel transitions (jump, docking, rescue, reset)
-     * 4. update HUD and canvas
-     * 5. schedule the next frame
-     */
+    const onResize = () => resize();
+    window.addEventListener('resize', onResize);
+
     const loop = (timestamp: number) => {
       const deltaMs = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
       lastTimestamp = timestamp;
       const dt = Math.min(deltaMs, 32) / 16.6667;
+      const liveInput = inputRef.current;
+      const keys = keysRef.current;
 
-      // Game over freezes normal simulation and waits for the player to fire in
-      // order to restart the prototype encounter.
       if (flightState === 'GAMEOVER') {
-        if (input.fire || keys[' ']) {
+        if (liveInput.fire || keys[' ']) {
           resetPrototype();
         }
         renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem);
@@ -392,45 +303,42 @@ export function useTravelSession(
       }
 
       if (keys.ArrowLeft) {
-        input.turn = -1;
+        liveInput.turn = -1;
       } else if (keys.ArrowRight) {
-        input.turn = 1;
+        liveInput.turn = 1;
       } else if (!joyActiveRef.current) {
-        input.turn = 0;
+        liveInput.turn = 0;
       }
       if (keys.ArrowUp) {
-        input.thrust = 1;
+        liveInput.thrust = 1;
       } else if (!joyActiveRef.current) {
-        input.thrust = 0;
+        liveInput.thrust = 0;
       }
       if (!joyActiveRef.current) {
-        input.vectorX = 0;
-        input.vectorY = 0;
-        input.vectorStrength = 0;
+        liveInput.vectorX = 0;
+        liveInput.vectorY = 0;
+        liveInput.vectorStrength = 0;
       }
 
-      input.fire = keys[' '] || input.fire;
-      input.jump = keys.j || keys.J || input.jump;
-      input.hyperspace = keys.h || keys.H || input.hyperspace;
-      input.activateEcm = keys.e || keys.E || input.activateEcm;
-      input.triggerEnergyBomb = keys.b || keys.B || input.triggerEnergyBomb;
-      input.autoDock = keys.d || keys.D || input.autoDock;
+      liveInput.fire = keys[' '] || liveInput.fire;
+      liveInput.jump = keys.j || keys.J || liveInput.jump;
+      liveInput.hyperspace = keys.h || keys.H || liveInput.hyperspace;
+      liveInput.activateEcm = keys.e || keys.E || liveInput.activateEcm;
+      liveInput.triggerEnergyBomb = keys.b || keys.B || liveInput.triggerEnergyBomb;
+      liveInput.autoDock = keys.d || keys.D || liveInput.autoDock;
 
-      // The initial phase becomes "real flight" as soon as the player actually
-      // applies movement input or the ship starts drifting.
-      if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || input.thrust > 0 || Math.abs(input.turn) > 0.1)) {
+      if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || liveInput.thrust > 0 || Math.abs(liveInput.turn) > 0.1)) {
         flightState = 'PLAYING';
       }
 
-      // On touch/joystick input the ship points directly at the stick vector.
-      if (joyActiveRef.current && input.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
-        combatState.player.angle = Math.atan2(input.vectorY, input.vectorX);
+      if (joyActiveRef.current && liveInput.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
+        combatState.player.angle = Math.atan2(liveInput.vectorY, liveInput.vectorX);
       }
 
       if (jumpActivationFrames > 0) {
         jumpActivationFrames -= 1;
       }
-      const jumpRequested = input.jump || jumpActivationFrames > 0;
+      const jumpRequested = liveInput.jump || jumpActivationFrames > 0;
       const jumpBlocked = isMassNearby(combatState);
       if (flightState === 'JUMPING' && (!jumpRequested || jumpBlocked)) {
         flightState = getManualFlightState();
@@ -439,19 +347,17 @@ export function useTravelSession(
         }
       }
 
-      // The domain layer handles combat rules. The UI layer only gates controls
-      // during hyperspace and interprets the returned high-level outcome flags.
       const result = stepTravelCombat(
         combatState,
         {
-          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : input.thrust,
-          turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : input.turn,
-          fire: flightState === 'HYPERSPACE' ? false : input.fire,
+          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : liveInput.thrust,
+          turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : liveInput.turn,
+          fire: flightState === 'HYPERSPACE' ? false : liveInput.fire,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
-          activateEcm: flightState === 'HYPERSPACE' ? false : input.activateEcm,
-          triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : input.triggerEnergyBomb,
-          autoDock: flightState === 'HYPERSPACE' ? false : input.autoDock
+          activateEcm: flightState === 'HYPERSPACE' ? false : liveInput.activateEcm,
+          triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : liveInput.triggerEnergyBomb,
+          autoDock: flightState === 'HYPERSPACE' ? false : liveInput.autoDock
         },
         dt,
         flightState,
@@ -464,17 +370,14 @@ export function useTravelSession(
         return;
       }
 
-      if ((flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') && input.jump) {
+      if ((flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') && liveInput.jump) {
         startLocalJump();
       }
 
-      if ((flightState === 'READY' || flightState === 'PLAYING') && input.hyperspace) {
+      if ((flightState === 'READY' || flightState === 'PLAYING') && liveInput.hyperspace) {
         startHyperspace();
       }
 
-      // Hyperspace travel is still partially a UI concern because the tunnel
-      // pacing and destination handoff are route-flow behavior rather than pure
-      // dogfight simulation.
       if (flightState === 'HYPERSPACE') {
         const progress = 1 - hyperspaceTimer / HYPERSPACE_DURATION;
         const speedFactor = progress < 0.55 ? 1.05 : 0.97;
@@ -492,8 +395,6 @@ export function useTravelSession(
         }
       }
 
-      // Manual docking/collision handling sits here because it needs to react
-      // immediately with navigation and player guidance messages.
       if (combatState.station && flightState !== 'HYPERSPACE') {
         const docking = assessDockingApproach(combatState.station, combatState.player);
         if (docking.distance < combatState.station.radius + 15) {
@@ -514,14 +415,11 @@ export function useTravelSession(
         }
       }
 
-      // Total destruction transitions into the resetable local GAMEOVER phase.
       if (result.playerDestroyed) {
         flightState = 'GAMEOVER';
         showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
       }
 
-      // Escape-pod rescue exits the flight screen and returns the outcome to the
-      // store through the rescue-specific completion path.
       if (result.playerEscaped) {
         consumeEscapePod(combatState);
         const snapshot = getPlayerCombatSnapshot(combatState);
@@ -541,8 +439,6 @@ export function useTravelSession(
         return;
       }
 
-      // Small UX aid: after arriving, a motionless player gets a hint about the
-      // station slot instead of sitting with no feedback.
       if (flightState === 'ARRIVED' && Math.hypot(combatState.player.vx, combatState.player.vy) < 0.05) {
         stationaryTicks += 1;
         if (stationaryTicks > 120) {
@@ -553,35 +449,31 @@ export function useTravelSession(
         stationaryTicks = 0;
       }
 
-      // Local overlay messages intentionally override ordinary combat messages
-      // for a short time.
       if (overlayTimer > 0) {
         overlayTimer -= deltaMs;
         if (overlayTimer <= 0) {
           overlayMessage = '';
         }
       }
-      messageNode.textContent = overlayMessage || combatState.messages[0]?.text || '';
+      setMessageState(overlayMessage || combatState.messages[0]?.text || '');
 
-      // One-shot actions should not stay latched once the corresponding key is
-      // released.
       if (!keys[' ']) {
-        input.fire = false;
+        liveInput.fire = false;
       }
       if (!keys.j && !keys.J) {
-        input.jump = false;
+        liveInput.jump = false;
       }
       if (!keys.h && !keys.H) {
-        input.hyperspace = false;
+        liveInput.hyperspace = false;
       }
       if (!keys.e && !keys.E) {
-        input.activateEcm = false;
+        liveInput.activateEcm = false;
       }
       if (!keys.b && !keys.B) {
-        input.triggerEnergyBomb = false;
+        liveInput.triggerEnergyBomb = false;
       }
       if (!keys.d && !keys.D) {
-        input.autoDock = false;
+        liveInput.autoDock = false;
       }
 
       updateHud();
@@ -589,14 +481,26 @@ export function useTravelSession(
       animationFrameId = window.requestAnimationFrame(loop);
     };
 
-    // Boot the session into origin-system local space and start rendering.
     resetPrototype();
     animationFrameId = window.requestAnimationFrame(loop);
     return () => {
-      // Standard full teardown for the mounted flight session.
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
-      unbindInput();
+      resetInput();
     };
-  }, [refs, session, commander, completeTravel, cancelTravel, navigate]);
+  }, [commander, completeTravel, inputRef, joyActiveRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
+
+  return {
+    hud,
+    message,
+    hyperspaceHidden,
+    joystickView,
+    viewportHandlers,
+    jumpButtonHandlers,
+    fireButtonHandlers,
+    hyperspaceButtonHandlers,
+    ecmButtonHandlers,
+    bombButtonHandlers,
+    dockButtonHandlers
+  };
 }

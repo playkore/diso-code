@@ -1,26 +1,5 @@
-import type { MutableRefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 
-/**
- * Travel input overview
- * --------------------
- *
- * The travel screen accepts multiple input sources at once:
- * - keyboard
- * - on-screen press buttons
- * - a draggable virtual joystick
- *
- * This module normalizes all of those into one mutable `TravelInputState`
- * object. The animation loop reads that object each frame and converts it into
- * domain-level combat input.
- */
-
-/**
- * Shared mutable input model for one mounted travel screen.
- *
- * `turn` / `thrust` are the continuous controls.
- * The booleans are one-shot or held actions.
- * `vector*` preserve joystick direction for touch aiming.
- */
 export interface TravelInputState {
   turn: number;
   thrust: number;
@@ -35,273 +14,281 @@ export interface TravelInputState {
   vectorStrength: number;
 }
 
-/**
- * Creates the default "no input" state.
- */
+export interface TravelJoystickView {
+  active: boolean;
+  left: string;
+  top: string;
+  bottom: string;
+  knobLeft: string;
+  knobTop: string;
+}
+
+export interface TravelPressHandlers {
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onLostPointerCapture: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+}
+
+export interface TravelTapHandlers {
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+  onContextMenu: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+}
+
+const JOYSTICK_RADIUS = 60;
+const JOYSTICK_MAX_DIST = 40;
+
+const DEFAULT_JOYSTICK_VIEW: TravelJoystickView = {
+  active: false,
+  left: '1.8rem',
+  top: 'auto',
+  bottom: '1.8rem',
+  knobLeft: '40px',
+  knobTop: '40px'
+};
+
 export function createTravelInput(): TravelInputState {
   return { turn: 0, thrust: 0, fire: false, jump: false, hyperspace: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
 }
 
-/**
- * Connects DOM events to the normalized travel input object.
- *
- * The caller owns the input object and passes it in; this function only wires
- * event listeners that mutate that object in response to browser input.
- *
- * Return value:
- * - a teardown function that removes every event listener added here
- */
-export function bindTravelInput(params: {
-  viewport: HTMLDivElement;
-  knobNode: HTMLDivElement;
-  jumpButton: HTMLButtonElement;
-  hyperspaceButton: HTMLButtonElement;
-  fireButton: HTMLButtonElement;
-  ecmButton: HTMLButtonElement;
-  bombButton: HTMLButtonElement;
-  dockButton: HTMLButtonElement;
-  input: TravelInputState;
-  keys: Record<string, boolean>;
-  joyActiveRef: MutableRefObject<boolean>;
-}) {
-  const { viewport, knobNode, jumpButton, hyperspaceButton, fireButton, ecmButton, bombButton, dockButton, input, keys, joyActiveRef } = params;
-  const joystickArea = viewport.querySelector('.travel-screen__joystick') as HTMLDivElement | null;
+export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
+  const inputRef = useRef(createTravelInput());
+  const keysRef = useRef<Record<string, boolean>>({
+    ArrowLeft: false,
+    ArrowRight: false,
+    ArrowUp: false,
+    ' ': false,
+    j: false,
+    J: false,
+    h: false,
+    H: false,
+    e: false,
+    E: false,
+    b: false,
+    B: false,
+    d: false,
+    D: false
+  });
+  const joyActiveRef = useRef(false);
+  const joyPointerIdRef = useRef<number | null>(null);
+  const joyCenterRef = useRef({ x: 0, y: 0 });
+  const jumpPointerIdRef = useRef<number | null>(null);
+  const firePointerIdRef = useRef<number | null>(null);
+  const [joystickView, setJoystickView] = useState<TravelJoystickView>(DEFAULT_JOYSTICK_VIEW);
 
-  // These values define the physical feel of the virtual joystick.
-  const JOYSTICK_RADIUS = 60;
-  const JOYSTICK_MAX_DIST = 40;
-  let joyPointerId: number | null = null;
-  let joyCenter = { x: 0, y: 0 };
-
-  /**
-   * Moves the visual joystick knob relative to the joystick center.
-   */
-  const setKnob = (dx: number, dy: number) => {
-    knobNode.style.left = `${dx + 40}px`;
-    knobNode.style.top = `${dy + 40}px`;
+  const setJoystickState = (next: TravelJoystickView) => {
+    setJoystickView((previous) =>
+      previous.active === next.active &&
+      previous.left === next.left &&
+      previous.top === next.top &&
+      previous.bottom === next.bottom &&
+      previous.knobLeft === next.knobLeft &&
+      previous.knobTop === next.knobTop
+        ? previous
+        : next
+    );
   };
 
-  const setJoystickVisible = (visible: boolean) => {
-    if (!joystickArea) {
-      return;
-    }
-    joystickArea.classList.toggle('travel-screen__joystick--active', visible);
+  const resetJoystick = () => {
+    joyActiveRef.current = false;
+    joyPointerIdRef.current = null;
+    inputRef.current.turn = 0;
+    inputRef.current.thrust = 0;
+    inputRef.current.vectorX = 0;
+    inputRef.current.vectorY = 0;
+    inputRef.current.vectorStrength = 0;
+    setJoystickState(DEFAULT_JOYSTICK_VIEW);
   };
 
-  /**
-   * Converts a pointer position into a normalized joystick vector and updates
-   * both the visual knob and the shared input state.
-   */
   const handleJoystick = (clientX: number, clientY: number) => {
-    let dx = clientX - joyCenter.x;
-    let dy = clientY - joyCenter.y;
+    let dx = clientX - joyCenterRef.current.x;
+    let dy = clientY - joyCenterRef.current.y;
     const dist = Math.hypot(dx, dy);
     if (dist > JOYSTICK_MAX_DIST) {
       dx = (dx / dist) * JOYSTICK_MAX_DIST;
       dy = (dy / dist) * JOYSTICK_MAX_DIST;
     }
-    setKnob(dx, dy);
-    input.vectorX = dx / JOYSTICK_MAX_DIST;
-    input.vectorY = dy / JOYSTICK_MAX_DIST;
-    input.vectorStrength = Math.min(1, Math.hypot(input.vectorX, input.vectorY));
-    input.turn = input.vectorX;
-    input.thrust = input.vectorStrength;
+
+    inputRef.current.vectorX = dx / JOYSTICK_MAX_DIST;
+    inputRef.current.vectorY = dy / JOYSTICK_MAX_DIST;
+    inputRef.current.vectorStrength = Math.min(1, Math.hypot(inputRef.current.vectorX, inputRef.current.vectorY));
+    inputRef.current.turn = inputRef.current.vectorX;
+    inputRef.current.thrust = inputRef.current.vectorStrength;
+
+    setJoystickView((previous) => {
+      const next: TravelJoystickView = {
+        ...previous,
+        active: true,
+        knobLeft: `${dx + 40}px`,
+        knobTop: `${dy + 40}px`
+      };
+      return previous.active === next.active && previous.knobLeft === next.knobLeft && previous.knobTop === next.knobTop ? previous : next;
+    });
   };
 
-  /**
-   * Returns the joystick UI to its resting corner position.
-   */
-  const resetJoystickPosition = () => {
-    if (!joystickArea) {
-      return;
-    }
-    joystickArea.style.left = '1.8rem';
-    joystickArea.style.bottom = '1.8rem';
-    joystickArea.style.top = 'auto';
-    setJoystickVisible(false);
-  };
-
-  /**
-   * Repositions the floating joystick so touch control starts under the finger
-   * instead of forcing the user to reach a fixed on-screen pad.
-   */
-  const placeJoystickAt = (clientX: number, clientY: number) => {
-    if (!joystickArea) {
-      return;
-    }
-    const viewportRect = viewport.getBoundingClientRect();
-    const left = clientX - viewportRect.left - JOYSTICK_RADIUS;
-    const top = clientY - viewportRect.top - JOYSTICK_RADIUS;
-    joystickArea.style.left = `${left}px`;
-    joystickArea.style.top = `${top}px`;
-    joystickArea.style.bottom = 'auto';
-  };
-
-  /**
-   * Keyboard state is stored separately in `keys`; the frame loop decides how
-   * that state maps into continuous actions.
-   */
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key in keys) {
-      keys[event.key] = true;
-      if (event.key === ' ' || event.key === 'ArrowUp') {
-        event.preventDefault();
-      }
-    }
-  };
-
-  /**
-   * Keyboard release simply updates the pressed-key map.
-   */
-  const onKeyUp = (event: KeyboardEvent) => {
-    if (event.key in keys) {
-      keys[event.key] = false;
-    }
-  };
-
-  /**
-   * Starts a joystick gesture unless the user pressed one of the explicit
-   * action buttons.
-   */
-  const onJoyPointerDown = (event: PointerEvent) => {
-    if (!joystickArea || event.button !== 0) {
+  const onViewportPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport || event.button !== 0) {
       return;
     }
     const target = event.target as Element | null;
     if (target?.closest('.travel-screen__button, .travel-screen__actions button')) {
       return;
     }
+
+    const viewportRect = viewport.getBoundingClientRect();
+    const left = `${event.clientX - viewportRect.left - JOYSTICK_RADIUS}px`;
+    const top = `${event.clientY - viewportRect.top - JOYSTICK_RADIUS}px`;
     joyActiveRef.current = true;
-    joyPointerId = event.pointerId;
-    setJoystickVisible(true);
-    placeJoystickAt(event.clientX, event.clientY);
-    const rect = joystickArea.getBoundingClientRect();
-    joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    joyPointerIdRef.current = event.pointerId;
     viewport.setPointerCapture(event.pointerId);
+    joyCenterRef.current = { x: event.clientX, y: event.clientY };
+    setJoystickState({
+      active: true,
+      left,
+      top,
+      bottom: 'auto',
+      knobLeft: '40px',
+      knobTop: '40px'
+    });
     handleJoystick(event.clientX, event.clientY);
   };
 
-  /**
-   * Updates joystick direction while the active pointer is still held.
-   */
-  const onJoyPointerMove = (event: PointerEvent) => {
-    if (!joyActiveRef.current || joyPointerId !== event.pointerId) {
+  const onViewportPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!joyActiveRef.current || joyPointerIdRef.current !== event.pointerId) {
       return;
     }
     handleJoystick(event.clientX, event.clientY);
   };
 
-  /**
-   * Ends the active joystick gesture and resets continuous control values.
-   */
-  const onJoyPointerUp = (event: PointerEvent) => {
-    if (joyPointerId !== event.pointerId) {
+  const onViewportPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (joyPointerIdRef.current !== event.pointerId) {
       return;
     }
-    joyActiveRef.current = false;
-    joyPointerId = null;
-    input.turn = 0;
-    input.thrust = 0;
-    input.vectorX = 0;
-    input.vectorY = 0;
-    input.vectorStrength = 0;
-    setKnob(0, 0);
-    resetJoystickPosition();
+    if (viewport?.hasPointerCapture(event.pointerId)) {
+      viewport.releasePointerCapture(event.pointerId);
+    }
+    resetJoystick();
   };
 
-  /**
-   * Binds a press-and-hold action button such as FIRE or JUMP.
-   */
-  const bindPressButton = (button: HTMLButtonElement, key: 'fire' | 'jump') => {
-    let activePointerId: number | null = null;
-
-    const onPointerDown = (event: PointerEvent) => {
-      event.preventDefault();
-      activePointerId = event.pointerId;
-      button.setPointerCapture(event.pointerId);
-      input[key] = true;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key in keysRef.current) {
+        keysRef.current[event.key] = true;
+        if (event.key === ' ' || event.key === 'ArrowUp') {
+          event.preventDefault();
+        }
+      }
     };
-    const releasePointer = (event?: PointerEvent) => {
-      if (event && activePointerId !== null && event.pointerId !== activePointerId) {
+
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key in keysRef.current) {
+        keysRef.current[event.key] = false;
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
+
+  const createPressHandlers = (key: 'fire' | 'jump', activePointerIdRef: MutableRefObject<number | null>): TravelPressHandlers => {
+    const release = (event?: ReactPointerEvent<HTMLButtonElement>) => {
+      if (event && activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
         return;
       }
       if (event) {
         event.preventDefault();
-        if (button.hasPointerCapture(event.pointerId)) {
-          button.releasePointerCapture(event.pointerId);
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
         }
       }
-      activePointerId = null;
-      input[key] = false;
+      activePointerIdRef.current = null;
+      inputRef.current[key] = false;
     };
-    const onContextMenu = (event: MouseEvent) => {
-      event.preventDefault();
-    };
-    button.addEventListener('pointerdown', onPointerDown);
-    button.addEventListener('pointerup', releasePointer);
-    button.addEventListener('pointercancel', releasePointer);
-    button.addEventListener('lostpointercapture', releasePointer);
-    button.addEventListener('contextmenu', onContextMenu);
-    return () => {
-      button.removeEventListener('pointerdown', onPointerDown);
-      button.removeEventListener('pointerup', releasePointer);
-      button.removeEventListener('pointercancel', releasePointer);
-      button.removeEventListener('lostpointercapture', releasePointer);
-      button.removeEventListener('contextmenu', onContextMenu);
+
+    return {
+      onPointerDown: (event) => {
+        event.preventDefault();
+        activePointerIdRef.current = event.pointerId;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        inputRef.current[key] = true;
+      },
+      onPointerUp: release,
+      onPointerCancel: release,
+      onLostPointerCapture: release,
+      onContextMenu: (event) => {
+        event.preventDefault();
+      }
     };
   };
 
-  /**
-   * Binds a tap-style action button. These are latched once and later cleared
-   * by the frame loop after it consumes the action.
-   */
-  const bindTapButton = (button: HTMLButtonElement, key: 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock') => {
-    const onPointerDown = (event: PointerEvent) => {
+  const createTapHandlers = (key: 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock'): TravelTapHandlers => ({
+    onPointerDown: (event) => {
       event.preventDefault();
-      input[key] = true;
-    };
-    const onContextMenu = (event: MouseEvent) => {
+      inputRef.current[key] = true;
+    },
+    onContextMenu: (event) => {
       event.preventDefault();
-    };
-    button.addEventListener('pointerdown', onPointerDown);
-    button.addEventListener('contextmenu', onContextMenu);
-    return () => {
-      button.removeEventListener('pointerdown', onPointerDown);
-      button.removeEventListener('contextmenu', onContextMenu);
-    };
-  };
+    }
+  });
 
-  // Register every listener needed for the mounted session.
-  resetJoystickPosition();
-  window.addEventListener('keydown', onKeyDown);
-  window.addEventListener('keyup', onKeyUp);
-  viewport.addEventListener('pointerdown', onJoyPointerDown);
-  viewport.addEventListener('pointermove', onJoyPointerMove);
-  viewport.addEventListener('pointerup', onJoyPointerUp);
-  viewport.addEventListener('pointercancel', onJoyPointerUp);
+  const viewportHandlers = useMemo(
+    () => ({
+      onPointerDown: onViewportPointerDown,
+      onPointerMove: onViewportPointerMove,
+      onPointerUp: onViewportPointerUp,
+      onPointerCancel: onViewportPointerUp
+    }),
+    []
+  );
+  const jumpButtonHandlers = useMemo(() => createPressHandlers('jump', jumpPointerIdRef), []);
+  const fireButtonHandlers = useMemo(() => createPressHandlers('fire', firePointerIdRef), []);
+  const hyperspaceButtonHandlers = useMemo(() => createTapHandlers('hyperspace'), []);
+  const ecmButtonHandlers = useMemo(() => createTapHandlers('activateEcm'), []);
+  const bombButtonHandlers = useMemo(() => createTapHandlers('triggerEnergyBomb'), []);
+  const dockButtonHandlers = useMemo(() => createTapHandlers('autoDock'), []);
+  const resetInput = useMemo(
+    () => () => {
+      Object.assign(inputRef.current, createTravelInput());
+      Object.keys(keysRef.current).forEach((key) => {
+        keysRef.current[key] = false;
+      });
+      resetJoystick();
+    },
+    []
+  );
 
-  const unbindJumpButton = bindPressButton(jumpButton, 'jump');
-  const unbindHyperspaceButton = bindTapButton(hyperspaceButton, 'hyperspace');
-  const unbindFireButton = bindPressButton(fireButton, 'fire');
-  const unbindEcmButton = bindTapButton(ecmButton, 'activateEcm');
-  const unbindBombButton = bindTapButton(bombButton, 'triggerEnergyBomb');
-  const unbindDockButton = bindTapButton(dockButton, 'autoDock');
-
-  /**
-   * Full teardown for all listeners installed above.
-   */
-  return () => {
-    window.removeEventListener('keydown', onKeyDown);
-    window.removeEventListener('keyup', onKeyUp);
-    viewport.removeEventListener('pointerdown', onJoyPointerDown);
-    viewport.removeEventListener('pointermove', onJoyPointerMove);
-    viewport.removeEventListener('pointerup', onJoyPointerUp);
-    viewport.removeEventListener('pointercancel', onJoyPointerUp);
-    unbindJumpButton();
-    unbindHyperspaceButton();
-    unbindFireButton();
-    unbindEcmButton();
-    unbindBombButton();
-    unbindDockButton();
-  };
+  return useMemo(
+    () => ({
+      inputRef,
+      keysRef,
+      joyActiveRef,
+      joystickView,
+      viewportHandlers,
+      jumpButtonHandlers,
+      fireButtonHandlers,
+      hyperspaceButtonHandlers,
+      ecmButtonHandlers,
+      bombButtonHandlers,
+      dockButtonHandlers,
+      resetInput
+    }),
+    [
+      bombButtonHandlers,
+      dockButtonHandlers,
+      ecmButtonHandlers,
+      fireButtonHandlers,
+      hyperspaceButtonHandlers,
+      joystickView,
+      jumpButtonHandlers,
+      resetInput,
+      viewportHandlers
+    ]
+  );
 }
