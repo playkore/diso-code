@@ -264,6 +264,9 @@ const PACK_SEQUENCE: BlueprintId[] = ['sidewinder', 'mamba', 'krait', 'adder', '
 const LONE_BOUNTY_SEQUENCE: BlueprintId[] = ['cobra-mk3-pirate', 'asp-mk2', 'python-pirate', 'fer-de-lance'];
 const SAFE_ZONE_ENEMY_MARGIN = 18;
 const SAFE_ZONE_AVOIDANCE_DISTANCE = 96;
+const STATION_TRAFFIC_HOLD_DISTANCE = 148;
+const STATION_TRAFFIC_SLOT_DISTANCE = 30;
+const STATION_TRAFFIC_DOCKING_RADIUS = 96;
 const STATION_LAUNCH_DISTANCE = 240;
 // TODO increase when jump is implemented
 const HYPERSPACE_ARRIVAL_MIN_DISTANCE = 10_000;
@@ -283,6 +286,10 @@ function clampShields(value: number, maxShields: number): number {
 
 function isEnemyExcludedFromSafeZone(enemy: CombatEnemy): boolean {
   return !enemy.roles.cop && (enemy.roles.hostile || enemy.roles.pirate || enemy.roles.bountyHunter || enemy.kind === 'thargon' || Boolean(enemy.missionTag));
+}
+
+function isStationTraffic(enemy: CombatEnemy): boolean {
+  return !enemy.roles.cop && !enemy.roles.hostile && !enemy.roles.pirate && !enemy.roles.bountyHunter && !enemy.missionTag && (enemy.roles.trader || enemy.roles.innocent || enemy.roles.docking);
 }
 
 function getDistanceFromStation(station: CombatStation, x: number, y: number): number {
@@ -312,6 +319,44 @@ function keepEnemyOutsideSafeZone(station: CombatStation, enemy: CombatEnemy) {
   enemy.vx = Math.cos(escapeAngle) * outwardSpeed;
   enemy.vy = Math.sin(escapeAngle) * outwardSpeed;
   enemy.angle = escapeAngle;
+}
+
+function getStationTrafficHoldPoint(station: CombatStation) {
+  const slotAngle = getStationSlotAngle(station.angle);
+  return {
+    x: station.x + Math.cos(slotAngle) * STATION_TRAFFIC_HOLD_DISTANCE,
+    y: station.y + Math.sin(slotAngle) * STATION_TRAFFIC_HOLD_DISTANCE,
+    slotAngle
+  };
+}
+
+function stepStationTraffic(enemy: CombatEnemy, station: CombatStation, dt: number) {
+  const { x: holdX, y: holdY, slotAngle } = getStationTrafficHoldPoint(station);
+  const holdDx = holdX - enemy.x;
+  const holdDy = holdY - enemy.y;
+  const holdDistance = Math.hypot(holdDx, holdDy);
+  const distanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
+  const relativeAngle = Math.atan2(enemy.y - station.y, enemy.x - station.x);
+  const slotOffset = clampAngle(relativeAngle - slotAngle);
+  const alignedForDocking = Math.abs(slotOffset) < Math.PI / 7;
+  const shouldDock = holdDistance < 42 || (distanceFromStation < STATION_TRAFFIC_HOLD_DISTANCE + 8 && alignedForDocking);
+
+  const targetX = shouldDock ? station.x + Math.cos(slotAngle) * STATION_TRAFFIC_SLOT_DISTANCE : holdX;
+  const targetY = shouldDock ? station.y + Math.sin(slotAngle) * STATION_TRAFFIC_SLOT_DISTANCE : holdY;
+  const targetAngle = Math.atan2(targetY - enemy.y, targetX - enemy.x);
+  const angleDiff = clampAngle(targetAngle - enemy.angle);
+  enemy.angle += Math.sign(angleDiff) * enemy.turnRate * dt * 0.8;
+
+  const thrustScale = shouldDock ? 0.48 : 0.34;
+  enemy.vx += Math.cos(enemy.angle) * enemy.acceleration * thrustScale * dt;
+  enemy.vy += Math.sin(enemy.angle) * enemy.acceleration * thrustScale * dt;
+}
+
+function isStationTrafficDocked(enemy: CombatEnemy, station: CombatStation): boolean {
+  const slotAngle = getStationSlotAngle(station.angle);
+  const dockingDistance = getDistanceFromStation(station, enemy.x, enemy.y);
+  const dockingOffset = Math.abs(clampAngle(Math.atan2(enemy.y - station.y, enemy.x - station.x) - slotAngle));
+  return dockingDistance <= STATION_TRAFFIC_DOCKING_RADIUS && dockingOffset < Math.PI / 5;
 }
 
 export function getStationSlotAngle(stationAngle: number): number {
@@ -553,7 +598,7 @@ function spawnLoneBounty(state: TravelCombatState, random: RandomSource) {
 function spawnBenignTrader(state: TravelCombatState, random: RandomSource) {
   const blueprintId = (random.nextByte() & 1) === 0 ? 'cobra-mk3-trader' : 'python-trader';
   spawnEnemyFromBlueprint(state, blueprintId, random, {
-    roles: { trader: true, innocent: true, hostile: false },
+    roles: { trader: true, innocent: true, docking: true, hostile: false },
     aggression: 10,
     baseAggression: 10
   });
@@ -943,7 +988,7 @@ function triggerEnergyBomb(state: TravelCombatState, random: RandomSource) {
   pushMessage(state, kills > 0 ? `ENERGY BOMB DETONATED: ${kills}` : 'ENERGY BOMB DETONATED', 1200);
 }
 
-function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, random: RandomSource) {
+function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, random: RandomSource): boolean {
   applyEnemyHostility(state, enemy);
   enemy.energy = Math.min(enemy.maxEnergy, enemy.energy + 0.08 * dt);
 
@@ -951,6 +996,7 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   const dy = state.player.y - enemy.y;
   const dist = Math.hypot(dx, dy);
   const station = state.station;
+  const stationTraffic = station ? isStationTraffic(enemy) : false;
   const safeZoneBoundary = station ? station.safeZoneRadius + SAFE_ZONE_ENEMY_MARGIN : 0;
   const enemyExcludedFromSafeZone = station ? isEnemyExcludedFromSafeZone(enemy) : false;
   const distanceFromStation = station ? getDistanceFromStation(station, enemy.x, enemy.y) : Number.POSITIVE_INFINITY;
@@ -964,6 +1010,8 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   if (mustAvoidSafeZone && station) {
     enemy.vx += Math.cos(enemy.angle) * enemy.acceleration * dt * 1.25;
     enemy.vy += Math.sin(enemy.angle) * enemy.acceleration * dt * 1.25;
+  } else if (stationTraffic && station) {
+    stepStationTraffic(enemy, station, dt);
   } else if (enemy.roles.hostile || enemy.missionTag || enemy.kind === 'thargon') {
     if (dist > 110) {
       enemy.vx += Math.cos(enemy.angle) * enemy.acceleration * dt;
@@ -990,6 +1038,10 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   enemy.x += enemy.vx * dt;
   enemy.y += enemy.vy * dt;
 
+  if (stationTraffic && station && isStationTrafficDocked(enemy, station)) {
+    return true;
+  }
+
   if (enemyExcludedFromSafeZone && station) {
     keepEnemyOutsideSafeZone(station, enemy);
   }
@@ -1000,12 +1052,12 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   if (enemyExcludedFromSafeZone && station) {
     const finalDistanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
     if (state.encounter.safeZone || finalDistanceFromStation <= safeZoneBoundary + SAFE_ZONE_ENEMY_MARGIN) {
-      return;
+      return false;
     }
   }
 
   if (!(enemy.roles.hostile || enemy.kind === 'thargon')) {
-    return;
+    return false;
   }
 
   if (enemy.missileCooldown <= 0 && enemy.missiles > 0 && state.encounter.ecmTimer <= 0) {
@@ -1027,25 +1079,26 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   }
 
   if (dist > enemy.laserRange || enemy.fireCooldown > 0) {
-    return;
+    return false;
   }
 
   const cnt = estimateCnt(angleDiff);
   if (!canEnemyLaserFireByCnt(cnt) || enemy.laserPower <= 0) {
-    return;
+    return false;
   }
 
   enemy.isFiringLaser = true;
   enemy.fireCooldown = 45;
 
   if (!canEnemyLaserHitByCnt(cnt)) {
-    return;
+    return false;
   }
 
   state.player.shields = clampShields(state.player.shields - enemy.laserPower, state.player.maxShields);
   enemy.vx *= 0.5;
   enemy.vy *= 0.5;
   spawnParticles(state, state.player.x, state.player.y, '#ff5555');
+  return false;
 }
 
 function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
@@ -1201,8 +1254,14 @@ export function stepTravelCombat(
     spawnCop(state, random, true);
   }
 
-  for (const enemy of state.enemies) {
-    stepEnemy(state, enemy, dt, random);
+  for (let index = state.enemies.length - 1; index >= 0; index -= 1) {
+    const enemy = state.enemies[index];
+    if (!enemy) {
+      continue;
+    }
+    if (stepEnemy(state, enemy, dt, random)) {
+      state.enemies.splice(index, 1);
+    }
   }
 
   state.encounter.copsNearby = state.enemies.filter((enemy) => enemy.roles.cop).length;
