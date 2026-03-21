@@ -23,6 +23,8 @@ import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { createTravelInput, bindTravelInput } from './useTravelInput';
 import { getHudState } from './travelViewModel';
 
+const HYPERSPACE_DURATION = 160;
+
 /**
  * Travel screen lifecycle overview
  * -------------------------------
@@ -326,7 +328,7 @@ export function useTravelSession(
         return;
       }
       flightState = 'HYPERSPACE';
-      hyperspaceTimer = 160;
+      hyperspaceTimer = HYPERSPACE_DURATION;
       showMessage(`HYPERSPACE TO ${session.destinationSystem.toUpperCase()}`, 2000);
       combatState.player.vx = Math.cos(combatState.player.angle) * 5;
       combatState.player.vy = Math.sin(combatState.player.angle) * 5;
@@ -474,8 +476,10 @@ export function useTravelSession(
       // pacing and destination handoff are route-flow behavior rather than pure
       // dogfight simulation.
       if (flightState === 'HYPERSPACE') {
-        combatState.player.vx *= 1.05;
-        combatState.player.vy *= 1.05;
+        const progress = 1 - hyperspaceTimer / HYPERSPACE_DURATION;
+        const speedFactor = progress < 0.55 ? 1.05 : 0.97;
+        combatState.player.vx *= speedFactor;
+        combatState.player.vy *= speedFactor;
         combatState.player.x += combatState.player.vx * dt;
         combatState.player.y += combatState.player.vy * dt;
         hyperspaceTimer -= dt;
