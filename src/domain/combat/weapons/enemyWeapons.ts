@@ -1,0 +1,93 @@
+import { pushMessage, projectileId, spawnParticles } from '../state';
+import { spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
+import { clampShields } from '../state';
+import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
+
+export function estimateCnt(angleDiff: number): number {
+  const alignment = Math.max(0, Math.cos(Math.abs(angleDiff)));
+  return -Math.round(alignment * 36);
+}
+
+export function canEnemyLaserFireByCnt(cnt: number): boolean {
+  return cnt <= -32;
+}
+
+export function canEnemyLaserHitByCnt(cnt: number): boolean {
+  return cnt <= -35;
+}
+
+export function applyEnemyHostility(state: TravelCombatState, enemy: CombatEnemy) {
+  if (enemy.roles.bountyHunter && state.legalValue >= 40) {
+    enemy.roles.hostile = true;
+  }
+  if (enemy.roles.pirate && enemy.roles.hostile && state.encounter.safeZone) {
+    enemy.aggression = 0;
+  } else {
+    enemy.aggression = enemy.baseAggression;
+  }
+  if (enemy.roles.cop && state.encounter.stationHostile) {
+    enemy.roles.hostile = true;
+  }
+}
+
+export function spawnEnemyMissile(state: TravelCombatState, enemy: CombatEnemy) {
+  state.projectiles.push({
+    id: projectileId(state),
+    kind: 'missile',
+    owner: 'enemy',
+    x: enemy.x + Math.cos(enemy.angle) * 14,
+    y: enemy.y + Math.sin(enemy.angle) * 14,
+    vx: enemy.vx + Math.cos(enemy.angle) * 6,
+    vy: enemy.vy + Math.sin(enemy.angle) * 6,
+    damage: 22,
+    life: 180,
+    sourceEnemyId: enemy.id
+  });
+  pushMessage(state, `INCOMING MISSILE: ${enemy.label.toUpperCase()}`, 1000);
+}
+
+export function tryEnemyMissileLaunch(state: TravelCombatState, enemy: CombatEnemy, random: RandomSource) {
+  if (enemy.missileCooldown > 0 || enemy.missiles <= 0 || state.encounter.ecmTimer > 0) {
+    return;
+  }
+  if ((random.nextByte() & 31) >= enemy.missiles) {
+    return;
+  }
+
+  enemy.missiles -= 1;
+  enemy.missileCooldown = 150;
+  if (enemy.blueprintId === 'thargoid') {
+    spawnEnemyFromBlueprint(state, 'thargon', random, {
+      kind: 'thargon',
+      x: enemy.x + Math.cos(enemy.angle) * 24,
+      y: enemy.y + Math.sin(enemy.angle) * 24,
+      angle: enemy.angle,
+      missionTag: enemy.missionTag
+    });
+    return;
+  }
+
+  spawnEnemyMissile(state, enemy);
+}
+
+export function tryEnemyLaserAttack(state: TravelCombatState, enemy: CombatEnemy, dist: number, angleDiff: number) {
+  if (dist > enemy.laserRange || enemy.fireCooldown > 0) {
+    return;
+  }
+
+  const cnt = estimateCnt(angleDiff);
+  if (!canEnemyLaserFireByCnt(cnt) || enemy.laserPower <= 0) {
+    return;
+  }
+
+  enemy.isFiringLaser = true;
+  enemy.fireCooldown = 45;
+  if (!canEnemyLaserHitByCnt(cnt)) {
+    return;
+  }
+
+  state.player.shields = clampShields(state.player.shields - enemy.laserPower, state.player.maxShields);
+  enemy.vx *= 0.5;
+  enemy.vy *= 0.5;
+  spawnParticles(state, state.player.x, state.player.y, '#ff5555');
+}
