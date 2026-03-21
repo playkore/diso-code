@@ -264,6 +264,8 @@ const PACK_SEQUENCE: BlueprintId[] = ['sidewinder', 'mamba', 'krait', 'adder', '
 const LONE_BOUNTY_SEQUENCE: BlueprintId[] = ['cobra-mk3-pirate', 'asp-mk2', 'python-pirate', 'fer-de-lance'];
 const SAFE_ZONE_ENEMY_MARGIN = 18;
 const SAFE_ZONE_AVOIDANCE_DISTANCE = 96;
+const STATION_LAUNCH_DISTANCE = 240;
+const HYPERSPACE_ARRIVAL_DISTANCE = 840;
 
 function clampAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -278,7 +280,7 @@ function clampShields(value: number, maxShields: number): number {
 }
 
 function isEnemyExcludedFromSafeZone(enemy: CombatEnemy): boolean {
-  return !enemy.roles.cop && (enemy.roles.hostile || enemy.kind === 'thargon' || Boolean(enemy.missionTag));
+  return !enemy.roles.cop && (enemy.roles.hostile || enemy.roles.pirate || enemy.roles.bountyHunter || enemy.kind === 'thargon' || Boolean(enemy.missionTag));
 }
 
 function getDistanceFromStation(station: CombatStation, x: number, y: number): number {
@@ -292,6 +294,22 @@ function getSafeZoneEscapeAngle(station: CombatStation, enemy: CombatEnemy): num
     return enemy.angle;
   }
   return Math.atan2(dy, dx);
+}
+
+function keepEnemyOutsideSafeZone(station: CombatStation, enemy: CombatEnemy) {
+  const safeZoneBoundary = station.safeZoneRadius + SAFE_ZONE_ENEMY_MARGIN;
+  const distanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
+  if (distanceFromStation >= safeZoneBoundary) {
+    return;
+  }
+
+  const escapeAngle = getSafeZoneEscapeAngle(station, enemy);
+  enemy.x = station.x + Math.cos(escapeAngle) * safeZoneBoundary;
+  enemy.y = station.y + Math.sin(escapeAngle) * safeZoneBoundary;
+  const outwardSpeed = Math.max(enemy.acceleration * 24, Math.hypot(enemy.vx, enemy.vy));
+  enemy.vx = Math.cos(escapeAngle) * outwardSpeed;
+  enemy.vy = Math.sin(escapeAngle) * outwardSpeed;
+  enemy.angle = escapeAngle;
 }
 
 export function getStationSlotAngle(stationAngle: number): number {
@@ -499,6 +517,10 @@ function spawnEnemyFromBlueprint(
     missionTag: overrides.missionTag
   };
 
+  if (state.station && isEnemyExcludedFromSafeZone(enemy)) {
+    keepEnemyOutsideSafeZone(state.station, enemy);
+  }
+
   state.enemies.push(enemy);
   return enemy;
 }
@@ -666,7 +688,7 @@ export function enterStationSpace(
     safeZoneRadius: 360
   };
   state.player.x = state.station.x;
-  state.player.y = state.station.y + 240;
+  state.player.y = state.station.y + STATION_LAUNCH_DISTANCE;
   state.player.vx = 0;
   state.player.vy = 0;
   state.player.angle = -Math.PI / 2;
@@ -683,6 +705,12 @@ export function enterStationSpace(
 
 export function enterArrivalSpace(state: TravelCombatState, random: RandomSource) {
   enterStationSpace(state, random, { rewardScore: true, message: 'SYSTEM REACHED' });
+  if (!state.station) {
+    return;
+  }
+
+  state.player.y = state.station.y + HYPERSPACE_ARRIVAL_DISTANCE;
+  state.encounter.safeZone = false;
 }
 
 function estimateCnt(angleDiff: number): number {
@@ -958,16 +986,7 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   enemy.y += enemy.vy * dt;
 
   if (enemyExcludedFromSafeZone && station) {
-    const newDistanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
-    if (newDistanceFromStation < safeZoneBoundary) {
-      const escapeAngle = getSafeZoneEscapeAngle(station, enemy);
-      enemy.x = station.x + Math.cos(escapeAngle) * safeZoneBoundary;
-      enemy.y = station.y + Math.sin(escapeAngle) * safeZoneBoundary;
-      const outwardSpeed = Math.max(enemy.acceleration * 24, Math.hypot(enemy.vx, enemy.vy));
-      enemy.vx = Math.cos(escapeAngle) * outwardSpeed;
-      enemy.vy = Math.sin(escapeAngle) * outwardSpeed;
-      enemy.angle = escapeAngle;
-    }
+    keepEnemyOutsideSafeZone(station, enemy);
   }
 
   enemy.fireCooldown = Math.max(0, enemy.fireCooldown - dt);

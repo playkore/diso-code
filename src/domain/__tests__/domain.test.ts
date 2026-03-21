@@ -36,6 +36,7 @@ import {
   consumeEscapePod,
   createDeterministicRandomSource,
   createTravelCombatState,
+  enterArrivalSpace,
   getPlayerCombatSnapshot,
   getBlueprintAvailability,
   getAvailablePackHunters,
@@ -450,6 +451,18 @@ describe('travel combat rules', () => {
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(true);
   });
 
+  it('places hyperspace arrivals well outside the station safe zone', () => {
+    const rng = createDeterministicRandomSource([128, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0]);
+
+    enterArrivalSpace(state, rng);
+
+    expect(state.station).not.toBeNull();
+    expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeGreaterThan(state.station!.safeZoneRadius);
+    expect(state.player.angle).toBe(-Math.PI / 2);
+    expect(state.encounter.safeZone).toBe(false);
+  });
+
   it('turns bounty hunters hostile at FIST 40 and suppresses pirate aggression in safe zones', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0], { legalValue: 40, government: 7, techLevel: 12 });
@@ -718,6 +731,52 @@ describe('travel combat rules', () => {
 
     expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(377.5);
     expect(state.player.shields).toBe(70);
+    expect(state.enemies[0].isFiringLaser).toBe(false);
+  });
+
+  it('keeps bounty hunters out of the station safe zone before they turn hostile', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0], { legalValue: 0 });
+    state.station = {
+      x: 0,
+      y: 0,
+      radius: 80,
+      angle: 0,
+      rotSpeed: 0,
+      safeZoneRadius: 360
+    };
+    state.player.x = 0;
+    state.player.y = 0;
+    state.enemies.push({
+      id: 9,
+      kind: 'ship',
+      blueprintId: 'asp-mk2',
+      label: 'Asp Mk II',
+      x: 350,
+      y: 0,
+      vx: -3,
+      vy: 0,
+      angle: Math.PI,
+      energy: 150,
+      maxEnergy: 150,
+      laserPower: 5,
+      missiles: 1,
+      targetableArea: 280,
+      laserRange: 380,
+      topSpeed: 6.6,
+      acceleration: 0.12,
+      turnRate: 0.06,
+      roles: { bountyHunter: true },
+      aggression: 20,
+      baseAggression: 20,
+      fireCooldown: 0,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+
+    expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(377.5);
     expect(state.enemies[0].isFiringLaser).toBe(false);
   });
 
