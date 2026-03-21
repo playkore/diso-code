@@ -213,27 +213,40 @@ export function bindTravelInput(params: {
    * Binds a press-and-hold action button such as FIRE or JUMP.
    */
   const bindPressButton = (button: HTMLButtonElement, key: 'fire' | 'jump') => {
+    let activePointerId: number | null = null;
+
     const onPointerDown = (event: PointerEvent) => {
       event.preventDefault();
+      activePointerId = event.pointerId;
+      button.setPointerCapture(event.pointerId);
       input[key] = true;
     };
-    const onPointerUp = (event?: Event) => {
-      event?.preventDefault();
+    const releasePointer = (event?: PointerEvent) => {
+      if (event && activePointerId !== null && event.pointerId !== activePointerId) {
+        return;
+      }
+      if (event) {
+        event.preventDefault();
+        if (button.hasPointerCapture(event.pointerId)) {
+          button.releasePointerCapture(event.pointerId);
+        }
+      }
+      activePointerId = null;
       input[key] = false;
     };
     const onContextMenu = (event: MouseEvent) => {
       event.preventDefault();
     };
     button.addEventListener('pointerdown', onPointerDown);
-    button.addEventListener('pointerup', onPointerUp);
-    button.addEventListener('pointerleave', onPointerUp);
-    button.addEventListener('pointercancel', onPointerUp);
+    button.addEventListener('pointerup', releasePointer);
+    button.addEventListener('pointercancel', releasePointer);
+    button.addEventListener('lostpointercapture', releasePointer);
     button.addEventListener('contextmenu', onContextMenu);
     return () => {
       button.removeEventListener('pointerdown', onPointerDown);
-      button.removeEventListener('pointerup', onPointerUp);
-      button.removeEventListener('pointerleave', onPointerUp);
-      button.removeEventListener('pointercancel', onPointerUp);
+      button.removeEventListener('pointerup', releasePointer);
+      button.removeEventListener('pointercancel', releasePointer);
+      button.removeEventListener('lostpointercapture', releasePointer);
       button.removeEventListener('contextmenu', onContextMenu);
     };
   };
