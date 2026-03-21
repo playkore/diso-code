@@ -6,9 +6,9 @@ func _init() -> void:
 	empty_message = "Mission log entries will appear once the mission autoload contract is in place."
 
 func _populate_body() -> void:
-	var snapshot := get_state_snapshot()
-	var missions := StateBridge.read_value(snapshot, &"missions", null)
-	var mission_log := StateBridge.read_any(missions, ["mission_log", "missionLog"], [])
+	var snapshot: Dictionary = get_state_snapshot()
+	var missions: Variant = StateBridge.read_value(snapshot, &"missions", null)
+	var mission_log: Variant = StateBridge.read_any(missions, ["mission_log", "missionLog"], [])
 
 	add_section_title("Mission Log")
 	if mission_log is Array and not mission_log.is_empty():
@@ -18,7 +18,7 @@ func _populate_body() -> void:
 			var body := str(StateBridge.read_value(entry, &"body", ""))
 			add_detail_row(title, kind, UiTheme.CGA_RED if kind == "debriefing" else UiTheme.CGA_GREEN)
 			if body.length() > 0:
-			add_notice(body)
+				add_notice(body)
 	else:
 		add_notice("No active mission messages are available yet.")
 

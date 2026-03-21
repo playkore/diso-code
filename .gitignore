@@ -1,3 +1,9 @@
 node_modules
 dist
 .playwright-cli
+
+# Godot editor cache and imported intermediates live here and should stay local.
+godot/.godot/
+
+# TypeScript incremental compilation state is machine-local build output.
+*.tsbuildinfo

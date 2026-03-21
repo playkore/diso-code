@@ -92,20 +92,21 @@ static func get_current_tech_level(system_name: String) -> int:
 
 
 static func get_cheapest_commodity(session: Dictionary) -> Dictionary:
-	var items := DomainMarket.get_session_market_items(session)
+	var items: Array = DomainMarket.get_session_market_items(session)
 	if items.is_empty():
 		return {}
 
 	var cheapest: Dictionary = items[0]
-	for item in items:
+	for item_variant in items:
+		var item: Dictionary = item_variant
 		if int(item.get("price", 0)) < int(cheapest.get("price", 0)):
 			cheapest = item
 	return cheapest
 
 
 static func create_docked_state(state: Dictionary, system_name: String, options: Dictionary) -> Dictionary:
-	var source_commander := state.get("commander", {})
-	var next_commander := DomainCommander.normalize_commander_state({
+	var source_commander: Dictionary = state.get("commander", {})
+	var next_commander: Dictionary = DomainCommander.normalize_commander_state({
 		"name": source_commander.get("name", "Cmdr. Nova"),
 		"cash": source_commander.get("cash", 1000),
 		"fuel": source_commander.get("fuel", 7.0),

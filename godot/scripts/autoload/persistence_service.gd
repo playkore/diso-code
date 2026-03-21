@@ -23,8 +23,8 @@ func fnv1a32(input: String) -> int:
 	return hash & 0xFFFFFFFF
 
 func build_game_save(snapshot: Dictionary, saved_at: String = "") -> Dictionary:
-	var timestamp := saved_at if saved_at != "" else Time.get_datetime_string_from_system(true)
-	var snapshot_json := JSON.stringify(snapshot)
+	var timestamp: String = saved_at if saved_at != "" else Time.get_datetime_string_from_system(true)
+	var snapshot_json: String = JSON.stringify(snapshot)
 	return {
 		"version": GAME_SAVE_SCHEMA_VERSION,
 		"checksum": fnv1a32("%d:%s:%s" % [GAME_SAVE_SCHEMA_VERSION, timestamp, snapshot_json]),
@@ -44,16 +44,16 @@ func load_game_json(json_text: String) -> Dictionary:
 	if int(save_file.get("version", -1)) != GAME_SAVE_SCHEMA_VERSION:
 		push_error("Unsupported Godot save schema version: %s" % [save_file.get("version", "missing")])
 		return {}
-	var expected_checksum := build_game_save(save_file.get("snapshot", {}), str(save_file.get("saved_at", ""))).get("checksum", -1)
+	var expected_checksum: int = int(build_game_save(save_file.get("snapshot", {}), str(save_file.get("saved_at", ""))).get("checksum", -1))
 	if int(save_file.get("checksum", -2)) != int(expected_checksum):
 		push_error("Save checksum mismatch.")
 		return {}
 	return save_file
 
 func save_slot(slot_id: int, snapshot: Dictionary) -> Dictionary:
-	var saved_at := Time.get_datetime_string_from_system(true)
-	var payload := build_game_save(snapshot, saved_at)
-	var file := FileAccess.open(get_save_slot_path(slot_id), FileAccess.WRITE)
+	var saved_at: String = Time.get_datetime_string_from_system(true)
+	var payload: Dictionary = build_game_save(snapshot, saved_at)
+	var file: FileAccess = FileAccess.open(get_save_slot_path(slot_id), FileAccess.WRITE)
 	if file == null:
 		push_error("Failed to open save slot %d for writing." % slot_id)
 		return {}
@@ -62,21 +62,21 @@ func save_slot(slot_id: int, snapshot: Dictionary) -> Dictionary:
 	return payload
 
 func load_slot(slot_id: int) -> Dictionary:
-	var path := get_save_slot_path(slot_id)
+	var path: String = get_save_slot_path(slot_id)
 	if not FileAccess.file_exists(path):
 		return {}
-	var file := FileAccess.open(path, FileAccess.READ)
+	var file: FileAccess = FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		push_error("Failed to open save slot %d for reading." % slot_id)
 		return {}
-	var text := file.get_as_text()
+	var text: String = file.get_as_text()
 	file.close()
 	return load_game_json(text)
 
 func load_all_slots() -> Dictionary:
-	var slots := {}
+	var slots: Dictionary = {}
 	for slot_id in SAVE_SLOT_IDS:
-		var payload := load_slot(slot_id)
+		var payload: Dictionary = load_slot(slot_id)
 		if payload.is_empty():
 			continue
 		slots[slot_id] = payload

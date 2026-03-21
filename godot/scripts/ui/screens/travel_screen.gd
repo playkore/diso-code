@@ -88,6 +88,15 @@ func _build_shell() -> void:
 		UiTheme.style_button(button, false)
 		controls.add_child(button)
 
+	var cancel_button := Button.new()
+	cancel_button.text = "ABORT"
+	cancel_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	cancel_button.pressed.connect(func() -> void:
+		StateBridge.call_action(&"cancel_travel")
+	)
+	UiTheme.style_button(cancel_button, false)
+	playfield_column.add_child(cancel_button)
+
 	_status_label = Label.new()
 	UiTheme.style_label(_status_label, UiTheme.CGA_RED, 12)
 	_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -119,19 +128,22 @@ func _on_action_pressed(action_name: String) -> void:
 	UiTheme.style_label(_message_label, UiTheme.CGA_GREEN, 14)
 
 func _refresh_view() -> void:
-	var snapshot := StateBridge.collect_snapshot()
-	var commander := snapshot.get("commander", null)
-	var universe := snapshot.get("universe", null)
-	var travel_session := snapshot.get("travel_session", null)
+	var snapshot: Dictionary = StateBridge.collect_snapshot()
+	var commander: Variant = snapshot.get("commander", null)
+	var universe: Variant = snapshot.get("universe", null)
+	var travel_session: Variant = snapshot.get("travel_session", null)
 
-	var origin := StateBridge.read_any(travel_session, ["origin_system", "originSystem"], StateBridge.read_any(universe, ["current_system", "currentSystem"], "Unknown"))
-	var destination := StateBridge.read_any(travel_session, ["destination_system", "destinationSystem"], "Awaiting selection")
-	var fuel := StateBridge.read_value(commander, &"fuel", null)
-	var legal := StateBridge.read_any(commander, ["legal_value", "legalValue"], null)
+	var origin: Variant = StateBridge.read_any(travel_session, ["origin_system", "originSystem"], StateBridge.read_any(universe, ["current_system", "currentSystem"], "Unknown"))
+	var destination: Variant = StateBridge.read_any(travel_session, ["destination_system", "destinationSystem"], "Awaiting selection")
+	var fuel: Variant = StateBridge.read_value(commander, &"fuel", null)
+	var legal: Variant = StateBridge.read_any(commander, ["legal_value", "legalValue"], null)
+	var fuel_cost: Variant = StateBridge.read_any(travel_session, ["fuel_cost", "fuelCost"], null)
 	var status_lines := PackedStringArray()
 	status_lines.append("Route: %s -> %s" % [str(origin), str(destination)])
 	if fuel != null:
 		status_lines.append("Fuel: %s" % _format_light_years(fuel))
+	if fuel_cost != null:
+		status_lines.append("Jump Cost: %s" % _format_light_years(fuel_cost))
 	if legal != null:
 		status_lines.append("Legal: %s" % str(legal))
 
@@ -144,7 +156,7 @@ func _refresh_view() -> void:
 func _format_number(value: Variant, decimals: int = 0) -> String:
 	if value == null:
 		return "-"
-	var number := float(value)
+	var number: float = float(value)
 	if decimals <= 0:
 		return str(int(round(number)))
 	return "%0.*f" % [decimals, number]

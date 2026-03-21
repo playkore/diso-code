@@ -66,6 +66,7 @@ var _screen_host: MarginContainer
 var _travel_host: Control
 var _status_title: Label
 var _status_details: Label
+var _notice_label: Label
 var _tab_buttons: Dictionary = {}
 var _current_screen: Node = null
 var _refresh_timer := 0.0
@@ -146,6 +147,12 @@ func _build_shell() -> void:
 	_status_details.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_column.add_child(_status_details)
 
+	_notice_label = Label.new()
+	_notice_label.text = ""
+	UiTheme.style_label(_notice_label, UiTheme.CGA_RED, 13)
+	_notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_column.add_child(_notice_label)
+
 	var content_panel := PanelContainer.new()
 	UiTheme.style_panel(content_panel, UiTheme.CGA_GREEN)
 	content_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -177,7 +184,7 @@ func _build_shell() -> void:
 		_tab_buttons[tab_id] = button
 
 func _on_tab_pressed(tab_id: String) -> void:
-	var state_tab := TAB_STATE_VALUES.get(tab_id, tab_id)
+	var state_tab: String = str(TAB_STATE_VALUES.get(tab_id, tab_id))
 	StateBridge.call_action("set_active_tab", [state_tab])
 	_set_tab(tab_id)
 
@@ -221,19 +228,20 @@ func _sync_nav_buttons() -> void:
 		UiTheme.style_tab_button(button, tab_id == _selected_tab)
 
 func _sync_chrome() -> void:
-	var snapshot := StateBridge.collect_snapshot()
-	var commander := snapshot.get("commander", null)
-	var universe := snapshot.get("universe", null)
-	var travel_session := snapshot.get("travel_session", null)
+	var snapshot: Dictionary = StateBridge.collect_snapshot()
+	var commander: Variant = snapshot.get("commander", null)
+	var universe: Variant = snapshot.get("universe", null)
+	var travel_session: Variant = snapshot.get("travel_session", null)
 
-	var commander_name := StateBridge.read_any(commander, ["name", "cmdrName"], "Cmdr. Nova")
-	var credits := StateBridge.read_any(commander, ["cash", "credits"], null)
-	var system_name := StateBridge.read_any(universe, ["current_system", "currentSystem"], "Lave")
-	var stardate := StateBridge.read_value(universe, &"stardate", null)
-	var route_text := "Awaiting docked state."
+	var commander_name: String = str(StateBridge.read_any(commander, ["name", "cmdrName"], "Cmdr. Nova"))
+	var credits: Variant = StateBridge.read_any(commander, ["cash", "credits"], null)
+	var system_name: String = str(StateBridge.read_any(universe, ["current_system", "currentSystem"], "Lave"))
+	var stardate: Variant = StateBridge.read_value(universe, &"stardate", null)
+	var route_text: String = "Awaiting docked state."
+	var latest_event: Variant = StateBridge.read_any(snapshot.get("ui", null), ["latest_event", "latestEvent"], null)
 	if travel_session != null:
-		var origin := StateBridge.read_any(travel_session, ["origin_system", "originSystem"], null)
-		var destination := StateBridge.read_any(travel_session, ["destination_system", "destinationSystem"], null)
+		var origin: Variant = StateBridge.read_any(travel_session, ["origin_system", "originSystem"], null)
+		var destination: Variant = StateBridge.read_any(travel_session, ["destination_system", "destinationSystem"], null)
 		if origin != null and destination != null:
 			route_text = "%s -> %s" % [origin, destination]
 
@@ -247,13 +255,15 @@ func _sync_chrome() -> void:
 	if travel_session != null:
 		status_lines.append("Travel: %s" % route_text)
 	_status_details.text = " | ".join(status_lines)
+	_notice_label.text = "" if latest_event == null else "%s: %s" % [str(StateBridge.read_value(latest_event, &"title", "")), str(StateBridge.read_value(latest_event, &"body", ""))]
 	UiTheme.style_label(_status_title, UiTheme.CGA_YELLOW, 20)
 	UiTheme.style_label(_status_details, UiTheme.CGA_GREEN, 13)
+	UiTheme.style_label(_notice_label, UiTheme.CGA_RED, 13)
 
 func _initial_state_tab() -> String:
-	var snapshot := StateBridge.collect_snapshot()
-	var ui_state := snapshot.get("ui", null)
-	var active_tab := StateBridge.read_any(ui_state, ["active_tab", "activeTab"], "market")
+	var snapshot: Dictionary = StateBridge.collect_snapshot()
+	var ui_state: Variant = snapshot.get("ui", null)
+	var active_tab: String = str(StateBridge.read_any(ui_state, ["active_tab", "activeTab"], "market"))
 	return str(active_tab)
 
 func _local_tab_from_state_tab(state_tab: String) -> String:

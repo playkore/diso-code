@@ -26,26 +26,28 @@ static func _wrap8(value: int) -> int:
 	return value & 0xFF
 
 static func generate_market(system_economy: int, fluct_byte: int) -> Array:
-	var economy := system_economy & 0xFF
-	var fluct := fluct_byte & 0xFF
+	var economy: int = system_economy & 0xFF
+	var fluct: int = fluct_byte & 0xFF
 	var output: Array = []
-	for commodity in COMMODITIES:
-		var changing := fluct & int(commodity.get("mask", 0))
-		var product := economy * int(commodity.get("gradient", 0))
-		var quantity_raw := _wrap8(int(commodity.get("base_quantity", 0)) + changing - product)
-		var quantity := 0 if quantity_raw > 0x7F else (quantity_raw & 0x3F)
-		var price_raw := _wrap8(int(commodity.get("base_price", 0)) + changing + product)
-		var price := price_raw * 4
-		var item := commodity.duplicate(true)
+	for commodity_variant in COMMODITIES:
+		var commodity: Dictionary = commodity_variant
+		var changing: int = fluct & int(commodity.get("mask", 0))
+		var product: int = economy * int(commodity.get("gradient", 0))
+		var quantity_raw: int = _wrap8(int(commodity.get("base_quantity", 0)) + changing - product)
+		var quantity: int = 0 if quantity_raw > 0x7F else (quantity_raw & 0x3F)
+		var price_raw: int = _wrap8(int(commodity.get("base_price", 0)) + changing + product)
+		var price: int = price_raw * 4
+		var item: Dictionary = commodity.duplicate(true)
 		item["quantity"] = quantity
 		item["price"] = price
 		output.append(item)
 	return output
 
 static func create_docked_market_session(system_name: String, economy: int, fluctuation: int) -> Dictionary:
-	var baseline := generate_market(economy, fluctuation)
-	var local_quantities := {}
-	for item in baseline:
+	var baseline: Array = generate_market(economy, fluctuation)
+	var local_quantities: Dictionary = {}
+	for item_variant in baseline:
+		var item: Dictionary = item_variant
 		local_quantities[item.get("key", "")] = item.get("quantity", 0)
 	return {
 		"system_name": system_name,
@@ -57,16 +59,17 @@ static func create_docked_market_session(system_name: String, economy: int, fluc
 
 static func get_session_market_items(session: Dictionary) -> Array:
 	var items: Array = []
-	for item in session.get("baseline", []):
-		var next_item := item.duplicate(true)
+	for item_variant in session.get("baseline", []):
+		var item: Dictionary = item_variant
+		var next_item: Dictionary = item.duplicate(true)
 		next_item["quantity"] = int(session.get("local_quantities", {}).get(item.get("key", ""), item.get("quantity", 0)))
 		items.append(next_item)
 	return items
 
 static func apply_local_market_trade(session: Dictionary, commodity_key: String, delta_quantity: int) -> Dictionary:
-	var next_session := session.duplicate(true)
+	var next_session: Dictionary = session.duplicate(true)
 	var quantities: Dictionary = next_session.get("local_quantities", {}).duplicate(true)
-	var current := int(quantities.get(commodity_key, 0))
+	var current: int = int(quantities.get(commodity_key, 0))
 	quantities[commodity_key] = maxi(0, current + delta_quantity)
 	next_session["local_quantities"] = quantities
 	return next_session

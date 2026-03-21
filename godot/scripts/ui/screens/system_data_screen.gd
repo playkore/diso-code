@@ -30,13 +30,13 @@ func _init() -> void:
 	empty_message = "System data will be synthesized from the current system entry when the autoload exists."
 
 func _populate_body() -> void:
-	var snapshot := get_state_snapshot()
-	var universe := snapshot.get("universe", null)
-	var current_system_name := str(StateBridge.read_any(universe, ["current_system", "currentSystem"], "Lave"))
-	var system := GalaxyCatalog.get_system_by_name(current_system_name).get("data", {})
+	var snapshot: Dictionary = get_state_snapshot()
+	var universe: Variant = snapshot.get("universe", null)
+	var current_system_name: String = str(StateBridge.read_any(universe, ["current_system", "currentSystem"], "Lave"))
+	var system: Dictionary = GalaxyCatalog.get_system_by_name(current_system_name).get("data", {})
 
-	var economy := int(StateBridge.read_any(system, ["economy"], 0))
-	var government := int(StateBridge.read_any(system, ["government"], 0))
+	var economy: int = int(StateBridge.read_any(system, ["economy"], 0))
+	var government: int = int(StateBridge.read_any(system, ["government"], 0))
 
 	add_section_title("Local System")
 	add_detail_row("Name", str(StateBridge.read_any(system, ["name"], StateBridge.read_any(universe, ["current_system", "currentSystem"], "Unknown"))))
