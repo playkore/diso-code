@@ -213,21 +213,28 @@ export function bindTravelInput(params: {
    * Binds a press-and-hold action button such as FIRE or JUMP.
    */
   const bindPressButton = (button: HTMLButtonElement, key: 'fire' | 'jump') => {
-    const onPointerDown = () => {
+    const onPointerDown = (event: PointerEvent) => {
+      event.preventDefault();
       input[key] = true;
     };
-    const onPointerUp = () => {
+    const onPointerUp = (event?: Event) => {
+      event?.preventDefault();
       input[key] = false;
+    };
+    const onContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
     };
     button.addEventListener('pointerdown', onPointerDown);
     button.addEventListener('pointerup', onPointerUp);
     button.addEventListener('pointerleave', onPointerUp);
     button.addEventListener('pointercancel', onPointerUp);
+    button.addEventListener('contextmenu', onContextMenu);
     return () => {
       button.removeEventListener('pointerdown', onPointerDown);
       button.removeEventListener('pointerup', onPointerUp);
       button.removeEventListener('pointerleave', onPointerUp);
       button.removeEventListener('pointercancel', onPointerUp);
+      button.removeEventListener('contextmenu', onContextMenu);
     };
   };
 
@@ -236,11 +243,19 @@ export function bindTravelInput(params: {
    * by the frame loop after it consumes the action.
    */
   const bindTapButton = (button: HTMLButtonElement, key: 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock') => {
-    const onPointerDown = () => {
+    const onPointerDown = (event: PointerEvent) => {
+      event.preventDefault();
       input[key] = true;
     };
+    const onContextMenu = (event: MouseEvent) => {
+      event.preventDefault();
+    };
     button.addEventListener('pointerdown', onPointerDown);
-    return () => button.removeEventListener('pointerdown', onPointerDown);
+    button.addEventListener('contextmenu', onContextMenu);
+    return () => {
+      button.removeEventListener('pointerdown', onPointerDown);
+      button.removeEventListener('contextmenu', onContextMenu);
+    };
   };
 
   // Register every listener needed for the mounted session.

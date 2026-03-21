@@ -202,6 +202,7 @@ export function useTravelSession(
     // flow such as the hyperspace transition and game-over reset behavior.
     let flightState: FlightPhase = 'READY';
     let hyperspaceTimer = 0;
+    let jumpActivationFrames = 0;
     let animationFrameId = 0;
     let lastTimestamp = 0;
     let stationaryTicks = 0;
@@ -309,6 +310,7 @@ export function useTravelSession(
         return;
       }
       flightState = 'JUMPING';
+      jumpActivationFrames = 6;
       showMessage('JUMP ENGAGED', 900);
       updateHud();
     };
@@ -324,7 +326,7 @@ export function useTravelSession(
         return;
       }
       flightState = 'HYPERSPACE';
-      hyperspaceTimer = 100;
+      hyperspaceTimer = 160;
       showMessage(`HYPERSPACE TO ${session.destinationSystem.toUpperCase()}`, 2000);
       combatState.player.vx = Math.cos(combatState.player.angle) * 5;
       combatState.player.vy = Math.sin(combatState.player.angle) * 5;
@@ -423,8 +425,12 @@ export function useTravelSession(
         combatState.player.angle = Math.atan2(input.vectorY, input.vectorX);
       }
 
+      if (jumpActivationFrames > 0) {
+        jumpActivationFrames -= 1;
+      }
+      const jumpRequested = input.jump || jumpActivationFrames > 0;
       const jumpBlocked = isMassNearby(combatState);
-      if (flightState === 'JUMPING' && (!input.jump || jumpBlocked)) {
+      if (flightState === 'JUMPING' && (!jumpRequested || jumpBlocked)) {
         flightState = getManualFlightState();
         if (jumpBlocked) {
           showMessage('MASS LOCK', 900);
@@ -439,7 +445,7 @@ export function useTravelSession(
           thrust: flightState === 'HYPERSPACE' ? 0 : input.thrust,
           turn: flightState === 'HYPERSPACE' ? 0 : input.turn,
           fire: flightState === 'HYPERSPACE' ? false : input.fire,
-          jump: flightState === 'JUMPING' && !jumpBlocked,
+          jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
           activateEcm: flightState === 'HYPERSPACE' ? false : input.activateEcm,
           triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : input.triggerEnergyBomb,

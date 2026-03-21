@@ -592,6 +592,10 @@ button:disabled {
   box-shadow: none;
   text-shadow: none;
   font-family: inherit;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .travel-screen__button:active {

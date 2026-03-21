@@ -8,7 +8,7 @@ const HYPERSPACE_ARRIVAL_MAX_DISTANCE = 20_000;
 export function enterStationSpace(
   state: TravelCombatState,
   random: RandomSource,
-  options: { rewardScore?: boolean; message?: string } = {}
+  options: { rewardScore?: boolean; message?: string; playerAngle?: number } = {}
 ) {
   state.station = {
     x: Math.round((random.nextFloat() - 0.5) * 120),
@@ -22,7 +22,7 @@ export function enterStationSpace(
   state.player.y = state.station.y + STATION_LAUNCH_DISTANCE;
   state.player.vx = 0;
   state.player.vy = 0;
-  state.player.angle = -Math.PI / 2;
+  state.player.angle = options.playerAngle ?? -Math.PI / 2;
   state.enemies = state.enemies.filter((enemy) => enemy.roles.cop || enemy.missionTag);
   state.projectiles = [];
   state.encounter.safeZone = false;
@@ -35,7 +35,8 @@ export function enterStationSpace(
 }
 
 export function enterArrivalSpace(state: TravelCombatState, random: RandomSource) {
-  enterStationSpace(state, random, { rewardScore: true, message: 'SYSTEM REACHED' });
+  const playerAngle = state.player.angle;
+  enterStationSpace(state, random, { rewardScore: true, message: 'SYSTEM REACHED', playerAngle });
   if (!state.station) {
     return;
   }

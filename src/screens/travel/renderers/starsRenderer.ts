@@ -1,5 +1,5 @@
 import type { FlightPhase } from '../../../domain/travelCombat';
-import { CGA_YELLOW } from './constants';
+import { CGA_RED, CGA_YELLOW } from './constants';
 
 export interface StarPoint {
   x: number;
@@ -27,29 +27,30 @@ export function drawStars(
   ch: number,
   player: { x: number; y: number; vx: number; vy: number }
 ) {
-  ctx.fillStyle = CGA_YELLOW;
-  ctx.strokeStyle = CGA_YELLOW;
-  ctx.shadowBlur = 2;
-  ctx.shadowColor = CGA_YELLOW;
-
   for (const star of stars) {
     const sx = ((star.x - player.x * star.z) % cw + cw) % cw;
     const sy = ((star.y - player.y * star.z) % ch + ch) % ch;
 
     if (flightState === 'HYPERSPACE') {
-      const dx = sx - cw / 2;
-      const dy = sy - ch / 2;
-      const scale = 0.28 + star.z * 0.85;
+      ctx.strokeStyle = CGA_RED;
+      ctx.shadowBlur = 2;
+      ctx.shadowColor = CGA_RED;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
-      ctx.lineTo(sx + dx * scale, sy + dy * scale);
+      ctx.lineTo(sx - player.vx * star.z * 2, sy - player.vy * star.z * 2);
       ctx.stroke();
     } else if (flightState === 'JUMPING') {
+      ctx.strokeStyle = CGA_YELLOW;
+      ctx.shadowBlur = 2;
+      ctx.shadowColor = CGA_YELLOW;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(sx - player.vx * star.z * 2, sy - player.vy * star.z * 2);
       ctx.stroke();
     } else {
+      ctx.fillStyle = CGA_YELLOW;
+      ctx.shadowBlur = 2;
+      ctx.shadowColor = CGA_YELLOW;
       ctx.fillRect(sx, sy, 1.5, 1.5);
     }
   }
