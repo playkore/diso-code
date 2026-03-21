@@ -1,21 +1,6 @@
 import { getLaserProjectileProfile, projectileId } from '../state';
-import type { CombatEnemy, TravelCombatState } from '../types';
+import type { TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../shipCatalog';
-
-function getClosestEnemy(state: TravelCombatState): CombatEnemy | null {
-  let closest: CombatEnemy | null = null;
-  let closestDistance = Number.POSITIVE_INFINITY;
-
-  for (const enemy of state.enemies) {
-    const distance = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closest = enemy;
-    }
-  }
-
-  return closest;
-}
 
 function getMountAngle(playerAngle: number, mount: LaserMountPosition): number {
   switch (mount) {
@@ -31,21 +16,8 @@ function getMountAngle(playerAngle: number, mount: LaserMountPosition): number {
   }
 }
 
-export function determinePlayerArc(state: TravelCombatState): LaserMountPosition {
-  const enemy = getClosestEnemy(state);
-  if (!enemy) {
-    return 'front';
-  }
-
-  const bearing = Math.atan2(enemy.y - state.player.y, enemy.x - state.player.x);
-  const delta = Math.atan2(Math.sin(bearing - state.player.angle), Math.cos(bearing - state.player.angle));
-  if (Math.abs(delta) < Math.PI / 4) {
-    return 'front';
-  }
-  if (Math.abs(delta) > (Math.PI * 3) / 4) {
-    return 'rear';
-  }
-  return delta < 0 ? 'left' : 'right';
+export function getPlayerFiringMounts(state: TravelCombatState): LaserMountPosition[] {
+  return (['front', 'left', 'right', 'rear'] as const).filter((mount) => Boolean(state.playerLoadout.laserMounts[mount]));
 }
 
 export function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId) {

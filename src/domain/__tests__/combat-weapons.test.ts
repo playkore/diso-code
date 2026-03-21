@@ -49,48 +49,17 @@ describe('travel combat weapons', () => {
     expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
   });
 
-  it('fires the installed laser in the active arc and respects empty arcs', () => {
+  it('fires every installed laser mount at the same time', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
     const commander = createDefaultCommander();
+    commander.laserMounts.front = 'pulse_laser';
     commander.laserMounts.left = 'beam_laser';
+    commander.laserMounts.rear = 'mining_laser';
     const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push({
-      id: 1,
-      kind: 'ship',
-      blueprintId: 'sidewinder',
-      label: 'Sidewinder',
-      behavior: 'hostile',
-      x: -120,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI / 2,
-      energy: 70,
-      maxEnergy: 70,
-      laserPower: 2,
-      missiles: 0,
-      targetableArea: 210,
-      laserRange: 290,
-      topSpeed: 6,
-      acceleration: 0.11,
-      turnRate: 0.05,
-      roles: { hostile: true },
-      aggression: 42,
-      baseAggression: 42,
-      fireCooldown: 999,
-      missileCooldown: 999,
-      isFiringLaser: false
-    });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, rng);
-    expect(state.lastPlayerArc).toBe('left');
-    expect(state.projectiles[0]?.damage).toBe(16);
-    state.projectiles = [];
-    state.player.fireCooldown = 0;
-    state.enemies[0].x = 120;
-    state.enemies[0].y = 0;
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, rng);
-    expect(state.lastPlayerArc).toBe('right');
-    expect(state.projectiles).toHaveLength(0);
+    expect(state.projectiles).toHaveLength(3);
+    expect(state.projectiles.map((projectile) => projectile.damage)).toEqual([12, 16, 10]);
+    expect(state.lastPlayerArc).toBe('rear');
   });
 
   it('uses ECM to clear missiles and suppresses further launches while active', () => {

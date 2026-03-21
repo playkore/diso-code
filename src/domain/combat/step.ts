@@ -5,7 +5,7 @@ import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
-import { determinePlayerArc, spawnPlayerLaser } from './weapons/playerWeapons';
+import { getPlayerFiringMounts, spawnPlayerLaser } from './weapons/playerWeapons';
 import { clampShields, stepParticles } from './state';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
@@ -76,12 +76,16 @@ export function stepTravelCombat(
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
     if (input.fire && state.player.fireCooldown <= 0) {
-      const mount = determinePlayerArc(state);
-      const laserId = state.playerLoadout.laserMounts[mount];
-      if (laserId) {
-        spawnPlayerLaser(state, mount, laserId);
+      const firingMounts = getPlayerFiringMounts(state);
+      if (firingMounts.length === 0) {
+        state.lastPlayerArc = 'front';
       } else {
-        state.lastPlayerArc = mount;
+        for (const mount of firingMounts) {
+          const laserId = state.playerLoadout.laserMounts[mount];
+          if (laserId) {
+            spawnPlayerLaser(state, mount, laserId);
+          }
+        }
       }
     }
   }
