@@ -458,7 +458,8 @@ describe('travel combat rules', () => {
     enterArrivalSpace(state, rng);
 
     expect(state.station).not.toBeNull();
-    expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeGreaterThan(state.station!.safeZoneRadius);
+    expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeGreaterThanOrEqual(57_600);
+    expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeLessThanOrEqual(86_400);
     expect(state.player.angle).toBe(-Math.PI / 2);
     expect(state.encounter.safeZone).toBe(false);
   });

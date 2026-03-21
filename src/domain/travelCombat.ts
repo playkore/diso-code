@@ -265,7 +265,9 @@ const LONE_BOUNTY_SEQUENCE: BlueprintId[] = ['cobra-mk3-pirate', 'asp-mk2', 'pyt
 const SAFE_ZONE_ENEMY_MARGIN = 18;
 const SAFE_ZONE_AVOIDANCE_DISTANCE = 96;
 const STATION_LAUNCH_DISTANCE = 240;
-const HYPERSPACE_ARRIVAL_DISTANCE = 840;
+// TODO increase when jump is implemented
+const HYPERSPACE_ARRIVAL_MIN_DISTANCE = 10_000;
+const HYPERSPACE_ARRIVAL_MAX_DISTANCE = 20_000;
 
 function clampAngle(angle: number): number {
   return Math.atan2(Math.sin(angle), Math.cos(angle));
@@ -709,7 +711,10 @@ export function enterArrivalSpace(state: TravelCombatState, random: RandomSource
     return;
   }
 
-  state.player.y = state.station.y + HYPERSPACE_ARRIVAL_DISTANCE;
+  const arrivalDistance =
+    HYPERSPACE_ARRIVAL_MIN_DISTANCE +
+    Math.round(random.nextFloat() * (HYPERSPACE_ARRIVAL_MAX_DISTANCE - HYPERSPACE_ARRIVAL_MIN_DISTANCE));
+  state.player.y = state.station.y + arrivalDistance;
   state.encounter.safeZone = false;
 }
 
