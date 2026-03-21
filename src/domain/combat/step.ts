@@ -41,8 +41,11 @@ export function stepTravelCombat(
   }
 
   if (phase === 'PLAYING' || phase === 'ARRIVED' || phase === 'READY' || phase === 'JUMPING') {
-    state.player.angle += input.turn * 0.08 * dt;
-    if (input.thrust > 0) {
+    const jumpActive = Boolean(input.jump);
+    if (!jumpActive) {
+      state.player.angle += input.turn * 0.08 * dt;
+    }
+    if (input.thrust > 0 && !jumpActive) {
       state.player.vx += Math.cos(state.player.angle) * input.thrust * 0.2 * dt;
       state.player.vy += Math.sin(state.player.angle) * input.thrust * 0.2 * dt;
       state.particles.push({
@@ -57,19 +60,13 @@ export function stepTravelCombat(
 
     state.player.vx *= 0.99;
     state.player.vy *= 0.99;
-    if (input.jump) {
+    if (jumpActive) {
       const jumpSpeed = state.player.maxSpeed * LOCAL_JUMP_SPEED_MULTIPLIER;
-      const currentSpeed = Math.hypot(state.player.vx, state.player.vy);
-      if (currentSpeed <= 0.01) {
-        state.player.vx = Math.cos(state.player.angle) * jumpSpeed;
-        state.player.vy = Math.sin(state.player.angle) * jumpSpeed;
-      } else if (currentSpeed < jumpSpeed) {
-        state.player.vx = (state.player.vx / currentSpeed) * jumpSpeed;
-        state.player.vy = (state.player.vy / currentSpeed) * jumpSpeed;
-      }
+      state.player.vx = Math.cos(state.player.angle) * jumpSpeed;
+      state.player.vy = Math.sin(state.player.angle) * jumpSpeed;
     }
     const speed = Math.hypot(state.player.vx, state.player.vy);
-    const speedLimit = state.player.maxSpeed * (input.jump ? LOCAL_JUMP_SPEED_MULTIPLIER : 1);
+    const speedLimit = state.player.maxSpeed * (jumpActive ? LOCAL_JUMP_SPEED_MULTIPLIER : 1);
     if (speed > speedLimit) {
       state.player.vx = (state.player.vx / speed) * speedLimit;
       state.player.vy = (state.player.vy / speed) * speedLimit;

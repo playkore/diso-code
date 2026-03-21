@@ -423,7 +423,7 @@ export function useTravelSession(
       }
 
       // On touch/joystick input the ship points directly at the stick vector.
-      if (joyActiveRef.current && input.vectorStrength > 0.08 && flightState !== 'HYPERSPACE') {
+      if (joyActiveRef.current && input.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
         combatState.player.angle = Math.atan2(input.vectorY, input.vectorX);
       }
 
@@ -444,8 +444,8 @@ export function useTravelSession(
       const result = stepTravelCombat(
         combatState,
         {
-          thrust: flightState === 'HYPERSPACE' ? 0 : input.thrust,
-          turn: flightState === 'HYPERSPACE' ? 0 : input.turn,
+          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : input.thrust,
+          turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : input.turn,
           fire: flightState === 'HYPERSPACE' ? false : input.fire,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
