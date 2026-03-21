@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSystemByName, getSystemDistance, getVisibleSystems } from '../domain/galaxyCatalog';
-import { getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
+import { MAX_FUEL, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { useGameStore } from '../store/useGameStore';
 import { formatLightYears } from '../utils/distance';
 
@@ -36,6 +36,7 @@ export function StarMapScreen() {
   const navigate = useNavigate();
   const universe = useGameStore((state) => state.universe);
   const currentFuel = useGameStore((state) => state.commander.fuel);
+  const buyFuel = useGameStore((state) => state.buyFuel);
   const beginTravel = useGameStore((state) => state.beginTravel);
   const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ export function StarMapScreen() {
   const selectedPoint = starPoints.find((star) => star.name === selectedSystem) ?? null;
   const selectedDistance = selectedSystem ? getJumpFuelCost(getSystemDistance(universe.currentSystem, selectedSystem)) : null;
   const fuelAfterJump = selectedDistance === null ? null : Math.max(0, currentFuel - selectedDistance);
+  const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
 
   return (
     <section className="screen">
@@ -78,6 +80,16 @@ export function StarMapScreen() {
             </g>
           ))}
         </svg>
+      </div>
+      <div className="star-map__actions">
+        <p>
+          Fuel: <strong>{formatLightYears(currentFuel)}</strong>
+          {' / '}
+          <strong>{formatLightYears(MAX_FUEL)}</strong>
+        </p>
+        <button type="button" disabled={missingFuelUnits < 1} onClick={() => buyFuel(missingFuelUnits)}>
+          Fill Fuel to Full
+        </button>
       </div>
       {selectedSystem && selectedPoint ? (
         <div className="star-map__actions">
