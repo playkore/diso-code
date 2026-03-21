@@ -1001,10 +1001,12 @@ function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: number, ran
   const enemyExcludedFromSafeZone = station ? isEnemyExcludedFromSafeZone(enemy) : false;
   const distanceFromStation = station ? getDistanceFromStation(station, enemy.x, enemy.y) : Number.POSITIVE_INFINITY;
   const mustAvoidSafeZone = enemyExcludedFromSafeZone && distanceFromStation <= safeZoneBoundary + SAFE_ZONE_AVOIDANCE_DISTANCE;
-  const targetAngle = mustAvoidSafeZone && station ? getSafeZoneEscapeAngle(station, enemy) : Math.atan2(dy, dx);
-  const angleDiff = clampAngle(targetAngle - enemy.angle);
-
-  enemy.angle += Math.sign(angleDiff) * enemy.turnRate * dt * (enemy.aggression > 0 ? 1 : 0.4);
+  let angleDiff = 0;
+  if (!stationTraffic) {
+    const targetAngle = mustAvoidSafeZone && station ? getSafeZoneEscapeAngle(station, enemy) : Math.atan2(dy, dx);
+    angleDiff = clampAngle(targetAngle - enemy.angle);
+    enemy.angle += Math.sign(angleDiff) * enemy.turnRate * dt * (enemy.aggression > 0 ? 1 : 0.4);
+  }
   enemy.isFiringLaser = false;
 
   if (mustAvoidSafeZone && station) {
