@@ -5,6 +5,16 @@ import { useGameStore } from '../../store/useGameStore';
 import { formatLightYears } from '../../utils/distance';
 import { useTravelSession } from './useTravelSession';
 
+/**
+ * Declarative shell for the travel screen.
+ *
+ * This component intentionally stays light:
+ * - it selects the minimum store state needed to run a travel session
+ * - it creates the refs used by the imperative flight subsystem
+ * - it renders the static DOM scaffold that the session hook updates
+ *
+ * The real-time behavior lives in `useTravelSession`.
+ */
 export function TravelScreen() {
   const navigate = useNavigate();
   const session = useGameStore((state) => state.travelSession);
@@ -12,6 +22,8 @@ export function TravelScreen() {
   const completeTravel = useGameStore((state) => state.completeTravel);
   const cancelTravel = useGameStore((state) => state.cancelTravel);
 
+  // The flight UI is ref-driven. The session hook updates HUD nodes and canvas
+  // directly every frame instead of routing every change through React state.
   const refs = {
     canvasRef: useRef<HTMLCanvasElement | null>(null),
     viewportRef: useRef<HTMLDivElement | null>(null),
@@ -30,17 +42,22 @@ export function TravelScreen() {
     dockButtonRef: useRef<HTMLButtonElement | null>(null)
   };
 
+  // Mount the live flight session for the current route.
   useTravelSession(refs, session, commander, completeTravel, cancelTravel, navigate);
 
+  // If the user opens `/travel` without an active route, bounce back to the
+  // star map where travel can be started properly.
   if (!session) {
     return <Navigate to="/star-map" replace />;
   }
 
   return (
     <section className="travel-screen">
+      {/* The viewport contains the canvas, HUD, overlay messages and touch UI. */}
       <div className="travel-screen__viewport" ref={refs.viewportRef}>
         <canvas ref={refs.canvasRef} className="travel-screen__canvas" />
 
+        {/* HUD values are filled imperatively by the session hook. */}
         <div className="travel-screen__hud">
           <div className="travel-screen__hud-line">Route: {session.originSystem} -&gt; {session.destinationSystem}</div>
           <div className="travel-screen__hud-line">
@@ -56,6 +73,7 @@ export function TravelScreen() {
 
         <div ref={refs.messageRef} className="travel-screen__message" />
 
+        {/* On-screen controls are required for touch devices. */}
         <div className="travel-screen__controls">
           <div className="travel-screen__joystick">
             <div ref={refs.knobRef} className="travel-screen__joystick-knob" />
@@ -77,6 +95,7 @@ export function TravelScreen() {
           </button>
         </div>
 
+        {/* Compact reminder of keyboard controls and the current CNT thresholds. */}
         <div className="travel-screen__help">
           Arrow Keys: Turn/Thrust
           <br />
@@ -87,6 +106,7 @@ export function TravelScreen() {
           Laser CNT: {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} / {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
         </div>
 
+        {/* Explicit escape hatch back to the strategic layer. */}
         <div className="travel-screen__actions">
           <button
             type="button"

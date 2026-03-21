@@ -11,10 +11,34 @@ import { createUiMessage, withUiMessage } from './uiMessages';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
 import type { MarketState, MissionsState } from './types';
 
+/**
+ * Store factory helpers
+ * ---------------------
+ *
+ * This module contains the pure-ish state-construction helpers used by the
+ * Zustand slices and the root store. If you want to understand how the docked
+ * game is assembled or restored, start here.
+ *
+ * Responsibilities:
+ * - build docked market state for a system
+ * - derive mission log state after docking
+ * - create the initial game state
+ * - transition into a docked state after travel
+ * - snapshot / restore save payloads
+ * - persist and load local-storage preferences
+ */
+
+/**
+ * Supported local save slots.
+ */
 export const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
 export const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
 export const SETTINGS_STORAGE_KEY = 'diso-code:settings';
 
+/**
+ * Creates a docked market state for a given system. The market session holds
+ * raw market mechanics, while `items` is the precomputed UI-facing projection.
+ */
 export function createMarketState(systemName: string, economy: number, fluctuation: number): MarketState {
   const session = createDockedMarketSession(systemName, economy, fluctuation);
   return {
@@ -23,6 +47,9 @@ export function createMarketState(systemName: string, economy: number, fluctuati
   };
 }
 
+/**
+ * Rebuilds the UI-facing market item list after session quantities change.
+ */
 export function refreshItems(session: DockedMarketSession): MarketState {
   return {
     session,
@@ -30,6 +57,9 @@ export function refreshItems(session: DockedMarketSession): MarketState {
   };
 }
 
+/**
+ * Docking is the canonical moment when mission logs are refreshed.
+ */
 export function updateMissionLog(commander: CommanderState): MissionsState {
   const progress = applyDockingMissionState({ tp: commander.missionTP, variant: commander.missionVariant });
   return {
@@ -37,10 +67,16 @@ export function updateMissionLog(commander: CommanderState): MissionsState {
   };
 }
 
+/**
+ * Used for arrival messaging so the UI can highlight an immediate market hook.
+ */
 export function getCheapestCommodity(session: DockedMarketSession) {
   return getSessionMarketItems(session).reduce((lowest, item) => (item.price < lowest.price ? item : lowest));
 }
 
+/**
+ * Creates the initial docked game state for a commander.
+ */
 export function createInitialGameState(commander: CommanderState) {
   const normalizedCommander = normalizeCommanderState(commander);
   const system = getSystemByName(normalizedCommander.currentSystem);
@@ -60,6 +96,9 @@ export function createInitialGameState(commander: CommanderState) {
   };
 }
 
+/**
+ * Reduces live store state to the subset that belongs in a save file.
+ */
 export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market'>): GameSnapshot {
   return {
     commander: state.commander,
@@ -68,15 +107,24 @@ export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' |
   };
 }
 
+/**
+ * Safe lookup for a system's tech level.
+ */
 export function getCurrentTechLevel(systemName: string): number {
   return getSystemByName(systemName)?.data.techLevel ?? 0;
 }
 
+/**
+ * Core "arrive docked at a system" transition used by all travel completion
+ * paths, including normal arrival, re-docking at origin and rescue recovery.
+ */
 export function createDockedState(
   state: Pick<GameStore, 'universe' | 'commander' | 'ui'>,
   systemName: string,
   options: { spendJumpFuel: boolean; title: string; body: string; stardateDelta?: number }
 ) {
+  // Validate the jump before mutating anything if this transition is supposed
+  // to consume hyperspace fuel.
   const distance = getSystemDistance(state.universe.currentSystem, systemName);
   const jumpFuelUnits = getJumpFuelUnits(distance);
   const availableFuelUnits = getFuelUnits(state.commander.fuel);
@@ -84,6 +132,8 @@ export function createDockedState(
     return null;
   }
 
+  // Commander state is normalized after system transfer so any legacy or
+  // partial state stays consistent.
   const nextCommander = normalizeCommanderState({ ...state.commander, currentSystem: systemName });
   if (options.spendJumpFuel) {
     nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
@@ -96,6 +146,8 @@ export function createDockedState(
   const fluctuation = (state.universe.stardate + systemName.length) & 0xff;
   const nextMarket = createMarketState(systemName, nextEconomy, fluctuation);
 
+  // The returned object is intentionally a complete docked-state fragment that
+  // callers can spread into the store directly.
   return {
     universe: {
       ...state.universe,
@@ -114,6 +166,10 @@ export function createDockedState(
   };
 }
 
+/**
+ * Specialized helper for successful hyperspace arrival. It builds on
+ * `createDockedState` and then adds the arrival-specific UI summary.
+ */
 export function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
   const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName));
   const nextState = createDockedState(state, systemName, {
@@ -138,6 +194,9 @@ export function createArrivalState(state: Pick<GameStore, 'universe' | 'commande
   return nextState;
 }
 
+/**
+ * Rehydrates a saved snapshot into live store-ready state.
+ */
 export function restoreSnapshot(snapshot: GameSnapshot) {
   const missionProgress = applyDockingMissionState({
     tp: snapshot.commander.missionTP,
@@ -161,6 +220,10 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
   };
 }
 
+/**
+ * Writes all existing save slots into local storage as a compact serializable
+ * payload.
+ */
 export function persistSaveStates(saveStates: Partial<Record<SaveSlotId, SaveState>>) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
@@ -177,6 +240,10 @@ export function persistSaveStates(saveStates: Partial<Record<SaveSlotId, SaveSta
   window.localStorage.setItem(SAVE_SLOT_STORAGE_KEY, JSON.stringify(payload));
 }
 
+/**
+ * Loads save slots from local storage. Corrupt data is discarded rather than
+ * causing partial-store failures on startup.
+ */
 export function loadPersistedSaveStates(): Partial<Record<SaveSlotId, SaveState>> {
   if (typeof window === 'undefined' || !window.localStorage) {
     return {};
@@ -208,6 +275,9 @@ export function loadPersistedSaveStates(): Partial<Record<SaveSlotId, SaveState>
   }
 }
 
+/**
+ * Reads the instant-travel preference from local storage.
+ */
 export function loadInstantTravelEnabled(): boolean {
   if (typeof window === 'undefined' || !window.localStorage) {
     return false;
@@ -224,6 +294,9 @@ export function loadInstantTravelEnabled(): boolean {
   }
 }
 
+/**
+ * Persists the instant-travel preference.
+ */
 export function persistInstantTravelEnabled(enabled: boolean) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
@@ -231,6 +304,9 @@ export function persistInstantTravelEnabled(enabled: boolean) {
   window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ instantTravelEnabled: enabled }));
 }
 
+/**
+ * Builds the persisted payload for one save slot.
+ */
 export function createSaveState(snapshot: GameSnapshot) {
   const savedAt = new Date().toISOString();
   return {
@@ -241,6 +317,9 @@ export function createSaveState(snapshot: GameSnapshot) {
   };
 }
 
+/**
+ * Creates a brand-new game state for the "new game" action.
+ */
 export function createFreshGameState() {
   const freshCommander = createDefaultCommander();
   return createInitialGameState(freshCommander);

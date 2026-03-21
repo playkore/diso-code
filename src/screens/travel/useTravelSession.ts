@@ -21,6 +21,32 @@ import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { createTravelInput, bindTravelInput } from './useTravelInput';
 import { getHudState } from './travelViewModel';
 
+/**
+ * Travel screen lifecycle overview
+ * -------------------------------
+ *
+ * This hook is the UI-side orchestrator for the real-time flight segment.
+ *
+ * Responsibilities:
+ * - create one combat simulation state for the active route
+ * - wire browser input into normalized combat input
+ * - run the requestAnimationFrame loop
+ * - translate simulation outcomes into store transitions/navigation
+ * - keep the HUD and canvas synchronized with the live simulation
+ *
+ * In other words:
+ * - combat rules live in `domain/combat/*`
+ * - rendering primitives live in `screens/travel/render*`
+ * - this hook is the bridge that turns those pieces into a playable screen
+ */
+
+/**
+ * Collection of imperative refs used by the travel screen.
+ *
+ * The flight segment is intentionally ref-driven because the screen updates on
+ * every animation frame and would be too expensive/noisy to re-render through
+ * React state for each HUD change.
+ */
 interface TravelRefs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   viewportRef: React.RefObject<HTMLDivElement | null>;
@@ -39,6 +65,16 @@ interface TravelRefs {
   dockButtonRef: React.RefObject<HTMLButtonElement | null>;
 }
 
+/**
+ * Runs one full travel session for the current route.
+ *
+ * A session starts when the component mounts on `/travel` and ends when the
+ * player:
+ * - docks,
+ * - is rescued,
+ * - aborts,
+ * - or leaves the page.
+ */
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
@@ -47,13 +83,17 @@ export function useTravelSession(
   cancelTravel: () => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
+  // Shared mutable flag that lets keyboard and joystick input coexist cleanly.
   const joyActiveRef = useRef(false);
 
   useEffect(() => {
+    // No route, no flight session.
     if (!session) {
       return undefined;
     }
 
+    // Resolve both route endpoints up front. The flight screen only makes sense
+    // when both the origin and destination systems are known.
     const originSystem = getSystemByName(session.originSystem)?.data;
     const destinationSystem = getSystemByName(session.destinationSystem)?.data;
     if (!originSystem || !destinationSystem) {
@@ -75,6 +115,8 @@ export function useTravelSession(
     const ecmButton = refs.ecmButtonRef.current;
     const bombButton = refs.bombButtonRef.current;
     const dockButton = refs.dockButtonRef.current;
+    // The travel screen is fully imperative once mounted. If any required DOM
+    // node is missing, we abort the session rather than run partially.
     if (!canvas || !viewport || !messageNode || !scoreNode || !shieldsNode || !jumpNode || !legalNode || !threatNode || !arcNode || !knobNode || !jumpButton || !fireButton || !ecmButton || !bombButton || !dockButton) {
       return undefined;
     }
@@ -84,6 +126,9 @@ export function useTravelSession(
       return undefined;
     }
 
+    // One RNG and one mutable combat state live for the entire mounted session.
+    // The simulation mutates this object in place instead of rebuilding state
+    // every frame.
     const random = createMathRandomSource();
     const combatState = createTravelCombatState(
       {
@@ -101,14 +146,21 @@ export function useTravelSession(
 
     let cw = 0;
     let ch = 0;
+    // Canvas size is kept locked to the viewport so the renderer can work in
+    // actual device pixels rather than CSS guesses.
     const resize = () => {
       cw = canvas.width = viewport.clientWidth;
       ch = canvas.height = viewport.clientHeight;
     };
     resize();
 
+    // `input` is the normalized control object consumed by the simulation.
+    // Browser-specific event handling mutates this object, not React state.
     const input = createTravelInput();
     const keys: Record<string, boolean> = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ' ': false, j: false, J: false, e: false, E: false, b: false, B: false, d: false, D: false };
+
+    // This local phase machine sits above the domain simulation. It models UI
+    // flow such as the hyperspace transition and game-over reset behavior.
     let flightState: FlightPhase = 'READY';
     let jumpTimer = 0;
     let animationFrameId = 0;
@@ -134,12 +186,20 @@ export function useTravelSession(
       joyActiveRef
     });
 
+    /**
+     * Shows a local overlay message that takes priority over ordinary combat
+     * chatter. Used for route and docking guidance.
+     */
     const showMessage = (text: string, duration: number) => {
       overlayMessage = text;
       overlayTimer = duration;
       messageNode.textContent = text;
     };
 
+    /**
+     * Updates the textual HUD. This stays imperative on purpose so the screen
+     * does not re-render through React on every animation frame.
+     */
     const updateHud = () => {
       const hud = getHudState(combatState, flightState);
       scoreNode.textContent = hud.score;
@@ -154,6 +214,17 @@ export function useTravelSession(
       arcNode.style.color = combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED;
     };
 
+    /**
+     * Finalizes the route and merges the travel-combat outcome back into the
+     * main game store.
+     *
+     * This is used by both:
+     * - auto-docking
+     * - manual docking through the station slot
+     *
+     * Keeping one shared completion path prevents subtle divergences in fuel,
+     * mission-event or salvage handling.
+     */
     const completeDocking = (dockSystemName: string, spendJumpFuel: boolean, missionEvents = [...combatState.missionEvents]) => {
       const snapshot = getPlayerCombatSnapshot(combatState);
       if (jumpCompleted && hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
@@ -173,6 +244,9 @@ export function useTravelSession(
       navigate('/', { replace: true });
     };
 
+    /**
+     * Enters the hyperspace tunnel phase from manual flight.
+     */
     const startJump = () => {
       if (flightState !== 'READY' && flightState !== 'PLAYING') {
         return;
@@ -186,6 +260,12 @@ export function useTravelSession(
       updateHud();
     };
 
+    /**
+     * Rebuilds the entire encounter in place after game over.
+     *
+     * This keeps the user on the same route screen while restoring all combat
+     * state, stars and flight phase to a fresh starting point.
+     */
     const resetPrototype = () => {
       const fresh = createTravelCombatState(
         {
@@ -210,11 +290,23 @@ export function useTravelSession(
       updateHud();
     };
 
+    /**
+     * Main animation frame loop.
+     *
+     * Loop order:
+     * 1. derive normalized input from keyboard/joystick state
+     * 2. advance the combat simulation
+     * 3. resolve UI-level travel transitions (jump, docking, rescue, reset)
+     * 4. update HUD and canvas
+     * 5. schedule the next frame
+     */
     const loop = (timestamp: number) => {
       const deltaMs = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
       lastTimestamp = timestamp;
       const dt = Math.min(deltaMs, 32) / 16.6667;
 
+      // Game over freezes normal simulation and waits for the player to fire in
+      // order to restart the prototype encounter.
       if (flightState === 'GAMEOVER') {
         if (input.fire || keys[' ']) {
           resetPrototype();
@@ -248,13 +340,19 @@ export function useTravelSession(
       input.triggerEnergyBomb = keys.b || keys.B || input.triggerEnergyBomb;
       input.autoDock = keys.d || keys.D || input.autoDock;
 
+      // The initial phase becomes "real flight" as soon as the player actually
+      // applies movement input or the ship starts drifting.
       if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || input.thrust > 0 || Math.abs(input.turn) > 0.1)) {
         flightState = 'PLAYING';
       }
+
+      // On touch/joystick input the ship points directly at the stick vector.
       if (joyActiveRef.current && input.vectorStrength > 0.08 && flightState !== 'JUMPING') {
         combatState.player.angle = Math.atan2(input.vectorY, input.vectorX);
       }
 
+      // The domain layer handles combat rules. The UI layer only gates controls
+      // during hyperspace and interprets the returned high-level outcome flags.
       const result = stepTravelCombat(
         combatState,
         {
@@ -275,9 +373,14 @@ export function useTravelSession(
         completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
         return;
       }
+
       if ((flightState === 'READY' || flightState === 'PLAYING') && input.jump) {
         startJump();
       }
+
+      // Hyperspace travel is still partially a UI concern because the tunnel
+      // pacing and destination handoff are route-flow behavior rather than pure
+      // dogfight simulation.
       if (flightState === 'JUMPING') {
         combatState.player.vx *= 1.05;
         combatState.player.vy *= 1.05;
@@ -293,6 +396,8 @@ export function useTravelSession(
         }
       }
 
+      // Manual docking/collision handling sits here because it needs to react
+      // immediately with navigation and player guidance messages.
       if (combatState.station && flightState !== 'JUMPING') {
         const docking = assessDockingApproach(combatState.station, combatState.player);
         if (docking.distance < combatState.station.radius + 15) {
@@ -313,10 +418,14 @@ export function useTravelSession(
         }
       }
 
+      // Total destruction transitions into the resetable local GAMEOVER phase.
       if (result.playerDestroyed) {
         flightState = 'GAMEOVER';
         showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
       }
+
+      // Escape-pod rescue exits the flight screen and returns the outcome to the
+      // store through the rescue-specific completion path.
       if (result.playerEscaped) {
         consumeEscapePod(combatState);
         const snapshot = getPlayerCombatSnapshot(combatState);
@@ -336,6 +445,8 @@ export function useTravelSession(
         return;
       }
 
+      // Small UX aid: after arriving, a motionless player gets a hint about the
+      // station slot instead of sitting with no feedback.
       if (flightState === 'ARRIVED' && Math.hypot(combatState.player.vx, combatState.player.vy) < 0.05) {
         stationaryTicks += 1;
         if (stationaryTicks > 120) {
@@ -346,6 +457,8 @@ export function useTravelSession(
         stationaryTicks = 0;
       }
 
+      // Local overlay messages intentionally override ordinary combat messages
+      // for a short time.
       if (overlayTimer > 0) {
         overlayTimer -= deltaMs;
         if (overlayTimer <= 0) {
@@ -354,6 +467,8 @@ export function useTravelSession(
       }
       messageNode.textContent = overlayMessage || combatState.messages[0]?.text || '';
 
+      // One-shot actions should not stay latched once the corresponding key is
+      // released.
       if (!keys[' ']) {
         input.fire = false;
       }
@@ -375,9 +490,11 @@ export function useTravelSession(
       animationFrameId = window.requestAnimationFrame(loop);
     };
 
+    // Boot the session into origin-system local space and start rendering.
     resetPrototype();
     animationFrameId = window.requestAnimationFrame(loop);
     return () => {
+      // Standard full teardown for the mounted flight session.
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
       unbindInput();

@@ -2,7 +2,41 @@ import type { InstalledEquipmentState, LaserMountState, LegalStatus } from '../c
 import type { MissionExternalEvent, MissionVariant } from '../missions';
 import type { LaserMountPosition } from '../shipCatalog';
 
+/**
+ * Combat type system overview
+ * ---------------------------
+ *
+ * This file defines the shared language for the entire real-time flight segment.
+ * If you are trying to understand how travel combat works, start here:
+ *
+ * - `TravelCombatState` is the full mutable simulation state for one flight.
+ * - `TravelCombatInit` is the docked-game data required to create that state.
+ * - `CombatBlueprint` describes a ship archetype.
+ * - `CombatEnemy` is a live spawned instance built from a blueprint.
+ * - `CombatInput` is the normalized per-frame control signal.
+ * - `CombatTickResult` is the simulation outcome returned each frame.
+ *
+ * The rest of the combat modules are intentionally built around these contracts.
+ */
+
+/**
+ * High-level state of the flight segment.
+ *
+ * The UI, renderer and simulation all key off this value:
+ * - `READY`: launched but not yet moving
+ * - `PLAYING`: normal manual flight
+ * - `JUMPING`: hyperspace tunnel transition
+ * - `ARRIVED`: post-jump local space near the destination
+ * - `GAMEOVER`: destruction/reset state
+ */
 export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'GAMEOVER';
+
+/**
+ * Stable identifier for every NPC ship archetype used in encounter space.
+ *
+ * Player ship configuration lives in `shipCatalog.ts`. This union is strictly
+ * for non-player entities spawned during the travel/combat prototype.
+ */
 export type BlueprintId =
   | 'sidewinder'
   | 'mamba'
@@ -21,14 +55,36 @@ export type BlueprintId =
   | 'constrictor'
   | 'thargoid'
   | 'thargon';
+
+/**
+ * "Blueprint files" are classic encounter tables. A flight is assigned one
+ * active file depending on local system conditions and mission state.
+ */
 export type BlueprintFileId = 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P';
+
+/**
+ * Coarse behavior category used to route ships into the right AI module.
+ *
+ * The codebase deliberately uses role/data composition rather than a class per
+ * ship type. Most differences are "same behavior, different stats".
+ */
 export type CombatBehavior = 'hostile' | 'civilian' | 'police' | 'stationTraffic' | 'thargoid';
 
+/**
+ * Tiny abstraction over randomness so tests can run the exact same combat logic
+ * using deterministic byte streams.
+ */
 export interface RandomSource {
   nextFloat: () => number;
   nextByte: () => number;
 }
 
+/**
+ * Semantic tags used by spawning, AI, legal rules and rendering.
+ *
+ * These are intentionally behavior-oriented. For example, a Viper can be a
+ * `cop` and only become `hostile` once station defense escalates.
+ */
 export interface CombatShipRoles {
   trader?: boolean;
   bountyHunter?: boolean;
@@ -40,6 +96,15 @@ export interface CombatShipRoles {
   stationDefense?: boolean;
 }
 
+/**
+ * Immutable definition of a ship archetype.
+ *
+ * A blueprint answers "what kind of thing can be spawned?" and contains:
+ * - performance stats
+ * - weapon capability
+ * - behavior routing
+ * - role flags used by higher-level systems
+ */
 export interface CombatBlueprint {
   id: BlueprintId;
   label: string;
@@ -57,6 +122,10 @@ export interface CombatBlueprint {
   loneBounty?: boolean;
 }
 
+/**
+ * Mutable runtime representation of one NPC ship/thargon inside a live combat
+ * session. This is what the simulation updates every frame.
+ */
 export interface CombatEnemy {
   id: number;
   kind: 'ship' | 'thargon';
@@ -86,6 +155,10 @@ export interface CombatEnemy {
   missionTag?: 'constrictor' | 'thargoid-plans';
 }
 
+/**
+ * Runtime projectile. Projectiles are intentionally simple data objects because
+ * all special handling happens in dedicated projectile-processing code.
+ */
 export interface CombatProjectile {
   id: number;
   kind: 'laser' | 'missile';
@@ -99,6 +172,10 @@ export interface CombatProjectile {
   sourceEnemyId?: number;
 }
 
+/**
+ * Purely visual particle used for explosions, impacts and engine trails.
+ * Particles never affect gameplay rules.
+ */
 export interface CombatParticle {
   x: number;
   y: number;
@@ -108,6 +185,12 @@ export interface CombatParticle {
   color: string;
 }
 
+/**
+ * Combat-only projection of the commander ship.
+ *
+ * This is kept separate from the docked commander model so the real-time loop
+ * can remain small, mutable and testable without dragging in economy concerns.
+ */
 export interface CombatPlayer {
   x: number;
   y: number;
@@ -123,6 +206,12 @@ export interface CombatPlayer {
   rechargeRate: number;
 }
 
+/**
+ * Minimal station representation required for:
+ * - docking geometry
+ * - safe-zone protection
+ * - renderer placement
+ */
 export interface CombatStation {
   x: number;
   y: number;
@@ -132,6 +221,12 @@ export interface CombatStation {
   safeZoneRadius: number;
 }
 
+/**
+ * Per-encounter counters and flags used by spawn pacing and policing rules.
+ *
+ * These values intentionally sit under one object so the main tick loop can
+ * reason about encounter progression without hidden local state.
+ */
 export interface CombatEncounterState {
   mcnt: number;
   rareTimer: number;
@@ -144,18 +239,30 @@ export interface CombatEncounterState {
   activeBlueprintFile: BlueprintFileId;
 }
 
+/**
+ * Time-bound UI message produced by the simulation.
+ */
 export interface CombatMessage {
   id: string;
   text: string;
   duration: number;
 }
 
+/**
+ * Subset of commander equipment that matters during flight.
+ */
 export interface CombatPlayerLoadout {
   laserMounts: LaserMountState;
   installedEquipment: InstalledEquipmentState;
   missilesInstalled: number;
 }
 
+/**
+ * Full mutable state for one active travel/combat session.
+ *
+ * If you want to understand what the simulation can possibly change, inspect
+ * this interface. The main tick mutates this object in place every frame.
+ */
 export interface TravelCombatState {
   player: CombatPlayer;
   playerLoadout: CombatPlayerLoadout;
@@ -182,6 +289,9 @@ export interface TravelCombatState {
   lastPlayerArc: LaserMountPosition;
 }
 
+/**
+ * Data required to create a fresh travel combat session from the docked game.
+ */
 export interface TravelCombatInit {
   legalValue: number;
   government: number;
@@ -193,6 +303,12 @@ export interface TravelCombatInit {
   missilesInstalled: number;
 }
 
+/**
+ * Normalized frame input consumed by the combat tick.
+ *
+ * The UI layer is free to combine keyboard, touch and button state into this
+ * shape before handing control to the simulation.
+ */
 export interface CombatInput {
   thrust: number;
   turn: number;
@@ -202,6 +318,10 @@ export interface CombatInput {
   autoDock?: boolean;
 }
 
+/**
+ * Small result object returned from each tick so the caller can react to major
+ * transitions without re-deriving them from raw state.
+ */
 export interface CombatTickResult {
   state: TravelCombatState;
   playerDestroyed: boolean;
@@ -209,6 +329,14 @@ export interface CombatTickResult {
   autoDocked: boolean;
 }
 
+/**
+ * Geometric interpretation of the player's current docking approach.
+ *
+ * This lets the UI and game rules share one consistent understanding of:
+ * - whether the ship is inside the slot
+ * - whether it is nose-in
+ * - whether it should dock or collide
+ */
 export interface DockingAssessment {
   slotAngle: number;
   slotOffset: number;

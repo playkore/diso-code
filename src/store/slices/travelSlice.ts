@@ -8,9 +8,24 @@ import { createArrivalState, createDockedState } from '../gameStateFactory';
 import { createUiMessage, withUiMessage } from '../uiMessages';
 import type { GameSlice, GameStore } from '../storeTypes';
 
+/**
+ * Travel slice
+ * ------------
+ *
+ * This slice owns route lifecycle and the commander updates that happen when a
+ * travel segment begins or ends.
+ *
+ * It answers:
+ * - can the player start a jump?
+ * - should the route open the real-time flight screen or instant-arrive?
+ * - how do salvage, fuel, legal changes and mission events get merged back?
+ */
 export const createTravelSlice: GameSlice<
   Pick<GameStore, 'grantDebugCredits' | 'beginTravel' | 'cancelTravel' | 'completeTravel' | 'dockAtSystem'>
 > = (set, get) => ({
+  /**
+   * Debug-only helper used while balancing and UI-testing the economy.
+   */
   grantDebugCredits: (amount) =>
     set((state) => {
       const credits = Math.max(0, Math.trunc(amount));
@@ -25,6 +40,13 @@ export const createTravelSlice: GameSlice<
         ui: withUiMessage(state.ui, createUiMessage('success', 'Debug credits added', `${formatCredits(credits)} credited for debugging.`))
       };
     }),
+  /**
+   * Starts travel to a nearby system if the commander has enough fuel.
+   *
+   * Return value:
+   * - `true`: real-time travel segment should open
+   * - `false`: travel did not start, or instant-travel already completed it
+   */
   beginTravel: (systemName) => {
     const state = get();
     const distance = getSystemDistance(state.universe.currentSystem, systemName);
@@ -43,6 +65,8 @@ export const createTravelSlice: GameSlice<
       });
       return false;
     }
+    // Instant-travel mode skips the real-time flight screen entirely and
+    // immediately performs the same docked arrival transition.
     if (state.ui.instantTravelEnabled) {
       const nextState = createArrivalState(state, systemName);
       if (!nextState) {
@@ -67,18 +91,37 @@ export const createTravelSlice: GameSlice<
     });
     return true;
   },
+  /**
+   * Clears the in-progress route without applying any arrival effects.
+   */
   cancelTravel: () => set({ travelSession: null }),
+
+  /**
+   * Merges the outcome of the real-time travel segment back into the main store.
+   *
+   * The travel screen reports:
+   * - where the player ended up
+   * - whether hyperspace fuel should be spent
+   * - combat salvage / rescue effects
+   * - legal/tally/mission changes
+   *
+   * This function converts that report into the normal docked game state.
+   */
   completeTravel: (report) =>
     set((state) => {
       if (!state.travelSession) {
         return state;
       }
+
+      // Rescue clears existing cargo before applying any explicitly preserved
+      // salvage from the combat snapshot.
       const mergedCargo = report?.outcome === 'rescued' ? {} : { ...state.commander.cargo };
       for (const [commodityKey, amount] of Object.entries(report?.cargo ?? {})) {
         mergedCargo[commodityKey] = (mergedCargo[commodityKey] ?? 0) + Math.max(0, Math.trunc(amount));
       }
       const insurancePenalty = report?.outcome === 'rescued' ? Math.min(state.commander.cash, Math.max(250, Math.trunc(state.commander.cash * 0.1))) : 0;
 
+      // First, merge all direct commander deltas from the travel report.
       let commander = normalizeCommanderState({
         ...state.commander,
         cash: state.commander.cash - insurancePenalty,
@@ -89,6 +132,7 @@ export const createTravelSlice: GameSlice<
         installedEquipment: report?.installedEquipment ?? state.commander.installedEquipment,
         missilesInstalled: report?.missilesInstalled ?? state.commander.missilesInstalled
       });
+      // Then fold in mission-side effects emitted during travel combat.
       if (report?.missionEvents?.length) {
         const progress = report.missionEvents.reduce((current, event) => applyMissionExternalEvent(current, event), {
           tp: commander.missionTP,
@@ -102,6 +146,10 @@ export const createTravelSlice: GameSlice<
 
       const dockSystemName = report?.dockSystemName ?? state.travelSession.destinationSystem;
       const spendJumpFuel = report?.spendJumpFuel ?? dockSystemName === state.travelSession.destinationSystem;
+      // Finally choose the appropriate docked transition:
+      // - rescue recovery
+      // - normal destination arrival
+      // - origin re-dock without fuel spend
       const nextState =
         report?.outcome === 'rescued'
           ? createDockedState({ ...state, commander }, dockSystemName, {
@@ -127,6 +175,10 @@ export const createTravelSlice: GameSlice<
       }
       return { ...nextState, travelSession: null };
     }),
+
+  /**
+   * Debug/helper action that immediately docks the player at a target system.
+   */
   dockAtSystem: (systemName) =>
     set((state) => {
       const nextState = createArrivalState(state, systemName);

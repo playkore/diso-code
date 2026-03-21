@@ -3,6 +3,7 @@ import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt, consumeEscapePod, create
 import { TP_MISSION_FLAGS } from '../missions';
 import { createDefaultCommander } from '../commander';
 import { createCombatState } from './combatTestUtils';
+import { moveProjectiles } from '../combat/weapons/projectiles';
 
 describe('travel combat weapons', () => {
   it('uses documented CNT thresholds for enemy laser fire and hit gating', () => {
@@ -209,5 +210,53 @@ describe('travel combat weapons', () => {
     expect(escaped.playerEscaped).toBe(true);
     consumeEscapePod(state);
     expect(getPlayerCombatSnapshot(state).installedEquipment.escape_pod).toBe(false);
+  });
+
+  it('destroys enemies when a player projectile depletes their remaining energy', () => {
+    const state = createCombatState([0, 0, 0, 0]);
+    state.enemies.push({
+      id: 11,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      behavior: 'hostile',
+      x: 10,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 8,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6.2,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+    state.projectiles.push({
+      id: 12,
+      kind: 'laser',
+      owner: 'player',
+      x: 0,
+      y: 0,
+      vx: 10,
+      vy: 0,
+      damage: 12,
+      life: 20
+    });
+
+    moveProjectiles(state, 1, createDeterministicRandomSource([0, 0, 0, 0]));
+
+    expect(state.enemies).toHaveLength(0);
+    expect(state.player.tallyKills).toBe(1);
+    expect(state.score).toBe(100);
   });
 });

@@ -7,6 +7,29 @@ import { getCargoPirateInterest } from '../scoring/salvage';
 import { spawnCop, spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
 import type { BlueprintFileId, RandomSource, TravelCombatState } from '../types';
 
+/**
+ * Encounter spawning overview
+ * --------------------------
+ *
+ * This module answers two questions:
+ * 1. Which encounter table ("blueprint file") should be active in this system?
+ * 2. When the encounter timer ticks, what kind of contact should appear next?
+ *
+ * The design preserves the old gameplay behavior while separating it from the
+ * rest of the combat loop.
+ */
+
+/**
+ * Chooses the active blueprint file for the current context.
+ *
+ * Priority order:
+ * 1. witchspace / thargoid mission contact
+ * 2. unfinished constrictor mission
+ * 3. normal system danger table based on government + tech level
+ *
+ * The function intentionally mirrors the legacy mapping so the refactor does
+ * not silently change encounter flavor.
+ */
 export function selectBlueprintFile(params: {
   government: number;
   techLevel: number;
@@ -29,6 +52,12 @@ export function selectBlueprintFile(params: {
   return base[variant] as BlueprintFileId;
 }
 
+/**
+ * Spawns a multi-ship pirate wave constrained by the current blueprint file.
+ *
+ * `encounter.ev` is reused as a pacing counter so larger pirate packs naturally
+ * slow down subsequent dangerous spawns for a short time.
+ */
 function spawnPackPirates(state: TravelCombatState, random: RandomSource) {
   const size = (random.nextByte() & 3) + 1;
   state.encounter.ev = size - 1;
@@ -45,6 +74,9 @@ function spawnPackPirates(state: TravelCombatState, random: RandomSource) {
   pushMessage(state, `PIRATE PACK DETECTED: ${size}`);
 }
 
+/**
+ * Spawns a single notable hostile contact chosen from the "lone bounty" table.
+ */
 function spawnLoneBounty(state: TravelCombatState, random: RandomSource) {
   const candidate = getLoneBountySequence()[random.nextByte() & 3] ?? 'cobra-mk3-pirate';
   const available = new Set(getBlueprintAvailability(state.encounter.activeBlueprintFile));
@@ -53,6 +85,10 @@ function spawnLoneBounty(state: TravelCombatState, random: RandomSource) {
   pushMessage(state, `CONTACT: ${getCombatBlueprint(blueprintId).label.toUpperCase()}`);
 }
 
+/**
+ * Spawns civilian traffic. These ships are not just cosmetic: they exercise
+ * station approach, safe-zone and legal-response rules.
+ */
 function spawnBenignTrader(state: TravelCombatState, random: RandomSource) {
   const blueprintId = (random.nextByte() & 1) === 0 ? 'cobra-mk3-trader' : 'python-trader';
   spawnEnemyFromBlueprint(state, blueprintId, random, {
@@ -62,12 +98,19 @@ function spawnBenignTrader(state: TravelCombatState, random: RandomSource) {
   });
 }
 
+/**
+ * Mission-only Constrictor encounter.
+ */
 function spawnConstrictor(state: TravelCombatState, random: RandomSource) {
   spawnEnemyFromBlueprint(state, 'constrictor', random, { missionTag: 'constrictor', aggression: 56, baseAggression: 56 });
   state.constrictorSpawned = true;
   pushMessage(state, 'NAVY ALERT: CONSTRICTOR CONTACT');
 }
 
+/**
+ * Mission-only thargoid contact. The first spawn also emits a mission event so
+ * the campaign can react later when the player returns.
+ */
 function spawnThargoidIntercept(state: TravelCombatState, random: RandomSource) {
   spawnEnemyFromBlueprint(state, 'thargoid', random, { missionTag: 'thargoid-plans', aggression: 58, baseAggression: 58 });
   pushMessage(state, 'THARGOID INTERCEPTOR');
@@ -77,6 +120,12 @@ function spawnThargoidIntercept(state: TravelCombatState, random: RandomSource) 
   }
 }
 
+/**
+ * Determines whether contraband / legal pressure should attract police.
+ *
+ * Cops are intentionally suppressed while inside the station safe zone to avoid
+ * absurd "fresh spawn inside protection radius" behavior.
+ */
 function deepSpaceCopShouldSpawn(state: TravelCombatState, random: RandomSource, cargo: Record<string, number>): boolean {
   if (state.encounter.safeZone) {
     return false;
@@ -88,6 +137,15 @@ function deepSpaceCopShouldSpawn(state: TravelCombatState, random: RandomSource,
   return random.nextByte() < badness;
 }
 
+/**
+ * Periodic encounter driver called by the main combat tick.
+ *
+ * The order matters:
+ * - ambient traders first, so space does not feel empty
+ * - police pressure from cargo/legal status
+ * - scripted mission encounters
+ * - ordinary pirate / hostile contacts
+ */
 export function tryRareEncounter(state: TravelCombatState, random: RandomSource, cargo: Record<string, number>) {
   state.encounter.mcnt += 1;
 
@@ -142,6 +200,10 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
   }
 }
 
+/**
+ * Rebinds a running combat state to a new system context, typically after a
+ * jump or when resetting the prototype flight at the origin system.
+ */
 export function setCombatSystemContext(
   state: TravelCombatState,
   params: { government: number; techLevel: number; witchspace: boolean },

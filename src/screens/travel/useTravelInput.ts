@@ -1,5 +1,26 @@
 import type { MutableRefObject } from 'react';
 
+/**
+ * Travel input overview
+ * --------------------
+ *
+ * The travel screen accepts multiple input sources at once:
+ * - keyboard
+ * - on-screen press buttons
+ * - a draggable virtual joystick
+ *
+ * This module normalizes all of those into one mutable `TravelInputState`
+ * object. The animation loop reads that object each frame and converts it into
+ * domain-level combat input.
+ */
+
+/**
+ * Shared mutable input model for one mounted travel screen.
+ *
+ * `turn` / `thrust` are the continuous controls.
+ * The booleans are one-shot or held actions.
+ * `vector*` preserve joystick direction for touch aiming.
+ */
 export interface TravelInputState {
   turn: number;
   thrust: number;
@@ -13,10 +34,22 @@ export interface TravelInputState {
   vectorStrength: number;
 }
 
+/**
+ * Creates the default "no input" state.
+ */
 export function createTravelInput(): TravelInputState {
   return { turn: 0, thrust: 0, fire: false, jump: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
 }
 
+/**
+ * Connects DOM events to the normalized travel input object.
+ *
+ * The caller owns the input object and passes it in; this function only wires
+ * event listeners that mutate that object in response to browser input.
+ *
+ * Return value:
+ * - a teardown function that removes every event listener added here
+ */
 export function bindTravelInput(params: {
   viewport: HTMLDivElement;
   knobNode: HTMLDivElement;
@@ -31,16 +64,25 @@ export function bindTravelInput(params: {
 }) {
   const { viewport, knobNode, jumpButton, fireButton, ecmButton, bombButton, dockButton, input, keys, joyActiveRef } = params;
   const joystickArea = viewport.querySelector('.travel-screen__joystick') as HTMLDivElement | null;
+
+  // These values define the physical feel of the virtual joystick.
   const JOYSTICK_RADIUS = 60;
   const JOYSTICK_MAX_DIST = 40;
   let joyPointerId: number | null = null;
   let joyCenter = { x: 0, y: 0 };
 
+  /**
+   * Moves the visual joystick knob relative to the joystick center.
+   */
   const setKnob = (dx: number, dy: number) => {
     knobNode.style.left = `${dx + 40}px`;
     knobNode.style.top = `${dy + 40}px`;
   };
 
+  /**
+   * Converts a pointer position into a normalized joystick vector and updates
+   * both the visual knob and the shared input state.
+   */
   const handleJoystick = (clientX: number, clientY: number) => {
     let dx = clientX - joyCenter.x;
     let dy = clientY - joyCenter.y;
@@ -57,6 +99,9 @@ export function bindTravelInput(params: {
     input.thrust = input.vectorStrength;
   };
 
+  /**
+   * Returns the joystick UI to its resting corner position.
+   */
   const resetJoystickPosition = () => {
     if (!joystickArea) {
       return;
@@ -66,6 +111,10 @@ export function bindTravelInput(params: {
     joystickArea.style.top = 'auto';
   };
 
+  /**
+   * Repositions the floating joystick so touch control starts under the finger
+   * instead of forcing the user to reach a fixed on-screen pad.
+   */
   const placeJoystickAt = (clientX: number, clientY: number) => {
     if (!joystickArea) {
       return;
@@ -78,6 +127,10 @@ export function bindTravelInput(params: {
     joystickArea.style.bottom = 'auto';
   };
 
+  /**
+   * Keyboard state is stored separately in `keys`; the frame loop decides how
+   * that state maps into continuous actions.
+   */
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key in keys) {
       keys[event.key] = true;
@@ -87,12 +140,19 @@ export function bindTravelInput(params: {
     }
   };
 
+  /**
+   * Keyboard release simply updates the pressed-key map.
+   */
   const onKeyUp = (event: KeyboardEvent) => {
     if (event.key in keys) {
       keys[event.key] = false;
     }
   };
 
+  /**
+   * Starts a joystick gesture unless the user pressed one of the explicit
+   * action buttons.
+   */
   const onJoyPointerDown = (event: PointerEvent) => {
     if (!joystickArea || event.button !== 0) {
       return;
@@ -110,6 +170,9 @@ export function bindTravelInput(params: {
     handleJoystick(event.clientX, event.clientY);
   };
 
+  /**
+   * Updates joystick direction while the active pointer is still held.
+   */
   const onJoyPointerMove = (event: PointerEvent) => {
     if (!joyActiveRef.current || joyPointerId !== event.pointerId) {
       return;
@@ -117,6 +180,9 @@ export function bindTravelInput(params: {
     handleJoystick(event.clientX, event.clientY);
   };
 
+  /**
+   * Ends the active joystick gesture and resets continuous control values.
+   */
   const onJoyPointerUp = (event: PointerEvent) => {
     if (joyPointerId !== event.pointerId) {
       return;
@@ -132,6 +198,9 @@ export function bindTravelInput(params: {
     resetJoystickPosition();
   };
 
+  /**
+   * Binds a press-and-hold action button such as FIRE or JUMP.
+   */
   const bindPressButton = (button: HTMLButtonElement, key: 'fire' | 'jump') => {
     const onPointerDown = () => {
       input[key] = true;
@@ -151,6 +220,10 @@ export function bindTravelInput(params: {
     };
   };
 
+  /**
+   * Binds a tap-style action button. These are latched once and later cleared
+   * by the frame loop after it consumes the action.
+   */
   const bindTapButton = (button: HTMLButtonElement, key: 'activateEcm' | 'triggerEnergyBomb' | 'autoDock') => {
     const onPointerDown = () => {
       input[key] = true;
@@ -159,6 +232,7 @@ export function bindTravelInput(params: {
     return () => button.removeEventListener('pointerdown', onPointerDown);
   };
 
+  // Register every listener needed for the mounted session.
   resetJoystickPosition();
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
@@ -173,6 +247,9 @@ export function bindTravelInput(params: {
   const unbindBombButton = bindTapButton(bombButton, 'triggerEnergyBomb');
   const unbindDockButton = bindTapButton(dockButton, 'autoDock');
 
+  /**
+   * Full teardown for all listeners installed above.
+   */
   return () => {
     window.removeEventListener('keydown', onKeyDown);
     window.removeEventListener('keyup', onKeyUp);
