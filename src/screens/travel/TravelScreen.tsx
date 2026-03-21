@@ -106,19 +106,6 @@ export function TravelScreen() {
           Laser CNT: {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} / {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
         </div>
 
-        {/* Explicit escape hatch back to the strategic layer. */}
-        <div className="travel-screen__actions">
-          <button
-            type="button"
-            className="button-danger"
-            onClick={() => {
-              cancelTravel();
-              navigate('/star-map', { replace: true });
-            }}
-          >
-            Abort Flight
-          </button>
-        </div>
       </div>
     </section>
   );

@@ -79,6 +79,13 @@ export function bindTravelInput(params: {
     knobNode.style.top = `${dy + 40}px`;
   };
 
+  const setJoystickVisible = (visible: boolean) => {
+    if (!joystickArea) {
+      return;
+    }
+    joystickArea.classList.toggle('travel-screen__joystick--active', visible);
+  };
+
   /**
    * Converts a pointer position into a normalized joystick vector and updates
    * both the visual knob and the shared input state.
@@ -109,6 +116,7 @@ export function bindTravelInput(params: {
     joystickArea.style.left = '1.8rem';
     joystickArea.style.bottom = '1.8rem';
     joystickArea.style.top = 'auto';
+    setJoystickVisible(false);
   };
 
   /**
@@ -163,6 +171,7 @@ export function bindTravelInput(params: {
     }
     joyActiveRef.current = true;
     joyPointerId = event.pointerId;
+    setJoystickVisible(true);
     placeJoystickAt(event.clientX, event.clientY);
     const rect = joystickArea.getBoundingClientRect();
     joyCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };

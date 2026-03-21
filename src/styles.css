@@ -643,6 +643,14 @@ button:disabled {
   border: 2px dashed #ffff55;
   border-radius: 50%;
   pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease;
+}
+
+.travel-screen__joystick--active {
+  opacity: 1;
+  visibility: visible;
 }
 
 .travel-screen__joystick-knob {
@@ -668,19 +676,4 @@ button:disabled {
   opacity: 1;
   text-shadow: none;
   pointer-events: none;
-}
-
-.travel-screen__actions {
-  position: absolute;
-  left: 50%;
-  bottom: 1.4rem;
-  transform: translateX(-50%);
-}
-
-.travel-screen__actions button {
-  padding-inline: 1rem;
-  font-family: inherit;
-  background: #ff5555;
-  border-color: #ffff55;
-  color: #000;
 }
