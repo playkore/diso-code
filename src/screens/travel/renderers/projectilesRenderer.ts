@@ -10,7 +10,7 @@ import { getEnemyColor, getEnemyShape, getProjectileColor, drawWireframe } from 
  * projectiles, and particles visually grouped above the background layers.
  */
 export interface EnemyHealthBarState {
-  ratio: number;
+  bankRatios: number[];
   fillColor: string;
 }
 
@@ -20,8 +20,12 @@ export function getEnemyHealthBarState(enemy: CombatEnemy): EnemyHealthBarState 
   }
 
   const ratio = Math.max(0, Math.min(1, enemy.maxEnergy > 0 ? enemy.energy / enemy.maxEnergy : 0));
+  // Elite-style energy is displayed as four banks. We map the continuous enemy
+  // energy ratio into per-bank fill levels so the HUD communicates collapse
+  // bank-by-bank instead of as a single monolithic hit-point bar.
+  const bankRatios = Array.from({ length: 4 }, (_unused, bankIndex) => Math.max(0, Math.min(1, ratio * 4 - bankIndex)));
   return {
-    ratio,
+    bankRatios,
     fillColor: ratio <= 0.3 ? CGA_RED : ratio <= 0.65 ? CGA_YELLOW : CGA_GREEN
   };
 }
@@ -32,11 +36,13 @@ function drawEnemyHealthBar(ctx: CanvasRenderingContext2D, enemy: CombatEnemy, s
     return;
   }
 
-  const width = 20;
+  const bankCount = 4;
+  const bankWidth = 4;
+  const bankGap = 1;
+  const width = bankCount * bankWidth + (bankCount - 1) * bankGap;
   const height = 4;
   const x = Math.round(screenX - width / 2);
   const y = Math.round(screenY - 18);
-  const fillWidth = Math.round(width * healthBar.ratio);
 
   ctx.save();
   ctx.shadowBlur = 0;
@@ -45,11 +51,19 @@ function drawEnemyHealthBar(ctx: CanvasRenderingContext2D, enemy: CombatEnemy, s
   ctx.strokeStyle = CGA_YELLOW;
   ctx.lineWidth = 1;
   ctx.strokeRect(x - 0.5, y - 0.5, width + 1, height + 1);
-  ctx.fillStyle = CGA_RED;
-  ctx.fillRect(x, y, width, height);
-  if (fillWidth > 0) {
+  for (let bankIndex = 0; bankIndex < bankCount; bankIndex += 1) {
+    const bankX = x + bankIndex * (bankWidth + bankGap);
+    const bankFillWidth = Math.round(bankWidth * healthBar.bankRatios[bankIndex]);
+
+    // Red underlay keeps depleted banks visible, while a colored overlay marks
+    // the live charge level in each discrete segment.
+    ctx.fillStyle = CGA_RED;
+    ctx.fillRect(bankX, y, bankWidth, height);
+    if (bankFillWidth <= 0) {
+      continue;
+    }
     ctx.fillStyle = healthBar.fillColor;
-    ctx.fillRect(x, y, fillWidth, height);
+    ctx.fillRect(bankX, y, bankFillWidth, height);
   }
   ctx.restore();
 }
