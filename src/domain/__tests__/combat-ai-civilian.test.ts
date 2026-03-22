@@ -6,6 +6,8 @@ describe('travel combat civilian AI', () => {
   it('routes station traffic into the docking slot instead of orbiting the player', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0]);
+    // This test exercises docking behavior, not ambient encounter spawning.
+    state.encounter.rareTimer = -10_000;
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 220;
     state.player.y = 250;
@@ -36,7 +38,7 @@ describe('travel combat civilian AI', () => {
       missileCooldown: 999,
       isFiringLaser: false
     });
-    for (let index = 0; index < 180 && state.enemies.length > 0; index += 1) {
+    for (let index = 0; index < 1000 && state.enemies.length > 0; index += 1) {
       stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 4, 'JUMPING', {}, rng);
     }
     expect(state.enemies).toHaveLength(0);
