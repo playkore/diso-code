@@ -14,6 +14,22 @@ export interface TravelDriveStatus {
   hyperspace: string;
 }
 
+export interface TravelHudState {
+  score: string;
+  energyBanks: number[];
+  energyColor: string;
+  shieldRatio: number;
+  shieldColor: string;
+  laserHeat: { mount: LaserMountPosition; installed: boolean; ratio: number; color: string }[];
+  jump: string;
+  hyperspace: string;
+  legal: string;
+  hostileCount: number;
+  threat: string;
+  arc: string;
+  bombVisible: boolean;
+}
+
 function getHeatColor(heatRatio: number) {
   return heatRatio >= 0.8 ? '#ff5555' : heatRatio >= 0.45 ? '#ffff55' : '#55ff55';
 }
@@ -29,11 +45,12 @@ export function getHudState(
   state: TravelCombatState,
   flightState: FlightPhase,
   options: { jumpBlocked: boolean; hyperspaceBlocked: boolean; jumpCompleted: boolean }
-) {
+): TravelHudState {
   const hostileCount = state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
   const drives = getDriveStatus(flightState, options);
   const energyRatio = state.player.maxEnergy > 0 ? state.player.energy / state.player.maxEnergy : 0;
   const shieldRatio = state.player.maxShield > 0 ? state.player.shield / state.player.maxShield : 0;
+  const bombVisible = state.playerLoadout.installedEquipment.energy_bomb;
   const laserHeat = (['front', 'rear', 'left', 'right'] as LaserMountPosition[]).map((mount) => {
     const installed = Boolean(state.playerLoadout.laserMounts[mount]);
     const heatRatio = installed && state.player.maxLaserHeat > 0 ? state.player.laserHeat[mount] / state.player.maxLaserHeat : 0;
@@ -56,7 +73,8 @@ export function getHudState(
     legal: `${getLegalStatus(state.legalValue)} ${state.legalValue}`,
     hostileCount,
     threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount}`,
-    arc: `${state.lastPlayerArc.toUpperCase()} ${state.encounter.ecmTimer > 0 ? ' ECM' : ''}${state.playerLoadout.installedEquipment.energy_bomb ? ' BOMB' : ''}`
+    arc: `${state.lastPlayerArc.toUpperCase()} ${state.encounter.ecmTimer > 0 ? ' ECM' : ''}${bombVisible ? ' BOMB' : ''}`,
+    bombVisible
   };
 }
 

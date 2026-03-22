@@ -864,6 +864,11 @@ button:disabled {
   cursor: default;
 }
 
+.travel-screen__button--dock-active {
+  background: #ffff55;
+  color: #000;
+}
+
 .travel-screen__joystick {
   position: absolute;
   left: 1.8rem;

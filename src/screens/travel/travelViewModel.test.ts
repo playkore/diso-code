@@ -23,6 +23,7 @@ describe('travel drive status', () => {
     state.player.laserHeat.front = 80;
     state.player.laserHeat.rear = 30;
     state.playerLoadout.laserMounts.rear = 'beam_laser';
+    state.playerLoadout.installedEquipment.energy_bomb = true;
     const hud = getHudState(state, 'PLAYING', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false });
     expect(hud.energyBanks[0]).toBe(1);
     expect(hud.energyBanks[1]).toBe(1);
@@ -35,5 +36,7 @@ describe('travel drive status', () => {
       { mount: 'left', installed: false, ratio: 0, color: '#55ff55' },
       { mount: 'right', installed: false, ratio: 0, color: '#55ff55' }
     ]);
+    expect(hud.bombVisible).toBe(true);
+    expect(hud.arc).toContain('BOMB');
   });
 });

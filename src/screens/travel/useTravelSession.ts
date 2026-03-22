@@ -25,6 +25,7 @@ import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
+import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -68,6 +69,11 @@ interface TravelRefs {
 interface AutoDockUiState {
   visible: boolean;
   enabled: boolean;
+  active: boolean;
+}
+
+interface BombUiState {
+  visible: boolean;
 }
 
 const PERF_REPORT_INTERVAL_MS = 500;
@@ -144,12 +150,20 @@ export function useTravelSession(
   const [hud, setHud] = useState(INITIAL_HUD);
   const [message, setMessage] = useState('');
   const [hyperspaceHidden, setHyperspaceHidden] = useState(false);
-  const [autoDock, setAutoDock] = useState<AutoDockUiState>({ visible: commander.installedEquipment.docking_computer, enabled: false });
+  const [autoDock, setAutoDock] = useState<AutoDockUiState>({
+    visible: commander.installedEquipment.docking_computer,
+    enabled: false,
+    active: false
+  });
+  const [bomb, setBomb] = useState<BombUiState>({
+    visible: commander.installedEquipment.energy_bomb
+  });
   const [perf, setPerf] = useState(EMPTY_PERF_SNAPSHOT);
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
   const autoDockRef = useRef(autoDock);
+  const bombRef = useRef(bomb);
   const perfRef = useRef<PerfAccumulator>(createPerfAccumulator(typeof performance === 'undefined' ? 0 : performance.now()));
   const {
     inputRef,
@@ -219,11 +233,23 @@ export function useTravelSession(
   };
 
   const setAutoDockState = (next: AutoDockUiState) => {
-    if (autoDockRef.current.visible === next.visible && autoDockRef.current.enabled === next.enabled) {
+    if (
+      autoDockRef.current.visible === next.visible &&
+      autoDockRef.current.enabled === next.enabled &&
+      autoDockRef.current.active === next.active
+    ) {
       return;
     }
     autoDockRef.current = next;
     setAutoDock(next);
+  };
+
+  const setBombState = (next: BombUiState) => {
+    if (bombRef.current.visible === next.visible) {
+      return;
+    }
+    bombRef.current = next;
+    setBomb(next);
   };
 
   const publishPerfSnapshot = useCallback((now: number) => {
@@ -352,6 +378,15 @@ export function useTravelSession(
     let overlayMessage = '';
     let overlayTimer = 0;
     let jumpCompleted = false;
+    let autoDockActive = false;
+
+    const syncAutoDockUi = () => {
+      setAutoDockState({
+        visible: combatState.playerLoadout.installedEquipment.docking_computer,
+        enabled: canAutoDock(combatState),
+        active: autoDockActive
+      });
+    };
 
     const getManualFlightState = (): FlightPhase => {
       if (jumpCompleted) {
@@ -363,7 +398,6 @@ export function useTravelSession(
     const updateHud = () => {
       const jumpBlocked = isMassNearby(combatState);
       const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
-      const autoDockAllowed = canAutoDock(combatState);
       const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
       setHudState({
         score: nextHud.score,
@@ -383,13 +417,16 @@ export function useTravelSession(
         arc: nextHud.arc,
         arcColor: combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED
       });
+      // The bomb button is a live reflection of the mutable combat loadout, so
+      // it disappears immediately after the single-use charge is spent.
+      setBombState({
+        visible: nextHud.bombVisible
+      });
       setHyperspaceHiddenState(jumpCompleted);
       // The DOCK control is a purchased capability. Once owned, it stays on
-      // screen so the player can see when station position enables it again.
-      setAutoDockState({
-        visible: combatState.playerLoadout.installedEquipment.docking_computer,
-        enabled: autoDockAllowed
-      });
+      // screen so the player can see when station position enables it again,
+      // and whether the docking computer currently owns the controls.
+      syncAutoDockUi();
     };
 
     const showMessage = (text: string, duration: number) => {
@@ -486,6 +523,7 @@ export function useTravelSession(
       stars = createStars();
       jumpCompleted = false;
       flightState = 'READY';
+      autoDockActive = false;
       showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
       updateHud();
       resetInput();
@@ -538,12 +576,29 @@ export function useTravelSession(
         liveInput.vectorStrength = 0;
       }
 
+      const manualSteeringRequested = Math.abs(liveInput.turn) > 0.08 || liveInput.thrust > 0.08;
+      const hostileContacts = combatState.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
+
+      if (autoDockActive && manualSteeringRequested) {
+        autoDockActive = false;
+        showMessage('AUTO-DOCK CANCELLED', 900);
+      }
+      if (autoDockActive && (!canAutoDock(combatState) || hostileContacts > 0 || flightState === 'HYPERSPACE' || flightState === 'JUMPING')) {
+        autoDockActive = false;
+        showMessage(hostileContacts > 0 ? 'AUTO-DOCK BLOCKED BY HOSTILES' : 'AUTO-DOCK CANCELLED', 900);
+      }
+
       liveInput.fire = keys[' '] || liveInput.fire;
       liveInput.jump = keys.j || keys.J || liveInput.jump;
       liveInput.hyperspace = keys.h || keys.H || liveInput.hyperspace;
       liveInput.activateEcm = keys.e || keys.E || liveInput.activateEcm;
       liveInput.triggerEnergyBomb = keys.b || keys.B || liveInput.triggerEnergyBomb;
       liveInput.autoDock = autoDockRef.current.enabled && (keys.d || keys.D || liveInput.autoDock);
+
+      if (liveInput.autoDock && autoDockRef.current.enabled && hostileContacts === 0 && !autoDockActive && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
+        autoDockActive = true;
+        showMessage('AUTO-DOCK ENGAGED', 900);
+      }
 
       if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || liveInput.thrust > 0 || Math.abs(liveInput.turn) > 0.1)) {
         flightState = 'PLAYING';
@@ -565,17 +620,21 @@ export function useTravelSession(
         }
       }
 
+      const autoDockCommand = autoDockActive && combatState.station ? getAutoDockCommand(combatState.station, combatState.player) : null;
       const result = stepTravelCombat(
         combatState,
         {
-          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : liveInput.thrust,
-          turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : liveInput.turn,
+          // While auto-dock is active, the docking computer injects the same
+          // low-level turn/thrust controls a pilot would use, so the ship
+          // still follows the normal flight model and station collision rules.
+          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.thrust ?? liveInput.thrust,
+          turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn,
           fire: flightState === 'HYPERSPACE' ? false : liveInput.fire,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
           activateEcm: flightState === 'HYPERSPACE' ? false : liveInput.activateEcm,
           triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : liveInput.triggerEnergyBomb,
-          autoDock: flightState === 'HYPERSPACE' ? false : liveInput.autoDock
+          autoDock: false
         },
         dt,
         flightState,
@@ -583,9 +642,8 @@ export function useTravelSession(
         random
       );
 
-      const hostileContacts = combatState.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
-
       if (result.autoDocked) {
+        autoDockActive = false;
         completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
         return;
       }
@@ -638,9 +696,11 @@ export function useTravelSession(
             combatState.player.energy = Math.max(0, combatState.player.energy - 20);
             combatState.player.vx *= -1.5;
             combatState.player.vy *= -1.5;
+            autoDockActive = false;
             showMessage('COLLISION WARNING', 1000);
           } else if (docking.isInDockingGap && docking.distance < combatState.station.radius - 18) {
             if (docking.canDock) {
+              autoDockActive = false;
               completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
               return;
             }
@@ -652,6 +712,7 @@ export function useTravelSession(
       }
 
       if (result.playerDestroyed) {
+        autoDockActive = false;
         flightState = 'GAMEOVER';
         showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
       }
@@ -743,6 +804,7 @@ export function useTravelSession(
     message,
     hyperspaceHidden,
     autoDock,
+    bomb,
     perf,
     recordReactCommit,
     joystickView,

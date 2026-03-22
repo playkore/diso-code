@@ -101,7 +101,7 @@ describe('travel combat weapons', () => {
     expect(state.player.energy).toBe(state.player.maxEnergy);
   });
 
-  it('consumes energy bombs and preserves mission enemies', () => {
+  it('consumes energy bombs and destroys every ship visible on radar', () => {
     const rng = createDeterministicRandomSource([0, 0, 0]);
     const commander = createDefaultCommander();
     commander.installedEquipment.energy_bomb = true;
@@ -161,10 +161,66 @@ describe('travel combat weapons', () => {
       isFiringLaser: false,
       missionTag: 'constrictor'
     });
+    state.enemies.push({
+      id: 5,
+      kind: 'ship',
+      blueprintId: 'mamba',
+      label: 'Mamba',
+      behavior: 'hostile',
+      x: 590,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 90,
+      maxEnergy: 90,
+      laserPower: 3,
+      missiles: 2,
+      targetableArea: 220,
+      laserRange: 320,
+      topSpeed: 6,
+      acceleration: 0.12,
+      turnRate: 0.055,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+    state.enemies.push({
+      id: 6,
+      kind: 'ship',
+      blueprintId: 'adder',
+      label: 'Adder',
+      behavior: 'hostile',
+      x: 610,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 85,
+      maxEnergy: 85,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true },
+      aggression: 38,
+      baseAggression: 38,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, rng);
     expect(state.playerLoadout.installedEquipment.energy_bomb).toBe(false);
     expect(state.enemies.some((enemy) => enemy.blueprintId === 'sidewinder')).toBe(false);
-    expect(state.enemies.some((enemy) => enemy.missionTag === 'constrictor')).toBe(true);
+    expect(state.enemies.some((enemy) => enemy.missionTag === 'constrictor')).toBe(false);
+    expect(state.enemies.some((enemy) => enemy.blueprintId === 'mamba')).toBe(false);
+    expect(state.enemies.some((enemy) => enemy.blueprintId === 'adder')).toBe(true);
   });
 
   it('uses the escape pod recovery flow and preserves consumable state', () => {
