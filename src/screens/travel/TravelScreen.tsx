@@ -5,6 +5,7 @@ import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/trav
 import type { LaserMountPosition } from '../../domain/shipCatalog';
 import { useGameStore } from '../../store/useGameStore';
 import { formatLightYears } from '../../utils/distance';
+import { formatCredits } from '../../utils/money';
 import { TravelPerfOverlay } from './TravelPerfOverlay';
 import { useTravelSession } from './useTravelSession';
 
@@ -67,8 +68,8 @@ export function TravelScreen() {
                   <span className="travel-screen__hud-value">{formatLightYears(session.fuelCost)}</span>
                 </span>
                 <span className="travel-screen__hud-stat">
-                  <span className="travel-screen__hud-key">Score</span>
-                  <span className="travel-screen__hud-value">{travel.hud.score}</span>
+                  <span className="travel-screen__hud-key">Credits</span>
+                  <span className="travel-screen__hud-value">{formatCredits(commander.cash)}</span>
                 </span>
               </div>
               <div className="travel-screen__hud-row travel-screen__hud-row--systems">

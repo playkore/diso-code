@@ -15,7 +15,6 @@ export interface TravelDriveStatus {
 }
 
 export interface TravelHudState {
-  score: string;
   energyBanks: number[];
   energyColor: string;
   shieldRatio: number;
@@ -62,7 +61,6 @@ export function getHudState(
     };
   });
   return {
-    score: String(state.score),
     energyBanks: getSegmentedBankRatios(state.player.energy, state.player.maxEnergy, state.player.energyBanks),
     energyColor: getCgaBarFillColor(energyRatio),
     shieldRatio: Math.max(0, Math.min(1, shieldRatio)),

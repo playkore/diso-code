@@ -91,7 +91,6 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
     },
     legalValue: 0,
     legalStatus: 'clean',
-    score: 0,
     nextId: 1,
     currentGovernment: 0,
     currentTechLevel: 0,

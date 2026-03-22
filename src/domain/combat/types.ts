@@ -286,7 +286,6 @@ export interface TravelCombatState {
   encounter: CombatEncounterState;
   legalValue: number;
   legalStatus: LegalStatus;
-  score: number;
   nextId: number;
   currentGovernment: number;
   currentTechLevel: number;

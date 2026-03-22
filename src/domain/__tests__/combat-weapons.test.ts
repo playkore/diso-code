@@ -302,7 +302,6 @@ describe('travel combat weapons', () => {
 
     expect(state.enemies).toHaveLength(0);
     expect(state.player.tallyKills).toBe(1);
-    expect(state.score).toBe(100);
   });
 
   it('initializes the player energy pool from commander bank data', () => {

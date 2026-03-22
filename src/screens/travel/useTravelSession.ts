@@ -38,7 +38,6 @@ import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
  * paying React reconciliation costs.
  */
 const INITIAL_HUD = {
-  score: '0',
   energyBanks: [1, 1, 1, 1],
   energyColor: CGA_GREEN,
   shieldRatio: 1,
@@ -193,7 +192,6 @@ export function useTravelSession(
   const setHudState = (next: typeof INITIAL_HUD) => {
     const previous = hudRef.current;
     if (
-      previous.score === next.score &&
       previous.energyColor === next.energyColor &&
       previous.shieldRatio === next.shieldRatio &&
       previous.shieldColor === next.shieldColor &&
@@ -418,7 +416,6 @@ export function useTravelSession(
       const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
       const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
       setHudState({
-        score: nextHud.score,
         energyBanks: nextHud.energyBanks,
         energyColor: nextHud.energyColor,
         shieldRatio: nextHud.shieldRatio,

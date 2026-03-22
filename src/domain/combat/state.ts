@@ -235,7 +235,6 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
     },
     legalValue: init.legalValue,
     legalStatus: getLegalStatus(init.legalValue),
-    score: 0,
     nextId: 1,
     currentGovernment: init.government,
     currentTechLevel: init.techLevel,
