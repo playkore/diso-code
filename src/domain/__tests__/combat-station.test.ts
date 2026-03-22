@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultCommander } from '../commander';
 import { assessDockingApproach, createDeterministicRandomSource, enterArrivalSpace, enterStationSpace, getStationSlotAngle, stepTravelCombat } from '../travelCombat';
+import { clampAngle } from '../combat/state';
 import { createCombatState } from './combatTestUtils';
 
 describe('travel combat station rules', () => {
+  it('randomizes station rotation when launching from a station', () => {
+    const rng = createDeterministicRandomSource([64, 128, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0]);
+    enterStationSpace(state, rng);
+
+    expect(state.station).not.toBeNull();
+    expect(state.station!.angle).toBeCloseTo((64 / 255) * Math.PI * 2);
+  });
+
   it('launches just outside the docking door and already moving away from the station', () => {
-    const rng = createDeterministicRandomSource([128, 0, 0, 0]);
+    const rng = createDeterministicRandomSource([64, 128, 0, 0]);
     const state = createCombatState([0, 0, 0, 0]);
     enterStationSpace(state, rng);
 
@@ -19,8 +29,8 @@ describe('travel combat station rules', () => {
     const outwardVelocity = dx * state.player.vx + dy * state.player.vy;
 
     expect(distance).toBeCloseTo(state.station!.radius + 28);
-    expect(radialAngle).toBeCloseTo(slotAngle);
-    expect(state.player.angle).toBeCloseTo(slotAngle);
+    expect(clampAngle(radialAngle - slotAngle)).toBeCloseTo(0);
+    expect(clampAngle(state.player.angle - slotAngle)).toBeCloseTo(0);
     expect(speed).toBeCloseTo(2.4);
     expect(outwardVelocity).toBeGreaterThan(0);
   });

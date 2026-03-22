@@ -12,11 +12,15 @@ export function enterStationSpace(
   random: RandomSource,
   options: { message?: string; playerAngle?: number } = {}
 ) {
+  const stationAngle = random.nextFloat() * Math.PI * 2;
   state.station = {
     x: Math.round((random.nextFloat() - 0.5) * 120),
     y: -320 - Math.round(random.nextFloat() * 60),
     radius: 80,
-    angle: 0,
+    // Launches should not always reveal the same station face first; seeding a
+    // fresh rotation angle on each station-space entry makes departures feel
+    // like they are joining an already-live world state.
+    angle: stationAngle,
     rotSpeed: 0.005,
     safeZoneRadius: 360
   };
