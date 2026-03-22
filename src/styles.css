@@ -441,8 +441,33 @@ button:disabled {
     display: none;
   }
 
-  .travel-screen__actions {
-    bottom: 6.9rem;
+  .travel-screen__hud {
+    top: 0.55rem;
+    left: 0.55rem;
+    right: 0.55rem;
+  }
+
+  .travel-screen__hud-panel {
+    min-width: 0;
+  }
+
+  .travel-screen__hud-row {
+    gap: 0.22rem 0.55rem;
+  }
+
+  .travel-screen__hud-stat {
+    font-size: 0.76rem;
+  }
+
+  .travel-screen__hud-stat--route {
+    min-width: 0;
+  }
+
+  .travel-screen__telemetry {
+    top: 7.55rem;
+    left: 0.55rem;
+    right: auto;
+    bottom: auto;
   }
 }
 
@@ -558,26 +583,85 @@ button:disabled {
   position: absolute;
   top: 0.8rem;
   left: 0.8rem;
-  display: grid;
-  gap: 0.22rem;
   color: #55ff55;
   text-shadow: none;
   pointer-events: none;
 }
 
-.travel-screen__hud-line {
-  font-size: 0.92rem;
+.travel-screen__hud-panel,
+.travel-screen__telemetry {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.travel-screen__hud-panel {
+  min-width: min(38rem, calc(100vw - 14rem));
+}
+
+.travel-screen__hud-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.24rem 0.85rem;
+}
+
+.travel-screen__hud-row--systems {
+  gap: 0.2rem 0.75rem;
+}
+
+.travel-screen__hud-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
-.travel-screen__hud-line--bars {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
+.travel-screen__hud-stat--route {
+  min-width: 16rem;
 }
 
-.travel-screen__hud-label {
-  min-width: 3.7rem;
+.travel-screen__hud-stat--bar {
+  gap: 0.42rem;
+}
+
+.travel-screen__hud-stat--heat {
+  align-items: flex-start;
+}
+
+.travel-screen__hud-key {
+  color: var(--cga-yellow);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.travel-screen__hud-value {
+  min-width: 0;
+  color: var(--cga-green);
+  text-shadow: 0 0 6px rgba(85, 255, 85, 0.22);
+}
+
+.travel-screen__telemetry {
+  position: absolute;
+  top: 7.35rem;
+  left: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.travel-screen__telemetry-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .travel-screen__hud-banks {
@@ -648,9 +732,10 @@ button:disabled {
 
 .travel-screen__message {
   position: absolute;
-  top: 26%;
-  left: 0;
-  width: 100%;
+  top: 18%;
+  left: 50%;
+  width: min(100%, 34rem);
+  transform: translateX(-50%);
   padding: 0 1rem;
   text-align: center;
   font-size: clamp(1.1rem, 2.8vw, 1.7rem);
@@ -712,26 +797,26 @@ button:disabled {
 }
 
 .travel-screen__button--fire {
-  right: 1.8rem;
-  bottom: 1.8rem;
-  width: 5rem;
-  height: 5rem;
+  right: 1.6rem;
+  bottom: 1.6rem;
+  width: 4.9rem;
+  height: 4.9rem;
   line-height: 1;
 }
 
 .travel-screen__button--jump {
   right: 2.2rem;
-  bottom: 7.9rem;
-  width: 3.9rem;
-  height: 3.9rem;
+  bottom: 7.2rem;
+  width: 3.6rem;
+  height: 3.6rem;
   font-size: 0.82rem;
 }
 
 .travel-screen__button--hyperspace {
   right: 1.4rem;
-  bottom: 12.2rem;
-  width: 5.6rem;
-  height: 3.5rem;
+  bottom: 10.8rem;
+  width: 5rem;
+  height: 3rem;
   font-size: 0.74rem;
   border-radius: 0;
 }
@@ -741,22 +826,22 @@ button:disabled {
 }
 
 .travel-screen__button--aux {
-  right: 8rem;
-  width: 3.8rem;
-  height: 3.8rem;
+  right: 7.2rem;
+  width: 3.45rem;
+  height: 3.45rem;
   font-size: 0.72rem;
 }
 
 .travel-screen__button--ecm {
-  bottom: 1.8rem;
+  bottom: 1.7rem;
 }
 
 .travel-screen__button--bomb {
-  bottom: 6rem;
+  bottom: 5.8rem;
 }
 
 .travel-screen__button--dock {
-  bottom: 10.2rem;
+  bottom: 9.9rem;
 }
 
 .travel-screen__joystick {
@@ -793,12 +878,14 @@ button:disabled {
 
 .travel-screen__help {
   position: absolute;
-  top: 10rem;
-  right: 0.9rem;
+  right: 1.2rem;
+  bottom: 0.95rem;
+  width: 13rem;
   text-align: right;
-  font-size: 0.76rem;
+  font-size: 0.64rem;
   color: #ffff55;
   opacity: 1;
   text-shadow: none;
   pointer-events: none;
+  line-height: 1.2;
 }
