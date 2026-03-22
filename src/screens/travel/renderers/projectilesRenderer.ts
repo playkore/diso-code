@@ -15,6 +15,13 @@ export interface EnemyHealthBarState {
   fillColor: string;
 }
 
+export interface EnemyLaserTrace {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
 export function getEnemyHealthBarState(enemy: CombatEnemy): EnemyHealthBarState | null {
   if (enemy.energy >= enemy.maxEnergy) {
     return null;
@@ -68,6 +75,34 @@ function drawEnemyHealthBar(ctx: CanvasRenderingContext2D, enemy: CombatEnemy, s
   ctx.restore();
 }
 
+/**
+ * Enemy laser fire is currently simulation-only. This helper turns the AI's
+ * `isFiringLaser` flag into a short visible beam aimed at the player so shots
+ * are readable even when no projectile object is spawned for laser damage.
+ */
+export function getEnemyLaserTrace(enemy: CombatEnemy, state: TravelCombatState): EnemyLaserTrace | null {
+  if (!enemy.isFiringLaser) {
+    return null;
+  }
+
+  const dx = state.player.x - enemy.x;
+  const dy = state.player.y - enemy.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance <= 0.001) {
+    return null;
+  }
+
+  const maxTraceLength = Math.min(enemy.laserRange, distance);
+  const directionX = dx / distance;
+  const directionY = dy / distance;
+  return {
+    startX: enemy.x + directionX * 10,
+    startY: enemy.y + directionY * 10,
+    endX: enemy.x + directionX * maxTraceLength,
+    endY: enemy.y + directionY * maxTraceLength
+  };
+}
+
 export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatState, camX: number, camY: number) {
   for (const enemy of state.enemies) {
     const screenX = enemy.x - camX;
@@ -78,6 +113,21 @@ export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatStat
 }
 
 export function drawProjectilesAndParticles(ctx: CanvasRenderingContext2D, state: TravelCombatState, camX: number, camY: number) {
+  for (const enemy of state.enemies) {
+    const laserTrace = getEnemyLaserTrace(enemy, state);
+    if (!laserTrace) {
+      continue;
+    }
+    ctx.strokeStyle = CGA_RED;
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = CGA_RED;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(laserTrace.startX - camX, laserTrace.startY - camY);
+    ctx.lineTo(laserTrace.endX - camX, laserTrace.endY - camY);
+    ctx.stroke();
+  }
+
   ctx.lineWidth = 2;
   for (const projectile of state.projectiles) {
     ctx.strokeStyle = getProjectileColor(projectile);

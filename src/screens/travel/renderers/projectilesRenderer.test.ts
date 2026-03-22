@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { getEnemyHealthBarState } from './projectilesRenderer';
+import { getEnemyHealthBarState, getEnemyLaserTrace } from './projectilesRenderer';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './constants';
 import { getCgaBarFillColor, getSegmentedBankRatios } from './bars';
-import type { CombatEnemy } from '../../../domain/travelCombat';
+import type { CombatEnemy, TravelCombatState } from '../../../domain/travelCombat';
 
 function createEnemy(overrides: Partial<CombatEnemy> = {}): CombatEnemy {
   return {
@@ -32,6 +32,78 @@ function createEnemy(overrides: Partial<CombatEnemy> = {}): CombatEnemy {
     missileCooldown: 0,
     isFiringLaser: false,
     ...overrides
+  };
+}
+
+function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelCombatState {
+  return {
+    player: {
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      radius: 12,
+      energy: 255,
+      maxEnergy: 255,
+      energyBanks: 4,
+      energyPerBank: 64,
+      shield: 255,
+      maxShield: 255,
+      laserHeat: 0,
+      maxLaserHeat: 100,
+      laserHeatCooldownRate: 12,
+      maxSpeed: 8,
+      fireCooldown: 0,
+      tallyKills: 0,
+      energyRechargePerTick: 1,
+      shieldRechargePerTick: 1,
+      rechargeTickAccumulator: 0
+    },
+    playerLoadout: {
+      laserMounts: { front: 'pulse_laser', rear: null, left: null, right: null },
+      installedEquipment: {
+        fuel_scoops: false,
+        ecm: false,
+        docking_computer: false,
+        extra_energy_unit: false,
+        large_cargo_bay: false,
+        escape_pod: false,
+        energy_bomb: false
+      },
+      missilesInstalled: 0
+    },
+    enemies: [createEnemy(enemyOverrides)],
+    projectiles: [],
+    particles: [],
+    station: null,
+    encounter: {
+      mcnt: 0,
+      rareTimer: 0,
+      ev: 0,
+      safeZone: false,
+      stationHostile: false,
+      ecmTimer: 0,
+      copsNearby: 0,
+      benignCooldown: 0,
+      activeBlueprintFile: 'A'
+    },
+    legalValue: 0,
+    legalStatus: 'clean',
+    score: 0,
+    nextId: 1,
+    currentGovernment: 0,
+    currentTechLevel: 0,
+    missionTP: 0,
+    missionVariant: 'classic',
+    witchspace: false,
+    thargoidContactTriggered: false,
+    constrictorSpawned: false,
+    messages: [],
+    missionEvents: [],
+    salvageCargo: {},
+    salvageFuel: 0,
+    lastPlayerArc: 'front'
   };
 }
 
@@ -77,5 +149,22 @@ describe('travel bar helpers', () => {
     expect(getCgaBarFillColor(0.9)).toBe(CGA_GREEN);
     expect(getCgaBarFillColor(0.5)).toBe(CGA_YELLOW);
     expect(getCgaBarFillColor(0.2)).toBe(CGA_RED);
+  });
+});
+
+describe('enemy laser traces', () => {
+  it('returns no trace when the enemy is not firing', () => {
+    const state = createTraceState({ isFiringLaser: false });
+    expect(getEnemyLaserTrace(state.enemies[0], state)).toBeNull();
+  });
+
+  it('aims visible enemy laser traces toward the player', () => {
+    const state = createTraceState({ x: 0, y: 0, laserRange: 80, isFiringLaser: true });
+    expect(getEnemyLaserTrace(state.enemies[0], state)).toEqual({
+      startX: 10,
+      startY: 0,
+      endX: 80,
+      endY: 0
+    });
   });
 });
