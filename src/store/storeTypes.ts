@@ -77,6 +77,7 @@ export interface GameStore {
   setInstantTravelEnabled: (enabled: boolean) => void;
   setShowTravelPerfOverlay: (enabled: boolean) => void;
   grantDebugCredits: (amount: number) => void;
+  grantCombatCredits: (amount: number) => void;
   beginTravel: (systemName: string) => boolean;
   cancelTravel: () => void;
   completeTravel: (report?: TravelCompletionReport) => void;

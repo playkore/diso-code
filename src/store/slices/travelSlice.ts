@@ -21,7 +21,7 @@ import type { GameSlice, GameStore } from '../storeTypes';
  * - how do salvage, fuel, legal changes and mission events get merged back?
  */
 export const createTravelSlice: GameSlice<
-  Pick<GameStore, 'grantDebugCredits' | 'beginTravel' | 'cancelTravel' | 'completeTravel' | 'dockAtSystem'>
+  Pick<GameStore, 'grantDebugCredits' | 'grantCombatCredits' | 'beginTravel' | 'cancelTravel' | 'completeTravel' | 'dockAtSystem'>
 > = (set, get) => ({
   /**
    * Debug-only helper used while balancing and UI-testing the economy.
@@ -38,6 +38,23 @@ export const createTravelSlice: GameSlice<
           cash: state.commander.cash + credits
         },
         ui: withUiMessage(state.ui, createUiMessage('success', 'Debug credits added', `${formatCredits(credits)} credited for debugging.`))
+      };
+    }),
+  /**
+   * Credits live combat rewards immediately so the travel HUD balance updates
+   * as soon as the player destroys an eligible ship.
+   */
+  grantCombatCredits: (amount) =>
+    set((state) => {
+      const credits = Math.max(0, Math.trunc(amount));
+      if (credits < 1) {
+        return state;
+      }
+      return {
+        commander: {
+          ...state.commander,
+          cash: state.commander.cash + credits
+        }
       };
     }),
   /**
@@ -124,6 +141,8 @@ export const createTravelSlice: GameSlice<
       // First, merge all direct commander deltas from the travel report.
       let commander = normalizeCommanderState({
         ...state.commander,
+        // Live combat rewards already hit commander cash during flight, so
+        // travel completion only needs to settle rescue-side penalties here.
         cash: state.commander.cash - insurancePenalty,
         legalValue: report?.legalValue ?? state.commander.legalValue,
         tally: state.commander.tally + (report?.tallyDelta ?? 0),

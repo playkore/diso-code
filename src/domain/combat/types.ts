@@ -213,6 +213,7 @@ export interface CombatPlayer {
   maxSpeed: number;
   fireCooldown: number;
   tallyKills: number;
+  combatReward: number;
   energyRechargePerTick: number;
   shieldRechargePerTick: number;
   rechargeTickAccumulator: number;

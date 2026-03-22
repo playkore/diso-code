@@ -4,6 +4,7 @@ import { TP_MISSION_FLAGS } from '../missions';
 import { createDefaultCommander } from '../commander';
 import { createCombatState } from './combatTestUtils';
 import { moveProjectiles } from '../combat/weapons/projectiles';
+import { getLaserProjectileProfile } from '../combat/state';
 
 describe('travel combat weapons', () => {
   it('uses documented CNT thresholds for enemy laser fire and hit gating', () => {
@@ -60,6 +61,19 @@ describe('travel combat weapons', () => {
     expect(state.projectiles).toHaveLength(3);
     expect(state.projectiles.map((projectile) => projectile.damage)).toEqual([15, 16, 10]);
     expect(state.lastPlayerArc).toBe('rear');
+  });
+
+  it('gives player lasers roughly triple the previous reach while preserving per-laser range differences', () => {
+    const pulse = getLaserProjectileProfile('pulse_laser');
+    const beam = getLaserProjectileProfile('beam_laser');
+    const mining = getLaserProjectileProfile('mining_laser');
+    const military = getLaserProjectileProfile('military_laser');
+
+    expect(pulse.speed * pulse.life).toBe(14 * 18 * 3);
+    expect(beam.speed * beam.life).toBe(16 * 22 * 3);
+    expect(mining.speed * mining.life).toBe(14 * 24 * 3);
+    expect(military.speed * military.life).toBe(18 * 26 * 3);
+    expect(new Set([pulse.speed * pulse.life, beam.speed * beam.life, mining.speed * mining.life, military.speed * military.life]).size).toBe(4);
   });
 
   it('uses ECM to clear missiles and suppresses further launches while active', () => {
@@ -302,6 +316,100 @@ describe('travel combat weapons', () => {
 
     expect(state.enemies).toHaveLength(0);
     expect(state.player.tallyKills).toBe(1);
+    expect(state.player.combatReward).toBe(0);
+  });
+
+  it('awards configured cash rewards for pirate, bounty hunter, and thargoid kills', () => {
+    const commander = createDefaultCommander();
+    commander.installedEquipment.energy_bomb = true;
+    const state = createCombatState([0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
+    state.enemies.push({
+      id: 21,
+      kind: 'ship',
+      blueprintId: 'mamba',
+      label: 'Mamba',
+      behavior: 'hostile',
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 8,
+      maxEnergy: 90,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 220,
+      laserRange: 320,
+      topSpeed: 6,
+      acceleration: 0.12,
+      turnRate: 0.055,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+    state.enemies.push({
+      id: 22,
+      kind: 'ship',
+      blueprintId: 'asp-mk2',
+      label: 'Asp Mk II',
+      behavior: 'hostile',
+      x: 110,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 8,
+      maxEnergy: 150,
+      laserPower: 5,
+      missiles: 1,
+      targetableArea: 280,
+      laserRange: 380,
+      topSpeed: 6.6,
+      acceleration: 0.12,
+      turnRate: 0.06,
+      roles: { bountyHunter: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+    state.enemies.push({
+      id: 23,
+      kind: 'ship',
+      blueprintId: 'thargoid',
+      label: 'Thargoid',
+      behavior: 'thargoid',
+      x: 120,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 8,
+      maxEnergy: 180,
+      laserPower: 4,
+      missiles: 6,
+      targetableArea: 330,
+      laserRange: 380,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.055,
+      roles: { hostile: true },
+      aggression: 58,
+      baseAggression: 58,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
+
+    expect(state.enemies).toHaveLength(0);
+    expect(state.player.tallyKills).toBe(3);
+    expect(state.player.combatReward).toBe(710);
   });
 
   it('initializes the player energy pool from commander bank data', () => {

@@ -1,9 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import { createDefaultCommander } from '../commander';
-import { assessDockingApproach, createDeterministicRandomSource, enterArrivalSpace, getStationSlotAngle, stepTravelCombat } from '../travelCombat';
+import { assessDockingApproach, createDeterministicRandomSource, enterArrivalSpace, enterStationSpace, getStationSlotAngle, stepTravelCombat } from '../travelCombat';
 import { createCombatState } from './combatTestUtils';
 
 describe('travel combat station rules', () => {
+  it('launches just outside the docking door and already moving away from the station', () => {
+    const rng = createDeterministicRandomSource([128, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0]);
+    enterStationSpace(state, rng);
+
+    expect(state.station).not.toBeNull();
+    const slotAngle = getStationSlotAngle(state.station!.angle);
+    const dx = state.player.x - state.station!.x;
+    const dy = state.player.y - state.station!.y;
+    const distance = Math.hypot(dx, dy);
+    const radialAngle = Math.atan2(dy, dx);
+    const speed = Math.hypot(state.player.vx, state.player.vy);
+    const outwardVelocity = dx * state.player.vx + dy * state.player.vy;
+
+    expect(distance).toBeCloseTo(state.station!.radius + 28);
+    expect(radialAngle).toBeCloseTo(slotAngle);
+    expect(state.player.angle).toBeCloseTo(slotAngle);
+    expect(speed).toBeCloseTo(2.4);
+    expect(outwardVelocity).toBeGreaterThan(0);
+  });
+
   it('places hyperspace arrivals well outside the station safe zone', () => {
     const rng = createDeterministicRandomSource([128, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0]);

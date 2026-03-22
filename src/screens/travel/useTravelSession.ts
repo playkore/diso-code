@@ -147,6 +147,7 @@ export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
   commander: CommanderState,
+  grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: Parameters<ReturnType<typeof import('../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
@@ -392,6 +393,7 @@ export function useTravelSession(
     let overlayMessage = '';
     let overlayTimer = 0;
     let jumpCompleted = false;
+    let creditedCombatReward = 0;
     let autoDockActive = false;
     let autoDockWaitLatched = false;
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
@@ -541,6 +543,7 @@ export function useTravelSession(
       setCombatSystemContext(combatState, { government: originSystem.government, techLevel: originSystem.techLevel, witchspace: false }, random);
       enterStationSpace(combatState, random, { message: 'CLEARED FROM STATION' });
       stars = createStars();
+      creditedCombatReward = 0;
       jumpCompleted = false;
       flightState = 'READY';
       autoDockActive = false;
@@ -686,6 +689,12 @@ export function useTravelSession(
         commander.cargo,
         random
       );
+
+      if (combatState.player.combatReward > creditedCombatReward) {
+        const newlyEarnedCredits = combatState.player.combatReward - creditedCombatReward;
+        grantCombatCredits(newlyEarnedCredits);
+        creditedCombatReward = combatState.player.combatReward;
+      }
 
       if (result.autoDocked) {
         autoDockActive = false;

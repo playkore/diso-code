@@ -105,6 +105,12 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.fuel).toBe(expectedFuel);
   });
 
+  it('credits combat rewards immediately through the travel slice helper', () => {
+    const startingCash = useGameStore.getState().commander.cash;
+    useGameStore.getState().grantCombatCredits(710);
+    expect(useGameStore.getState().commander.cash).toBe(startingCash + 710);
+  });
+
   it('persists the last docked session for refresh recovery', () => {
     useGameStore.setState((state) => ({
       ...state,

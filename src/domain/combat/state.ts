@@ -208,6 +208,9 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       maxSpeed,
       fireCooldown: 0,
       tallyKills: 0,
+      // Rewards earned during the live encounter are buffered here until the
+      // travel screen hands control back to the docked commander state.
+      combatReward: 0,
       energyRechargePerTick: getPlayerEnergyRechargePerTick(init.installedEquipment),
       shieldRechargePerTick: 1,
       rechargeTickAccumulator: 0
@@ -348,17 +351,19 @@ export function getPlayerCombatSnapshot(state: TravelCombatState) {
  * Keeping this here makes it easy to reason about the current combat balance
  * without hunting through fire-control logic.
  */
+const PLAYER_LASER_RANGE_MULTIPLIER = 3;
+
 export function getLaserProjectileProfile(laserId: LaserId) {
   switch (laserId) {
     case 'military_laser':
-      return { damage: 24, speed: 18, life: 26, cooldown: 8 };
+      return { damage: 24, speed: 18, life: 26 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 8 };
     case 'beam_laser':
-      return { damage: 16, speed: 16, life: 22, cooldown: 10 };
+      return { damage: 16, speed: 16, life: 22 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 10 };
     case 'mining_laser':
-      return { damage: 10, speed: 14, life: 24, cooldown: 14 };
+      return { damage: 10, speed: 14, life: 24 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 14 };
     case 'pulse_laser':
     default:
-      return { damage: 15, speed: 14, life: 18, cooldown: 12 };
+      return { damage: 15, speed: 14, life: 18 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 12 };
   }
 }
 

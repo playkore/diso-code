@@ -56,6 +56,7 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
       maxSpeed: 6,
       fireCooldown: 0,
       tallyKills: 0,
+      combatReward: 0,
       energyRechargePerTick: 1,
       shieldRechargePerTick: 1,
       rechargeTickAccumulator: 0

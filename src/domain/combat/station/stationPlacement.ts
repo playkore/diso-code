@@ -1,7 +1,9 @@
 import { pushMessage } from '../state';
+import { getStationSlotAngle } from './docking';
 import type { RandomSource, TravelCombatState } from '../types';
 
-const STATION_LAUNCH_DISTANCE = 240;
+const STATION_LAUNCH_CLEARANCE = 28;
+const STATION_LAUNCH_SPEED = 2.4;
 const HYPERSPACE_ARRIVAL_MIN_DISTANCE = 10_000;
 const HYPERSPACE_ARRIVAL_MAX_DISTANCE = 20_000;
 
@@ -18,11 +20,19 @@ export function enterStationSpace(
     rotSpeed: 0.005,
     safeZoneRadius: 360
   };
-  state.player.x = state.station.x;
-  state.player.y = state.station.y + STATION_LAUNCH_DISTANCE;
-  state.player.vx = 0;
-  state.player.vy = 0;
-  state.player.angle = options.playerAngle ?? -Math.PI / 2;
+  const slotAngle = getStationSlotAngle(state.station.angle);
+  const launchDistance = state.station.radius + STATION_LAUNCH_CLEARANCE;
+  const launchAngle = slotAngle;
+  // Launches start just outside the visible docking door and already drifting
+  // outward so leaving a station reads as a continuation of motion rather than
+  // a hard reset at an arbitrary point near the station.
+  state.player.x = state.station.x + Math.cos(slotAngle) * launchDistance;
+  state.player.y = state.station.y + Math.sin(slotAngle) * launchDistance;
+  state.player.vx = Math.cos(launchAngle) * STATION_LAUNCH_SPEED;
+  state.player.vy = Math.sin(launchAngle) * STATION_LAUNCH_SPEED;
+  // When no explicit orientation is requested, align the ship nose with the
+  // launch vector so the player starts pointed away from the docking door.
+  state.player.angle = options.playerAngle ?? launchAngle;
   state.enemies = state.enemies.filter((enemy) => enemy.roles.cop || enemy.missionTag);
   state.projectiles = [];
   state.encounter.safeZone = false;
