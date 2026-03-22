@@ -41,16 +41,21 @@ describe('getEnemyHealthBarState', () => {
 
   it('shows the bar and clamps the ratio for damaged enemies', () => {
     expect(getEnemyHealthBarState(createEnemy({ energy: 35 }))).toEqual({
-      ratio: 0.5,
+      bankRatios: [1, 1, 0, 0],
       fillColor: CGA_YELLOW
     });
 
     expect(getEnemyHealthBarState(createEnemy({ energy: 120 }))).toBeNull();
 
     expect(getEnemyHealthBarState(createEnemy({ energy: -10 }))).toEqual({
-      ratio: 0,
+      bankRatios: [0, 0, 0, 0],
       fillColor: CGA_RED
     });
+  });
+
+  it('splits partial energy into four Elite-style banks', () => {
+    expect(getEnemyHealthBarState(createEnemy({ energy: 52.5, maxEnergy: 70 }))?.bankRatios).toEqual([1, 1, 1, 0]);
+    expect(getEnemyHealthBarState(createEnemy({ energy: 43.75, maxEnergy: 70 }))?.bankRatios).toEqual([1, 1, 0.5, 0]);
   });
 
   it('uses CGA fill colors for high, mid, and low health', () => {
