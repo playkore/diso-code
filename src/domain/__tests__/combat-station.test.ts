@@ -36,13 +36,21 @@ describe('travel combat station rules', () => {
   });
 
   it('places hyperspace arrivals well outside the station safe zone', () => {
-    const rng = createDeterministicRandomSource([128, 0, 0, 0]);
+    const rng = createDeterministicRandomSource([128, 0, 0, 64, 32]);
     const state = createCombatState([0, 0, 0, 0]);
     state.player.angle = Math.PI / 3;
     enterArrivalSpace(state, rng);
     expect(state.station).not.toBeNull();
-    expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeGreaterThanOrEqual(10_000);
-    expect(Math.hypot(state.player.x - state.station!.x, state.player.y - state.station!.y)).toBeLessThanOrEqual(20_000);
+    const dx = state.player.x - state.station!.x;
+    const dy = state.player.y - state.station!.y;
+    const distance = Math.hypot(dx, dy);
+    const radialAngle = Math.atan2(dy, dx);
+    const expectedArrivalAngle = (32 / 255) * Math.PI * 2;
+
+    expect(distance).toBeGreaterThanOrEqual(10_000);
+    expect(distance).toBeLessThanOrEqual(20_000);
+    expect(clampAngle(radialAngle - expectedArrivalAngle)).toBeCloseTo(0);
+    expect(dy).not.toBeCloseTo(distance);
     expect(state.player.angle).toBe(Math.PI / 3);
     expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(state.player.maxSpeed);
     expect(state.encounter.safeZone).toBe(false);

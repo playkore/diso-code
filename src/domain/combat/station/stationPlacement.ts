@@ -55,7 +55,13 @@ export function enterArrivalSpace(state: TravelCombatState, random: RandomSource
   const arrivalDistance =
     HYPERSPACE_ARRIVAL_MIN_DISTANCE +
     Math.round(random.nextFloat() * (HYPERSPACE_ARRIVAL_MAX_DISTANCE - HYPERSPACE_ARRIVAL_MIN_DISTANCE));
-  state.player.y = state.station.y + arrivalDistance;
+  const arrivalAngle = random.nextFloat() * Math.PI * 2;
+  // Hyperspace keeps the ship's nose from the tunnel exit, but the ship should
+  // not always materialize on the same station radial. Sampling a fresh polar
+  // offset preserves the legacy distance band while making the station appear
+  // from any direction around the arrival point.
+  state.player.x = state.station.x + Math.cos(arrivalAngle) * arrivalDistance;
+  state.player.y = state.station.y + Math.sin(arrivalAngle) * arrivalDistance;
   state.player.vx = Math.cos(state.player.angle) * state.player.maxSpeed;
   state.player.vy = Math.sin(state.player.angle) * state.player.maxSpeed;
   state.encounter.safeZone = false;
