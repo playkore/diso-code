@@ -13,8 +13,46 @@ const GALAXY_ONE_SYSTEMS: GalaxySystem[] = generateGalaxy(0).map((system) => ({
   data: generateSystemData(system.seed)
 }));
 
+const GALAXY_WIDTH = 256;
+const GALAXY_HEIGHT = 256;
+
+/**
+ * Returns the shortest signed offset on a toroidal axis.
+ *
+ * The galaxy wraps on both axes, so moving left from x=0 enters on the far
+ * right and moving up from y=0 enters on the bottom. This helper converts two
+ * absolute chart coordinates into the shortest wrapped delta between them.
+ */
+function getWrappedAxisDelta(origin: number, target: number, size: number): number {
+  const direct = target - origin;
+  const wrappedForward = direct + size;
+  const wrappedBackward = direct - size;
+  let shortest = direct;
+
+  if (Math.abs(wrappedForward) < Math.abs(shortest)) {
+    shortest = wrappedForward;
+  }
+  if (Math.abs(wrappedBackward) < Math.abs(shortest)) {
+    shortest = wrappedBackward;
+  }
+
+  return shortest;
+}
+
+/**
+ * Computes toroidal chart offsets while preserving the original half-height Y
+ * projection used by Elite's maps.
+ */
+export function getWrappedChartDelta(origin: SystemData, target: SystemData) {
+  return {
+    dx: getWrappedAxisDelta(origin.x, target.x, GALAXY_WIDTH),
+    dy: getWrappedAxisDelta(origin.y, target.y, GALAXY_HEIGHT) / 2
+  };
+}
+
 function chartDistance(a: SystemData, b: SystemData): number {
-  return Math.hypot(a.x - b.x, (a.y - b.y) / 2);
+  const { dx, dy } = getWrappedChartDelta(a, b);
+  return Math.hypot(dx, dy);
 }
 
 export function getGalaxySystems(): GalaxySystem[] {
@@ -44,9 +82,10 @@ export function getVisibleSystems(systemName: string, chartRadiusX = 26, chartRa
     return [];
   }
 
+  // Visibility uses wrapped deltas too, so systems near the opposite edge of
+  // the torus appear on the local map once they are close across the seam.
   return GALAXY_ONE_SYSTEMS.filter((system) => {
-    const dx = system.data.x - origin.data.x;
-    const dy = (system.data.y - origin.data.y) / 2;
+    const { dx, dy } = getWrappedChartDelta(origin.data, system.data);
 
     return Math.abs(dx) <= chartRadiusX && Math.abs(dy) <= chartRadiusY;
   });

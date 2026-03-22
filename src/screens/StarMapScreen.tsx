@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getGalaxySystems, getSystemByName, getSystemDistance, getVisibleSystems } from '../domain/galaxyCatalog';
+import { getGalaxySystems, getSystemByName, getSystemDistance, getVisibleSystems, getWrappedChartDelta } from '../domain/galaxyCatalog';
 import { MAX_FUEL, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { useGameStore } from '../store/useGameStore';
 import { formatLightYears } from '../utils/distance';
@@ -26,14 +26,13 @@ type MapMode = 'local' | 'galaxy';
 function getRelativePoint(currentSystem: string, targetSystem: string, availableFuel: number): StarPoint {
   const current = getSystemByName(currentSystem)?.data;
   const target = getSystemByName(targetSystem)?.data;
-  const dx = ((target?.x ?? 0) - (current?.x ?? 0)) * MAP_SCALE;
-  const dy = ((((target?.y ?? 0) - (current?.y ?? 0)) / 2)) * MAP_SCALE;
+  const { dx, dy } = current && target ? getWrappedChartDelta(current, target) : { dx: 0, dy: 0 };
   const distance = getSystemDistance(currentSystem, targetSystem);
 
   return {
     name: targetSystem,
-    x: dx,
-    y: dy,
+    x: dx * MAP_SCALE,
+    y: dy * MAP_SCALE,
     isCurrent: currentSystem === targetSystem,
     inRange: getJumpFuelUnits(distance) <= getFuelUnits(availableFuel)
   };
