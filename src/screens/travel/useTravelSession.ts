@@ -395,6 +395,8 @@ export function useTravelSession(
     let overlayTimer = 0;
     let jumpCompleted = false;
     let autoDockActive = false;
+    let autoDockWaitLatched = false;
+    const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
       setAutoDockState({
@@ -545,6 +547,7 @@ export function useTravelSession(
       jumpCompleted = false;
       flightState = 'READY';
       autoDockActive = false;
+      autoDockWaitLatched = false;
       showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
       updateHud();
       resetInput();
@@ -600,10 +603,12 @@ export function useTravelSession(
       const manualSteeringRequested = Math.abs(liveInput.turn) > 0.08 || liveInput.thrust > 0.08;
       if (autoDockActive && manualSteeringRequested) {
         autoDockActive = false;
+        autoDockWaitLatched = false;
         showMessage('AUTO-DOCK CANCELLED', 900);
       }
       if (autoDockActive && (!canAutoDock(combatState) || flightState === 'HYPERSPACE' || flightState === 'JUMPING')) {
         autoDockActive = false;
+        autoDockWaitLatched = false;
         showMessage('AUTO-DOCK CANCELLED', 900);
       }
 
@@ -616,6 +621,7 @@ export function useTravelSession(
 
       if (liveInput.autoDock && autoDockRef.current.enabled && !autoDockActive && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
         autoDockActive = true;
+        autoDockWaitLatched = false;
         showMessage('AUTO-DOCK ENGAGED', 900);
       }
 
@@ -639,7 +645,30 @@ export function useTravelSession(
         }
       }
 
-      const autoDockCommand = autoDockActive && combatState.station ? getAutoDockCommand(combatState.station, combatState.player) : null;
+      let autoDockCommand = autoDockActive && combatState.station ? getAutoDockCommand(combatState.station, combatState.player) : null;
+      if (autoDockCommand?.mode === 'wait') {
+        autoDockWaitLatched = true;
+      } else if (
+        autoDockWaitLatched &&
+        autoDockCommand &&
+        !autoDockCommand.debug.doorInFront &&
+        Math.abs(autoDockCommand.debug.stageRadiusError) <= AUTO_DOCK_WAIT_RELEASE_DISTANCE
+      ) {
+        // Once the ship has parked at the wall, keep it in wait mode until the
+        // door arrives instead of bouncing back into approach on tiny drift.
+        autoDockCommand = {
+          ...autoDockCommand,
+          mode: 'wait',
+          thrust: 0
+        };
+      } else if (
+        autoDockWaitLatched &&
+        autoDockCommand &&
+        Math.abs(autoDockCommand.debug.stageRadiusError) > AUTO_DOCK_WAIT_RELEASE_DISTANCE
+      ) {
+        autoDockWaitLatched = false;
+      }
+
       if (autoDockActive && autoDockCommand && combatState.station) {
         // Console tracing is intentionally left in place for live debugging of
         // the docking computer's state machine and slot-angle expectations.
@@ -685,6 +714,7 @@ export function useTravelSession(
 
       if (result.autoDocked) {
         autoDockActive = false;
+        autoDockWaitLatched = false;
         completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
         return;
       }
@@ -732,10 +762,12 @@ export function useTravelSession(
             combatState.player.vx *= -1.5;
             combatState.player.vy *= -1.5;
             autoDockActive = false;
+            autoDockWaitLatched = false;
             showMessage('COLLISION WARNING', 1000);
           } else if (docking.isInDockingGap && docking.distance < combatState.station.radius - 18) {
             if (docking.canDock) {
               autoDockActive = false;
+              autoDockWaitLatched = false;
               completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
               return;
             }
@@ -748,6 +780,7 @@ export function useTravelSession(
 
       if (result.playerDestroyed) {
         autoDockActive = false;
+        autoDockWaitLatched = false;
         flightState = 'GAMEOVER';
         showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
       }

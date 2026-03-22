@@ -48,7 +48,6 @@ const AUTO_DOCK_WAIT_ENTRY_SPEED = 0.6;
 const AUTO_DOCK_WAIT_ENTRY_BAND = 10;
 const AUTO_DOCK_STOPPING_FACTOR = 70;
 const AUTO_DOCK_STOPPING_BUFFER = 8;
-const AUTO_DOCK_CENTERING_THRUST = 0.35;
 const AUTO_DOCK_SLOT_LEAD_FRAMES = 10;
 
 function clampUnit(value: number) {
@@ -85,7 +84,7 @@ export function getAutoDockCommand(station: CombatStation, player: Pick<CombatPl
     (Math.abs(slotOffset) <= AUTO_DOCK_DOCK_WINDOW && Math.abs(noseAlignment) <= AUTO_DOCK_DOCK_WINDOW) ||
     (Math.abs(projectedSlotOffset) <= AUTO_DOCK_DOCK_WINDOW && Math.abs(projectedNoseAlignment) <= AUTO_DOCK_DOCK_WINDOW);
 
-  if ((onStageRing || withinWaitBand) && readyToWait && doorInFront) {
+  if ((onStageRing || withinWaitBand) && doorInFront) {
     return {
       turn: getTargetTurn(player.angle, inwardAngle),
       thrust: Math.max(0, radialSpeed) < AUTO_DOCK_INWARD_SPEED ? 1 : 0,
@@ -113,9 +112,10 @@ export function getAutoDockCommand(station: CombatStation, player: Pick<CombatPl
   if ((onStageRing && readyToWait) || canEnterWait) {
     return {
       // While waiting, keep the bow pointed at the center and only correct
-      // radial drift. No tangential chase is allowed in this phase.
+      // attitude. The ship must not thrust in this phase or it will creep away
+      // from the wall and miss the door timing again.
       turn: getTargetTurn(player.angle, inwardAngle),
-      thrust: distanceFromStation > stageRadius + AUTO_DOCK_STAGE_RADIUS_PADDING ? AUTO_DOCK_CENTERING_THRUST : 0,
+      thrust: 0,
       mode: 'wait',
       debug: {
         currentSlotAngle: slotAngle,
