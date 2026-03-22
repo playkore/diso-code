@@ -293,7 +293,7 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.laserHeat).toBe(10);
+    expect(state.player.laserHeat).toBe(6);
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 60, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.player.laserHeat).toBe(0);

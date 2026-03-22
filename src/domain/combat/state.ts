@@ -344,18 +344,20 @@ export function getLaserEnergyCost(laserId: LaserId) {
 /**
  * Heat is tracked as one shared weapon temperature. Each firing batch raises
  * that meter, even when multiple mounts are installed, and the meter cools
- * continuously while the ship is not adding more heat.
+ * continuously while the ship is not adding more heat. Pricier lasers are
+ * deliberately more heat-efficient so upgrades feel like real combat hardware,
+ * not just bigger damage spikes with faster lockouts.
  */
 export function getLaserHeatPerShot(laserId: LaserId) {
   switch (laserId) {
     case 'military_laser':
-      return 12;
+      return 4;
     case 'beam_laser':
-      return 10;
+      return 6;
     case 'mining_laser':
-      return 16;
+      return 7;
     case 'pulse_laser':
     default:
-      return 6;
+      return 8;
   }
 }
