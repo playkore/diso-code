@@ -669,28 +669,6 @@ export function useTravelSession(
         autoDockWaitLatched = false;
       }
 
-      if (autoDockActive && autoDockCommand && combatState.station) {
-        // Console tracing is intentionally left in place for live debugging of
-        // the docking computer's state machine and slot-angle expectations.
-        console.log('[auto-dock]', {
-          state: autoDockCommand.mode,
-          rotationAngle: autoDockCommand.debug.currentSlotAngle,
-          expectedRotationAngle: autoDockCommand.debug.expectedSlotAngle,
-          playerRadialAngle: autoDockCommand.debug.playerRadialAngle,
-          slotOffset: autoDockCommand.debug.slotOffset,
-          projectedSlotOffset: autoDockCommand.debug.projectedSlotOffset,
-          onStageRing: autoDockCommand.debug.onStageRing,
-          withinWaitBand: autoDockCommand.debug.withinWaitBand,
-          readyToWait: autoDockCommand.debug.readyToWait,
-          canEnterWait: autoDockCommand.debug.canEnterWait,
-          doorInFront: autoDockCommand.debug.doorInFront,
-          distanceFromStation: autoDockCommand.debug.distanceFromStation,
-          stageRadius: autoDockCommand.debug.stageRadius,
-          stageRadiusError: autoDockCommand.debug.stageRadiusError,
-          radialSpeed: autoDockCommand.debug.radialSpeed,
-          tangentialSpeed: autoDockCommand.debug.tangentialSpeed
-        });
-      }
       const result = stepTravelCombat(
         combatState,
         {

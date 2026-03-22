@@ -53,8 +53,8 @@ describe('travel combat station rules', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);
     const player = {
-      x: Math.cos(slotAngle) * 81,
-      y: Math.sin(slotAngle) * 81,
+      x: Math.cos(slotAngle) * 85,
+      y: Math.sin(slotAngle) * 85,
       vx: 0.3,
       vy: 0.3,
       angle: slotAngle + Math.PI

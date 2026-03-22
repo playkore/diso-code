@@ -31,7 +31,9 @@ export function assessDockingApproach(
   const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
   const isInDockingGap = distance < station.radius + 6 && isInsideSlot;
   const collidesWithHull = distance < station.radius - 5 && !isInDockingGap;
-  const canDock = distance < station.radius + 2 && isInDockingGap && isFacingHangar && speed < 3.6;
+  // Touching the visible doorway is enough to count as docked; asking the
+  // player to travel deeper into the station model feels wrong on screen.
+  const canDock = isInDockingGap && isFacingHangar;
 
   return {
     slotAngle,
