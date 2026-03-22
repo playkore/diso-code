@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { createDefaultCommander } from '../domain/commander';
-import { createInitialGameState, loadInstantTravelEnabled, loadPersistedSaveStates, persistInstantTravelEnabled } from './gameStateFactory';
+import {
+  createInitialGameState,
+  loadInstantTravelEnabled,
+  loadPersistedSaveStates,
+  loadTravelPerfOverlayEnabled,
+  persistInstantTravelEnabled,
+  persistTravelPerfOverlayEnabled
+} from './gameStateFactory';
 import { createMissionSlice } from './slices/missionSlice';
 import { createOutfittingSlice } from './slices/outfittingSlice';
 import { createSaveLoadSlice } from './slices/saveLoadSlice';
@@ -40,6 +47,7 @@ export const useGameStore = create<GameStore>((set, get, api) => {
   const initialState = createInitialGameState(initialCommander);
   const persistedSaveStates = loadPersistedSaveStates();
   const instantTravelEnabled = loadInstantTravelEnabled();
+  const showTravelPerfOverlay = loadTravelPerfOverlayEnabled();
 
   return {
     // Base state for a fresh session before any user actions occur.
@@ -53,6 +61,7 @@ export const useGameStore = create<GameStore>((set, get, api) => {
       activeTab: 'market',
       compactMode: true,
       instantTravelEnabled,
+      showTravelPerfOverlay,
       activityLog: []
     },
 
@@ -69,6 +78,20 @@ export const useGameStore = create<GameStore>((set, get, api) => {
               'info',
               enabled ? 'Instant travel enabled' : 'Space travel enabled',
               enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
+            )
+          )
+        };
+      }),
+    setShowTravelPerfOverlay: (enabled) =>
+      set((state) => {
+        persistTravelPerfOverlayEnabled(enabled);
+        return {
+          ui: withUiMessage(
+            { ...state.ui, showTravelPerfOverlay: enabled },
+            createUiMessage(
+              'info',
+              enabled ? 'Travel perf overlay enabled' : 'Travel perf overlay disabled',
+              enabled ? 'Space flight now shows a live frame and React commit overlay.' : 'Space flight hides the live performance overlay.'
             )
           )
         };

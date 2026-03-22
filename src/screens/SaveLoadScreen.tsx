@@ -11,7 +11,9 @@ export function SaveLoadScreen() {
   const loadFromSlot = useGameStore((state) => state.loadFromSlot);
   const startNewGame = useGameStore((state) => state.startNewGame);
   const instantTravelEnabled = useGameStore((state) => state.ui.instantTravelEnabled);
+  const showTravelPerfOverlay = useGameStore((state) => state.ui.showTravelPerfOverlay);
   const setInstantTravelEnabled = useGameStore((state) => state.setInstantTravelEnabled);
+  const setShowTravelPerfOverlay = useGameStore((state) => state.setShowTravelPerfOverlay);
   const grantDebugCredits = useGameStore((state) => state.grantDebugCredits);
   const saveStates = useGameStore((state) => state.saveStates);
   const commander = useGameStore((state) => state.commander);
@@ -168,6 +170,15 @@ export function SaveLoadScreen() {
           </button>
         </div>
         <p className="muted">Debug helper for quickly funding outfitting and trading tests.</p>
+        <label className="settings-toggle">
+          <input
+            type="checkbox"
+            checked={showTravelPerfOverlay}
+            onChange={(event) => setShowTravelPerfOverlay(event.target.checked)}
+          />
+          <span>Show space flight performance overlay</span>
+        </label>
+        <p className="muted">Adds a live readout for frame timing, React commits, and main-thread stalls while travelling.</p>
       </section>
     </section>
   );

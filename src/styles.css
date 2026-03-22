@@ -591,6 +591,27 @@ button:disabled {
   white-space: pre-line;
 }
 
+.travel-screen__perf {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: grid;
+  gap: 0.18rem;
+  min-width: 14.5rem;
+  padding: 0.45rem 0.55rem;
+  border: 2px solid var(--cga-red);
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.travel-screen__perf-title {
+  color: var(--cga-red);
+  font-weight: 700;
+}
+
 .travel-screen__controls {
   position: absolute;
   inset: 0;
@@ -702,7 +723,7 @@ button:disabled {
 
 .travel-screen__help {
   position: absolute;
-  top: 0.9rem;
+  top: 10rem;
   right: 0.9rem;
   text-align: right;
   font-size: 0.76rem;

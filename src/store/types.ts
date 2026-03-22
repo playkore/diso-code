@@ -40,6 +40,7 @@ export interface UiState {
   activeTab: AppTab;
   compactMode: boolean;
   instantTravelEnabled: boolean;
+  showTravelPerfOverlay: boolean;
   latestEvent?: UiMessage;
   activityLog: UiMessage[];
 }

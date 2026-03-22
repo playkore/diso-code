@@ -35,6 +35,11 @@ export const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
 export const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
 export const SETTINGS_STORAGE_KEY = 'diso-code:settings';
 
+interface PersistedSettings {
+  instantTravelEnabled?: boolean;
+  showTravelPerfOverlay?: boolean;
+}
+
 /**
  * Creates a docked market state for a given system. The market session holds
  * raw market mechanics, while `items` is the precomputed UI-facing projection.
@@ -287,7 +292,7 @@ export function loadInstantTravelEnabled(): boolean {
     if (!raw) {
       return false;
     }
-    const parsed = JSON.parse(raw) as { instantTravelEnabled?: boolean };
+    const parsed = JSON.parse(raw) as PersistedSettings;
     return parsed.instantTravelEnabled === true;
   } catch {
     return false;
@@ -298,10 +303,51 @@ export function loadInstantTravelEnabled(): boolean {
  * Persists the instant-travel preference.
  */
 export function persistInstantTravelEnabled(enabled: boolean) {
+  persistSettings({ instantTravelEnabled: enabled });
+}
+
+/**
+ * Reads the travel-performance overlay preference from local storage.
+ */
+export function loadTravelPerfOverlayEnabled(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return false;
+  }
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return false;
+    }
+    const parsed = JSON.parse(raw) as PersistedSettings;
+    return parsed.showTravelPerfOverlay === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Persists the travel-performance overlay preference.
+ */
+export function persistTravelPerfOverlayEnabled(enabled: boolean) {
+  persistSettings({ showTravelPerfOverlay: enabled });
+}
+
+/**
+ * Settings share one storage key so multiple toggles can evolve together
+ * without each writer accidentally erasing the others.
+ */
+function persistSettings(partial: PersistedSettings) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }
-  window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ instantTravelEnabled: enabled }));
+  let current: PersistedSettings = {};
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    current = raw ? (JSON.parse(raw) as PersistedSettings) : {};
+  } catch {
+    current = {};
+  }
+  window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ ...current, ...partial }));
 }
 
 /**

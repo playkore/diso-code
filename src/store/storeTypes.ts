@@ -75,6 +75,7 @@ export interface GameStore {
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
+  setShowTravelPerfOverlay: (enabled: boolean) => void;
   grantDebugCredits: (amount: number) => void;
   beginTravel: (systemName: string) => boolean;
   cancelTravel: () => void;

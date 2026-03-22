@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getSystemByName } from '../../domain/galaxyCatalog';
 import { applyLegalFloor, type CommanderState } from '../../domain/commander';
 import {
@@ -22,6 +22,7 @@ import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { createStars } from './renderers/starsRenderer';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
+import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -56,6 +57,70 @@ interface TravelRefs {
   viewportRef: RefObject<HTMLDivElement | null>;
 }
 
+const PERF_REPORT_INTERVAL_MS = 500;
+const PERF_SAMPLE_CAP = 120;
+const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
+  fps: 0,
+  frameAvgMs: 0,
+  frameP95Ms: 0,
+  frameMaxMs: 0,
+  workAvgMs: 0,
+  workP95Ms: 0,
+  workMaxMs: 0,
+  reactCommitsPerSecond: 0,
+  reactAvgMs: 0,
+  reactMaxMs: 0,
+  longTaskCount: 0,
+  longTaskMaxMs: 0
+};
+
+interface PerfAccumulator {
+  windowStart: number;
+  frameDeltas: number[];
+  workDurations: number[];
+  reactCommitCount: number;
+  reactCommitTotalMs: number;
+  reactCommitMaxMs: number;
+  longTaskCount: number;
+  longTaskMaxMs: number;
+}
+
+function pushPerfSample(samples: number[], value: number) {
+  samples.push(value);
+  if (samples.length > PERF_SAMPLE_CAP) {
+    samples.shift();
+  }
+}
+
+function average(samples: number[]) {
+  return samples.length === 0 ? 0 : samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
+}
+
+function max(samples: number[]) {
+  return samples.length === 0 ? 0 : Math.max(...samples);
+}
+
+function percentile95(samples: number[]) {
+  if (samples.length === 0) {
+    return 0;
+  }
+  const sorted = [...samples].sort((left, right) => left - right);
+  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
+}
+
+function createPerfAccumulator(now: number): PerfAccumulator {
+  return {
+    windowStart: now,
+    frameDeltas: [],
+    workDurations: [],
+    reactCommitCount: 0,
+    reactCommitTotalMs: 0,
+    reactCommitMaxMs: 0,
+    longTaskCount: 0,
+    longTaskMaxMs: 0
+  };
+}
+
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
@@ -66,9 +131,11 @@ export function useTravelSession(
   const [hud, setHud] = useState(INITIAL_HUD);
   const [message, setMessage] = useState('');
   const [hyperspaceHidden, setHyperspaceHidden] = useState(false);
+  const [perf, setPerf] = useState(EMPTY_PERF_SNAPSHOT);
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
+  const perfRef = useRef<PerfAccumulator>(createPerfAccumulator(typeof performance === 'undefined' ? 0 : performance.now()));
   const {
     inputRef,
     keysRef,
@@ -122,6 +189,73 @@ export function useTravelSession(
     hyperspaceHiddenRef.current = next;
     setHyperspaceHidden(next);
   };
+
+  const publishPerfSnapshot = useCallback((now: number) => {
+    const accumulator = perfRef.current;
+    const elapsedMs = Math.max(1, now - accumulator.windowStart);
+    const nextPerf: TravelPerfSnapshot = {
+      fps: accumulator.frameDeltas.length * (1000 / elapsedMs),
+      frameAvgMs: average(accumulator.frameDeltas),
+      frameP95Ms: percentile95(accumulator.frameDeltas),
+      frameMaxMs: max(accumulator.frameDeltas),
+      workAvgMs: average(accumulator.workDurations),
+      workP95Ms: percentile95(accumulator.workDurations),
+      workMaxMs: max(accumulator.workDurations),
+      reactCommitsPerSecond: accumulator.reactCommitCount * (1000 / elapsedMs),
+      reactAvgMs: accumulator.reactCommitCount === 0 ? 0 : accumulator.reactCommitTotalMs / accumulator.reactCommitCount,
+      reactMaxMs: accumulator.reactCommitMaxMs,
+      longTaskCount: accumulator.longTaskCount,
+      longTaskMaxMs: accumulator.longTaskMaxMs
+    };
+    setPerf((previous) => {
+      if (
+        previous.fps === nextPerf.fps &&
+        previous.frameAvgMs === nextPerf.frameAvgMs &&
+        previous.frameP95Ms === nextPerf.frameP95Ms &&
+        previous.frameMaxMs === nextPerf.frameMaxMs &&
+        previous.workAvgMs === nextPerf.workAvgMs &&
+        previous.workP95Ms === nextPerf.workP95Ms &&
+        previous.workMaxMs === nextPerf.workMaxMs &&
+        previous.reactCommitsPerSecond === nextPerf.reactCommitsPerSecond &&
+        previous.reactAvgMs === nextPerf.reactAvgMs &&
+        previous.reactMaxMs === nextPerf.reactMaxMs &&
+        previous.longTaskCount === nextPerf.longTaskCount &&
+        previous.longTaskMaxMs === nextPerf.longTaskMaxMs
+      ) {
+        return previous;
+      }
+      return nextPerf;
+    });
+    perfRef.current = createPerfAccumulator(now);
+  }, []);
+
+  const recordReactCommit = useCallback((actualDuration: number) => {
+    const accumulator = perfRef.current;
+    accumulator.reactCommitCount += 1;
+    accumulator.reactCommitTotalMs += actualDuration;
+    accumulator.reactCommitMaxMs = Math.max(accumulator.reactCommitMaxMs, actualDuration);
+  }, []);
+
+  useEffect(() => {
+    // Long-task entries capture unrelated main-thread stalls as well, which is
+    // useful because a dropped frame can come from work outside the travel loop.
+    if (typeof PerformanceObserver === 'undefined') {
+      return undefined;
+    }
+    const supportedEntryTypes = PerformanceObserver.supportedEntryTypes ?? [];
+    if (!supportedEntryTypes.includes('longtask')) {
+      return undefined;
+    }
+    const observer = new PerformanceObserver((list) => {
+      const accumulator = perfRef.current;
+      for (const entry of list.getEntries()) {
+        accumulator.longTaskCount += 1;
+        accumulator.longTaskMaxMs = Math.max(accumulator.longTaskMaxMs, entry.duration);
+      }
+    });
+    observer.observe({ entryTypes: ['longtask'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!session) {
@@ -311,6 +445,9 @@ export function useTravelSession(
       const deltaMs = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
       lastTimestamp = timestamp;
       const dt = Math.min(deltaMs, 32) / 16.6667;
+      const workStart = performance.now();
+      const perfAccumulator = perfRef.current;
+      pushPerfSample(perfAccumulator.frameDeltas, deltaMs);
       const liveInput = inputRef.current;
       const keys = keysRef.current;
 
@@ -319,6 +456,10 @@ export function useTravelSession(
           resetPrototype();
         }
         renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem);
+        pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+        if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+          publishPerfSnapshot(timestamp);
+        }
         animationFrameId = window.requestAnimationFrame(loop);
         return;
       }
@@ -504,10 +645,16 @@ export function useTravelSession(
 
       updateHud();
       renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem);
+      pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+      if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+        publishPerfSnapshot(timestamp);
+      }
       animationFrameId = window.requestAnimationFrame(loop);
     };
 
     resetPrototype();
+    perfRef.current = createPerfAccumulator(performance.now());
+    setPerf(EMPTY_PERF_SNAPSHOT);
     animationFrameId = window.requestAnimationFrame(loop);
     return () => {
       // Pointer/keyboard state is cleared on teardown so a route change cannot
@@ -522,6 +669,8 @@ export function useTravelSession(
     hud,
     message,
     hyperspaceHidden,
+    perf,
+    recordReactCommit,
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
