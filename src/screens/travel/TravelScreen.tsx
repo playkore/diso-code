@@ -31,6 +31,8 @@ export function TravelScreen() {
     </span>
   ));
   const mountLabels: Record<LaserMountPosition, string> = { front: 'F', rear: 'A', left: 'L', right: 'R' };
+  // Heat reserves a fixed slot for each mount so the row does not jump around
+  // between ships, but empty hardpoints stay visually hidden.
   const laserHeat = travel.hud.laserHeat.map((entry) => (
     <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
       <span className="travel-screen__hud-heat-label">{mountLabels[entry.mount as LaserMountPosition]}</span>

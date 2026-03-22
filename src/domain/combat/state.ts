@@ -98,10 +98,11 @@ export function createDeterministicRandomSource(bytes: number[]): RandomSource {
 
 /**
  * Placeholder for future speed tuning by ship/loadout. The current prototype
- * keeps player max speed fixed, but the hook remains explicit.
+ * keeps the player Cobra Mk III aligned with the pirate Cobra Mk III so the
+ * player cannot simply outrun the common hostile baseline.
  */
 function getPlayerMaxSpeed(_laserMounts: TravelCombatInit['laserMounts']): number {
-  return 8;
+  return 6;
 }
 
 /**
