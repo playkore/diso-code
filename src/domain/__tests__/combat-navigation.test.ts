@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getVisibleRadarContacts, isMassNearby, isPlayerInStationSafeZone, MASS_LOCK_DISTANCE, RADAR_SHIP_RANGE, stepTravelCombat } from '../travelCombat';
-import { createCombatState } from './combatTestUtils';
+import { createCombatState, createTestEnemy } from './combatTestUtils';
 
 describe('travel combat navigation rules', () => {
   it('treats nearby ships and stations as mass lock sources for local jump', () => {
@@ -12,33 +12,11 @@ describe('travel combat navigation rules', () => {
 
     state.station = null;
     state.player.x = 0;
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 2,
-      kind: 'ship',
-      blueprintId: 'sidewinder',
-      label: 'Sidewinder',
-      behavior: 'hostile',
       x: 300,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
-      energy: 70,
-      maxEnergy: 70,
-      laserPower: 2,
-      missiles: 0,
-      targetableArea: 210,
-      laserRange: 290,
-      topSpeed: 6,
-      acceleration: 0.11,
-      turnRate: 0.05,
-      roles: { hostile: true },
-      aggression: 42,
-      baseAggression: 42,
-      fireCooldown: 999,
-      missileCooldown: 999,
-      isFiringLaser: false
-    });
+      roles: { hostile: true }
+    }));
     expect(isMassNearby(state, MASS_LOCK_DISTANCE)).toBe(true);
   });
 
@@ -61,60 +39,20 @@ describe('travel combat navigation rules', () => {
   it('limits radar ship contacts to the configured range', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.enemies.push(
-      {
+      createTestEnemy({
         id: 1,
-        kind: 'ship',
-        blueprintId: 'sidewinder',
         label: 'Near',
-        behavior: 'hostile',
         x: RADAR_SHIP_RANGE - 1,
-        y: 0,
-        vx: 0,
-        vy: 0,
         angle: 0,
-        energy: 70,
-        maxEnergy: 70,
-        laserPower: 2,
-        missiles: 0,
-        targetableArea: 210,
-        laserRange: 290,
-        topSpeed: 6,
-        acceleration: 0.11,
-        turnRate: 0.05,
-        roles: { hostile: true },
-        aggression: 42,
-        baseAggression: 42,
-        fireCooldown: 999,
-        missileCooldown: 999,
-        isFiringLaser: false
-      },
-      {
+        roles: { hostile: true }
+      }),
+      createTestEnemy({
         id: 2,
-        kind: 'ship',
-        blueprintId: 'sidewinder',
         label: 'Far',
-        behavior: 'hostile',
         x: RADAR_SHIP_RANGE + 1,
-        y: 0,
-        vx: 0,
-        vy: 0,
         angle: 0,
-        energy: 70,
-        maxEnergy: 70,
-        laserPower: 2,
-        missiles: 0,
-        targetableArea: 210,
-        laserRange: 290,
-        topSpeed: 6,
-        acceleration: 0.11,
-        turnRate: 0.05,
-        roles: { hostile: true },
-        aggression: 42,
-        baseAggression: 42,
-        fireCooldown: 999,
-        missileCooldown: 999,
-        isFiringLaser: false
-      }
+        roles: { hostile: true }
+      })
     );
 
     expect(getVisibleRadarContacts(state, RADAR_SHIP_RANGE).map((enemy) => enemy.id)).toEqual([1]);
@@ -125,33 +63,13 @@ describe('travel combat navigation rules', () => {
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 100;
     state.player.y = 0;
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 3,
-      kind: 'ship',
-      blueprintId: 'sidewinder',
       label: 'Nearby ship',
-      behavior: 'hostile',
       x: 200,
-      y: 0,
-      vx: 0,
-      vy: 0,
       angle: 0,
-      energy: 70,
-      maxEnergy: 70,
-      laserPower: 2,
-      missiles: 0,
-      targetableArea: 210,
-      laserRange: 290,
-      topSpeed: 6,
-      acceleration: 0.11,
-      turnRate: 0.05,
-      roles: { hostile: true },
-      aggression: 42,
-      baseAggression: 42,
-      fireCooldown: 999,
-      missileCooldown: 999,
-      isFiringLaser: false
-    });
+      roles: { hostile: true }
+    }));
     expect(isPlayerInStationSafeZone(state)).toBe(true);
 
     state.player.x = 500;

@@ -31,6 +31,9 @@ function createEnemy(overrides: Partial<CombatEnemy> = {}): CombatEnemy {
     fireCooldown: 0,
     missileCooldown: 0,
     isFiringLaser: false,
+    // Renderer tests use hand-built enemies, so keep runtime bookkeeping fields
+    // initialized here to match the live combat shape.
+    lifetime: 0,
     ...overrides
   };
 }

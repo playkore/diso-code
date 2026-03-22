@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createDeterministicRandomSource, stepTravelCombat } from '../travelCombat';
-import { createCombatState } from './combatTestUtils';
+import { createCombatState, createTestEnemy } from './combatTestUtils';
 
 describe('travel combat civilian AI', () => {
   it('routes station traffic into the docking slot instead of orbiting the player', () => {
@@ -11,9 +11,8 @@ describe('travel combat civilian AI', () => {
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 220;
     state.player.y = 250;
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 10,
-      kind: 'ship',
       blueprintId: 'cobra-mk3-trader',
       label: 'Cobra Trader',
       behavior: 'stationTraffic',
@@ -37,7 +36,7 @@ describe('travel combat civilian AI', () => {
       fireCooldown: 999,
       missileCooldown: 999,
       isFiringLaser: false
-    });
+    }));
     for (let index = 0; index < 1000 && state.enemies.length > 0; index += 1) {
       stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 4, 'JUMPING', {}, rng);
     }

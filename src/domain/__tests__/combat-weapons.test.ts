@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt, consumeEscapePod, createDeterministicRandomSource, getPlayerCombatSnapshot, stepTravelCombat } from '../travelCombat';
 import { TP_MISSION_FLAGS } from '../missions';
 import { createDefaultCommander } from '../commander';
-import { createCombatState } from './combatTestUtils';
+import { createCombatState, createTestEnemy } from './combatTestUtils';
 import { moveProjectiles } from '../combat/weapons/projectiles';
 import { getLaserProjectileProfile } from '../combat/state';
 
@@ -17,17 +17,12 @@ describe('travel combat weapons', () => {
   it('spawns thargons instead of missiles for thargoids', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed });
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 5,
-      kind: 'ship',
       blueprintId: 'thargoid',
       label: 'Thargoid',
       behavior: 'thargoid',
       x: 100,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 180,
       maxEnergy: 180,
       laserPower: 4,
@@ -44,7 +39,7 @@ describe('travel combat weapons', () => {
       missileCooldown: 0,
       isFiringLaser: false,
       missionTag: 'thargoid-plans'
-    });
+    }));
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.kind === 'thargon')).toBe(true);
     expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
@@ -83,17 +78,11 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
     state.projectiles.push({ id: 5, kind: 'missile', owner: 'enemy', x: 20, y: 0, vx: 0, vy: 0, damage: 22, life: 20 });
     state.projectiles.push({ id: 6, kind: 'missile', owner: 'enemy', x: 500, y: 0, vx: 0, vy: 0, damage: 22, life: 20 });
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 9,
-      kind: 'ship',
       blueprintId: 'mamba',
       label: 'Mamba',
-      behavior: 'hostile',
       x: 100,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 90,
       maxEnergy: 90,
       laserPower: 2,
@@ -109,7 +98,7 @@ describe('travel combat weapons', () => {
       fireCooldown: 999,
       missileCooldown: 0,
       isFiringLaser: false
-    });
+    }));
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, activateEcm: true }, 1, 'PLAYING', {}, rng);
     expect(state.projectiles).toEqual([
       expect.objectContaining({ id: 6, kind: 'missile', owner: 'enemy' })
@@ -137,44 +126,16 @@ describe('travel combat weapons', () => {
     const commander = createDefaultCommander();
     commander.installedEquipment.energy_bomb = true;
     const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 3,
-      kind: 'ship',
-      blueprintId: 'sidewinder',
-      label: 'Sidewinder',
-      behavior: 'hostile',
       x: 100,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
-      energy: 70,
-      maxEnergy: 70,
-      laserPower: 2,
-      missiles: 0,
-      targetableArea: 210,
-      laserRange: 290,
-      topSpeed: 6,
-      acceleration: 0.11,
-      turnRate: 0.05,
-      roles: { hostile: true },
-      aggression: 42,
-      baseAggression: 42,
-      fireCooldown: 999,
-      missileCooldown: 999,
-      isFiringLaser: false
-    });
-    state.enemies.push({
+      roles: { hostile: true }
+    }));
+    state.enemies.push(createTestEnemy({
       id: 4,
-      kind: 'ship',
       blueprintId: 'constrictor',
       label: 'Constrictor',
-      behavior: 'hostile',
       x: 110,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 220,
       maxEnergy: 220,
       laserPower: 5,
@@ -191,18 +152,12 @@ describe('travel combat weapons', () => {
       missileCooldown: 999,
       isFiringLaser: false,
       missionTag: 'constrictor'
-    });
-    state.enemies.push({
+    }));
+    state.enemies.push(createTestEnemy({
       id: 5,
-      kind: 'ship',
       blueprintId: 'mamba',
       label: 'Mamba',
-      behavior: 'hostile',
       x: 590,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 90,
       maxEnergy: 90,
       laserPower: 3,
@@ -218,34 +173,22 @@ describe('travel combat weapons', () => {
       fireCooldown: 999,
       missileCooldown: 999,
       isFiringLaser: false
-    });
-    state.enemies.push({
+    }));
+    state.enemies.push(createTestEnemy({
       id: 6,
-      kind: 'ship',
       blueprintId: 'adder',
       label: 'Adder',
-      behavior: 'hostile',
       x: 610,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 85,
       maxEnergy: 85,
       laserPower: 2,
-      missiles: 0,
-      targetableArea: 210,
-      laserRange: 290,
-      topSpeed: 6,
-      acceleration: 0.11,
-      turnRate: 0.05,
       roles: { hostile: true },
       aggression: 38,
       baseAggression: 38,
       fireCooldown: 999,
       missileCooldown: 999,
       isFiringLaser: false
-    });
+    }));
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, rng);
     expect(state.playerLoadout.installedEquipment.energy_bomb).toBe(false);
     expect(state.encounter.bombEffectTimer).toBeGreaterThan(0);
@@ -273,33 +216,14 @@ describe('travel combat weapons', () => {
 
   it('destroys enemies when a player projectile depletes their remaining energy', () => {
     const state = createCombatState([0, 0, 0, 0]);
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 11,
-      kind: 'ship',
-      blueprintId: 'sidewinder',
-      label: 'Sidewinder',
-      behavior: 'hostile',
       x: 10,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 8,
-      maxEnergy: 70,
-      laserPower: 2,
-      missiles: 0,
-      targetableArea: 210,
-      laserRange: 290,
       topSpeed: 6.2,
-      acceleration: 0.11,
-      turnRate: 0.05,
       roles: { hostile: true, pirate: true },
-      aggression: 42,
-      baseAggression: 42,
-      fireCooldown: 999,
-      missileCooldown: 999,
       isFiringLaser: false
-    });
+    }));
     state.projectiles.push({
       id: 12,
       kind: 'laser',
@@ -323,44 +247,21 @@ describe('travel combat weapons', () => {
     const commander = createDefaultCommander();
     commander.installedEquipment.energy_bomb = true;
     const state = createCombatState([0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
-    state.enemies.push({
+    state.enemies.push(createTestEnemy({
       id: 21,
-      kind: 'ship',
       blueprintId: 'mamba',
       label: 'Mamba',
-      behavior: 'hostile',
       x: 100,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 8,
       maxEnergy: 90,
-      laserPower: 2,
-      missiles: 0,
-      targetableArea: 220,
-      laserRange: 320,
-      topSpeed: 6,
-      acceleration: 0.12,
-      turnRate: 0.055,
       roles: { hostile: true, pirate: true },
-      aggression: 42,
-      baseAggression: 42,
-      fireCooldown: 999,
-      missileCooldown: 999,
       isFiringLaser: false
-    });
-    state.enemies.push({
+    }));
+    state.enemies.push(createTestEnemy({
       id: 22,
-      kind: 'ship',
       blueprintId: 'asp-mk2',
       label: 'Asp Mk II',
-      behavior: 'hostile',
       x: 110,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 8,
       maxEnergy: 150,
       laserPower: 5,
@@ -376,18 +277,13 @@ describe('travel combat weapons', () => {
       fireCooldown: 999,
       missileCooldown: 999,
       isFiringLaser: false
-    });
-    state.enemies.push({
+    }));
+    state.enemies.push(createTestEnemy({
       id: 23,
-      kind: 'ship',
       blueprintId: 'thargoid',
       label: 'Thargoid',
       behavior: 'thargoid',
       x: 120,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      angle: Math.PI,
       energy: 8,
       maxEnergy: 180,
       laserPower: 4,
@@ -403,7 +299,7 @@ describe('travel combat weapons', () => {
       fireCooldown: 999,
       missileCooldown: 999,
       isFiringLaser: false
-    });
+    }));
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
 
