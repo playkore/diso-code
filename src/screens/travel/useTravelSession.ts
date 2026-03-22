@@ -13,6 +13,8 @@ import {
   canAutoDock,
   isPlayerInStationSafeZone,
   setCombatSystemContext,
+  spawnBombExplosion,
+  stepParticles,
   stepTravelCombat,
   type FlightPhase
 } from '../../domain/travelCombat';
@@ -81,6 +83,8 @@ interface EcmUiState {
 
 const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
+const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
+const PLAYER_DESTRUCTION_PULSE_MS = 180;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
   fps: 0,
   frameAvgMs: 0,
@@ -396,6 +400,9 @@ export function useTravelSession(
     let creditedCombatReward = 0;
     let autoDockActive = false;
     let autoDockWaitLatched = false;
+    let playerDestructionTimerMs = 0;
+    let playerDestructionPulseTimerMs = 0;
+    let respawnReady = false;
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
@@ -455,6 +462,13 @@ export function useTravelSession(
       overlayMessage = text;
       overlayTimer = duration;
       setMessageState(text);
+    };
+
+    const triggerPlayerDestructionAnimation = () => {
+      // The player ship explodes in repeated CGA-color pulses so the death
+      // state reads as a full animation instead of a single-frame vanish.
+      spawnBombExplosion(combatState, combatState.player.x, combatState.player.y);
+      playerDestructionPulseTimerMs = PLAYER_DESTRUCTION_PULSE_MS;
     };
 
     // All successful exits funnel through this helper so the store receives the
@@ -548,6 +562,9 @@ export function useTravelSession(
       flightState = 'READY';
       autoDockActive = false;
       autoDockWaitLatched = false;
+      playerDestructionTimerMs = 0;
+      playerDestructionPulseTimerMs = 0;
+      respawnReady = false;
       showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
       updateHud();
       resetInput();
@@ -570,7 +587,23 @@ export function useTravelSession(
       const keys = keysRef.current;
 
       if (flightState === 'GAMEOVER') {
-        if (liveInput.fire || keys[' ']) {
+        stepParticles(combatState, dt);
+        if (playerDestructionTimerMs > 0) {
+          playerDestructionTimerMs = Math.max(0, playerDestructionTimerMs - deltaMs);
+          playerDestructionPulseTimerMs -= deltaMs;
+          if (playerDestructionTimerMs > 0 && playerDestructionPulseTimerMs <= 0) {
+            triggerPlayerDestructionAnimation();
+          }
+          if (playerDestructionTimerMs <= 0) {
+            showMessage('PRESS FIRE TO RESET', 99999);
+          }
+        }
+        if (!liveInput.fire && !keys[' ']) {
+          // Respawn only arms after the player has fully released the fire
+          // control, which prevents the fatal shot input from being reused.
+          respawnReady = true;
+        }
+        if (playerDestructionTimerMs <= 0 && respawnReady && (liveInput.fire || keys[' '])) {
           resetPrototype();
         }
         renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem);
@@ -766,7 +799,10 @@ export function useTravelSession(
         autoDockActive = false;
         autoDockWaitLatched = false;
         flightState = 'GAMEOVER';
-        showMessage('SHIP DESTROYED - PRESS FIRE TO RESET', 99999);
+        playerDestructionTimerMs = PLAYER_DESTRUCTION_ANIMATION_MS;
+        respawnReady = false;
+        showMessage('SHIP DESTROYED', PLAYER_DESTRUCTION_ANIMATION_MS);
+        triggerPlayerDestructionAnimation();
       }
 
       if (result.playerEscaped) {
