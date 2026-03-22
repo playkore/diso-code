@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HUD Mock</title>
+    <link rel="stylesheet" href="./hud-mock.css" />
+  </head>
+  <body>
+    <!-- This standalone mock stays deliberately compact so the bar layout can be judged on its own. -->
+    <main class="hud-shell">
+      <section class="hud-top-strip" aria-label="Secondary flight telemetry">
+        <div class="telemetry-chip telemetry-chip--route">
+          <span class="telemetry-chip__label">Route</span>
+          <span class="telemetry-chip__value">LAVE -&gt; DISO</span>
+        </div>
+        <div class="telemetry-chip">
+          <span class="telemetry-chip__label">Score</span>
+          <span class="telemetry-chip__value">0042</span>
+        </div>
+        <div class="telemetry-chip">
+          <span class="telemetry-chip__label">Jump</span>
+          <span class="telemetry-chip__value telemetry-chip__value--ready">READY</span>
+        </div>
+        <div class="telemetry-chip">
+          <span class="telemetry-chip__label">Hyper</span>
+          <span class="telemetry-chip__value telemetry-chip__value--warn">SAFE ZONE</span>
+        </div>
+        <div class="telemetry-chip">
+          <span class="telemetry-chip__label">Legal</span>
+          <span class="telemetry-chip__value">CLEAN 0</span>
+        </div>
+        <div class="telemetry-chip">
+          <span class="telemetry-chip__label">Threat</span>
+          <span class="telemetry-chip__value telemetry-chip__value--alert">F4 / 03</span>
+        </div>
+        <div class="telemetry-chip">
+          <span class="telemetry-chip__label">Arc</span>
+          <span class="telemetry-chip__value telemetry-chip__value--focus">FRONT ECM</span>
+        </div>
+      </section>
+
+      <section class="hud-frame" aria-label="Standalone travel HUD">
+        <section class="hud-wing hud-wing--left" aria-label="Flight systems">
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Shield</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--yellow" style="width: 78%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Fuel</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--red" style="width: 41%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Energy 1</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--green" style="width: 100%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Energy 2</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--green" style="width: 88%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Energy 3</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--yellow" style="width: 53%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Energy 4</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--red" style="width: 24%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row hud-bar-row--axis">
+            <span class="hud-bar-row__label">Speed X</span>
+            <div class="axis-bar axis-bar--positive" aria-hidden="true">
+              <span class="axis-bar__center"></span>
+              <span class="axis-bar__marker" style="left: 82%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row hud-bar-row--axis">
+            <span class="hud-bar-row__label">Speed Y</span>
+            <div class="axis-bar axis-bar--negative" aria-hidden="true">
+              <span class="axis-bar__center"></span>
+              <span class="axis-bar__marker" style="left: 36%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Laser F</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--yellow" style="width: 62%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Laser A</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--red" style="width: 86%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Laser L</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--green" style="width: 15%"></span>
+            </div>
+          </div>
+          <div class="hud-bar-row">
+            <span class="hud-bar-row__label">Laser R</span>
+            <div class="fill-bar fill-bar--simple" aria-hidden="true">
+              <span class="fill-bar__fill fill-bar__fill--yellow" style="width: 48%"></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="hud-center hud-center--radar-only" aria-label="Pilot focus area">
+          <header class="hud-center__message">Mass Lock</header>
+
+          <div class="hud-radar-frame">
+            <div class="hud-radar-title">
+              <span>Radar</span>
+              <span>DISO</span>
+            </div>
+
+            <div class="hud-radar" aria-hidden="true">
+              <div class="hud-radar__ring hud-radar__ring--outer"></div>
+              <div class="hud-radar__ring hud-radar__ring--inner"></div>
+              <div class="hud-radar__axis hud-radar__axis--horizontal"></div>
+              <div class="hud-radar__axis hud-radar__axis--vertical"></div>
+              <div class="hud-radar__ship"></div>
+              <div class="hud-radar__blip hud-radar__blip--station"></div>
+              <div class="hud-radar__blip hud-radar__blip--enemy-a"></div>
+              <div class="hud-radar__blip hud-radar__blip--enemy-b"></div>
+              <div class="hud-radar__blip hud-radar__blip--enemy-c"></div>
+              <div class="hud-radar__reticle hud-radar__reticle--left"></div>
+              <div class="hud-radar__reticle hud-radar__reticle--right"></div>
+            </div>
+
+            <div class="hud-radar-readouts">
+              <div class="hud-radar-readout">
+                <span class="hud-radar-readout__label">Missiles</span>
+                <span class="hud-radar-readout__value">03 / 04</span>
+              </div>
+              <div class="hud-radar-readout">
+                <span class="hud-radar-readout__label">Cargo</span>
+                <span class="hud-radar-readout__value">12 TC</span>
+              </div>
+              <div class="hud-radar-readout">
+                <span class="hud-radar-readout__label">Credits</span>
+                <span class="hud-radar-readout__value">1912.4 CR</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </body>
+</html>

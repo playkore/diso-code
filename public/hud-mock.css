@@ -1,0 +1,531 @@
+:root {
+  --cga-black: #000000;
+  --cga-green: #55ff55;
+  --cga-red: #ff5555;
+  --cga-yellow: #ffff55;
+  --frame-border: 2px solid var(--cga-yellow);
+  --panel-border: 1px solid var(--cga-yellow);
+  --inner-border: 1px solid var(--cga-green);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  font-family: "Courier New", Courier, monospace;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.hud-shell {
+  width: min(100%, 1120px);
+  margin: 0 auto;
+  padding: 0.55rem;
+}
+
+.hud-top-strip {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.55fr) repeat(6, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0;
+  border: var(--frame-border);
+  background: var(--cga-black);
+}
+
+.telemetry-chip {
+  min-width: 0;
+  padding: 0;
+  border-right: 1px solid var(--cga-yellow);
+  background: var(--cga-black);
+}
+
+.telemetry-chip:last-child {
+  border-right: 0;
+}
+
+.telemetry-chip__label {
+  display: block;
+  color: var(--cga-green);
+  font-size: 0.84rem;
+  text-transform: uppercase;
+  padding: 0 0 0 0.28rem;
+}
+
+.telemetry-chip__value {
+  display: block;
+  color: var(--cga-yellow);
+  font-size: 1.08rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 0 0 0.28rem;
+}
+
+.telemetry-chip__value--ready {
+  color: var(--cga-green);
+}
+
+.telemetry-chip__value--warn {
+  color: var(--cga-red);
+}
+
+.telemetry-chip__value--alert,
+.telemetry-chip__value--focus {
+  color: var(--cga-yellow);
+}
+
+.hud-frame {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.28rem;
+  align-items: stretch;
+  margin-top: 0.28rem;
+  padding: 0;
+  border: var(--frame-border);
+  background: var(--cga-black);
+}
+
+.hud-wing {
+  display: grid;
+  grid-template-rows: repeat(12, minmax(0, 1fr));
+  gap: 0;
+  align-content: stretch;
+  border: var(--panel-border);
+}
+
+.hud-center {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.hud-center--radar-only {
+  border: var(--panel-border);
+}
+
+.hud-center__message {
+  padding: 0.08rem 0 0.08rem 0.32rem;
+  border: var(--panel-border);
+  color: var(--cga-red);
+  text-align: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 1.14rem;
+}
+
+.hud-radar-frame {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.24rem;
+  min-height: 0;
+  border: var(--panel-border);
+}
+
+.hud-radar-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+  color: var(--cga-green);
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 1.08rem;
+  padding: 0 0 0 0.28rem;
+}
+
+.hud-radar {
+  position: relative;
+  width: min(100%, 22rem);
+  aspect-ratio: 1.28 / 1;
+  margin: 0 auto;
+  border: var(--panel-border);
+  overflow: hidden;
+}
+
+.hud-radar__ring {
+  position: absolute;
+  border: 2px solid var(--cga-green);
+  border-radius: 50% / 42%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.hud-radar__ring--outer {
+  width: 84%;
+  height: 66%;
+}
+
+.hud-radar__ring--inner {
+  width: 48%;
+  height: 34%;
+}
+
+.hud-radar__axis {
+  position: absolute;
+  background: var(--cga-green);
+}
+
+.hud-radar__axis--horizontal {
+  top: 50%;
+  left: 8%;
+  width: 84%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.hud-radar__axis--vertical {
+  top: 17%;
+  left: 50%;
+  width: 2px;
+  height: 66%;
+  transform: translateX(-50%);
+}
+
+.hud-radar__ship {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 15px solid var(--cga-yellow);
+  transform: translate(-50%, -54%);
+}
+
+.hud-radar__blip {
+  position: absolute;
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 50%;
+}
+
+.hud-radar__blip--station {
+  top: 18%;
+  left: 64%;
+  background: var(--cga-yellow);
+}
+
+.hud-radar__blip--enemy-a {
+  top: 31%;
+  left: 24%;
+  background: var(--cga-red);
+}
+
+.hud-radar__blip--enemy-b {
+  top: 67%;
+  left: 70%;
+  background: var(--cga-red);
+}
+
+.hud-radar__blip--enemy-c {
+  top: 72%;
+  left: 34%;
+  background: var(--cga-green);
+}
+
+.hud-radar__reticle {
+  position: absolute;
+  top: 50%;
+  width: 7%;
+  height: 10%;
+  border-top: var(--inner-border);
+  border-bottom: var(--inner-border);
+  transform: translateY(-50%);
+}
+
+.hud-radar__reticle--left {
+  left: 2.5%;
+  border-left: var(--inner-border);
+}
+
+.hud-radar__reticle--right {
+  right: 2.5%;
+  border-right: var(--inner-border);
+}
+
+.hud-radar-readouts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.15rem;
+}
+
+.hud-radar-readout {
+  min-width: 0;
+  padding: 0;
+  border-top: 1px solid var(--cga-yellow);
+}
+
+.hud-radar-readout__label {
+  display: block;
+  color: var(--cga-green);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  padding: 0 0 0 0.2rem;
+}
+
+.hud-radar-readout__value {
+  display: block;
+  color: var(--cga-yellow);
+  font-weight: 700;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 0 0 0.2rem;
+}
+
+.hud-bar-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 0;
+  min-height: 0;
+  min-height: 0.7rem;
+  border-bottom: 1px solid var(--cga-yellow);
+}
+
+.hud-bar-row__label {
+  color: var(--cga-yellow);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 1.14rem;
+  border-right: 1px solid var(--cga-yellow);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.fill-bar,
+.axis-bar {
+  position: relative;
+  height: 100%;
+  background: var(--cga-red);
+  overflow: hidden;
+}
+
+.fill-bar--simple {
+  background: var(--cga-red);
+}
+
+.fill-bar__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+
+.fill-bar__fill--green {
+  background: var(--cga-green);
+}
+
+.fill-bar__fill--yellow {
+  background: var(--cga-green);
+}
+
+.fill-bar__fill--red {
+  background: var(--cga-green);
+}
+
+.axis-bar__center {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  background: var(--cga-yellow);
+  transform: translateX(-50%);
+}
+
+.axis-bar__fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--cga-green);
+}
+
+.axis-bar__fill--positive {
+  left: 50%;
+}
+
+.axis-bar__fill--negative {
+  right: 50%;
+}
+
+.axis-bar__marker {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--cga-green);
+  transform: translateX(-50%);
+}
+
+@media (max-width: 960px) and (min-width: 901px) {
+  .hud-top-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .telemetry-chip {
+    border-right: 0;
+    border-bottom: 1px solid var(--cga-yellow);
+  }
+
+  .hud-frame {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) and (min-width: 641px) {
+  .hud-shell {
+    padding: 0.6rem;
+  }
+
+  .hud-radar-readouts {
+    grid-template-columns: 1fr;
+  }
+
+  .hud-radar-title {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+/*
+  Phone-sized viewports need to behave like an in-game overlay instead of a
+  full page mock, so the entire HUD is compressed into a shallow top band.
+ */
+@media (max-width: 900px) {
+  body {
+    overflow: hidden;
+  }
+
+  .hud-shell {
+    position: fixed;
+    inset: 0 0 auto 0;
+    width: 100%;
+    max-width: none;
+    height: 25vh;
+    min-height: 25vh;
+    max-height: 25vh;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    align-content: start;
+    background: var(--cga-black);
+    z-index: 1;
+    overflow: hidden;
+  }
+
+  .hud-top-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    margin: 0;
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    overflow: hidden;
+  }
+
+  .telemetry-chip:nth-child(n + 5) {
+    display: none;
+  }
+
+  .telemetry-chip__label {
+    font-size: 0.58rem;
+    line-height: 1;
+  }
+
+  .telemetry-chip__value {
+    font-size: 0.78rem;
+    line-height: 1.05;
+  }
+
+  .hud-frame {
+    height: 100%;
+    gap: 0;
+    margin-top: 0;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .hud-wing--left {
+    grid-column: 1;
+  }
+
+  .hud-center {
+    grid-column: 2;
+    gap: 0;
+    justify-items: stretch;
+    overflow: hidden;
+  }
+
+  .hud-wing {
+    overflow: hidden;
+    grid-template-rows: repeat(12, minmax(0, 1fr));
+  }
+
+  .hud-center__message {
+    font-size: 0.54rem;
+    line-height: 1;
+    border-top: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .hud-radar-frame {
+    gap: 0;
+    border-top: 0;
+    overflow: hidden;
+  }
+
+  .hud-radar-title {
+    font-size: 0.74rem;
+    line-height: 1;
+  }
+
+  .hud-radar {
+    width: 100%;
+    max-width: 100%;
+    justify-self: center;
+  }
+
+  .hud-radar-readouts {
+    display: none;
+  }
+
+  .hud-bar-row {
+    grid-template-columns: 1fr 1fr;
+    min-height: 0;
+    height: calc((25vh - 2rem) / 12);
+    overflow: hidden;
+  }
+
+  .hud-bar-row__label {
+    font-size: 0.68rem;
+    line-height: 1;
+    justify-content: center;
+  }
+
+  .fill-bar,
+  .axis-bar {
+    min-height: 0;
+  }
+}
