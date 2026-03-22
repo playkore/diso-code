@@ -263,17 +263,17 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.projectiles).toHaveLength(1);
-    expect(state.player.energy).toBe(state.player.maxEnergy - 16);
+    expect(state.player.energy).toBe(state.player.maxEnergy - 0.8);
 
     state.projectiles.length = 0;
     state.player.fireCooldown = 0;
-    state.player.energy = 3;
+    state.player.energy = 0.5;
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.projectiles).toHaveLength(0);
     expect(state.messages.some((message) => message.text === 'ENERGY LOW')).toBe(true);
   });
 
-  it('still drains energy under sustained fire despite classic recharge ticks', () => {
+  it('keeps laser energy drain low enough that heat remains the main sustained-fire limiter', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'pulse_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
@@ -283,8 +283,33 @@ describe('travel combat weapons', () => {
       stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     }
 
-    expect(state.player.energy).toBe(241);
-    expect(state.player.energy).toBeLessThan(startingEnergy);
+    expect(state.player.energy).toBe(startingEnergy);
+    expect(state.player.laserHeat).toBeGreaterThan(0);
+  });
+
+  it('tracks one shared laser heat meter and cools it over time', () => {
+    const commander = createDefaultCommander();
+    commander.laserMounts.front = 'beam_laser';
+    const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.laserHeat).toBe(10);
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 60, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.laserHeat).toBe(0);
+  });
+
+  it('blocks firing when the shared heat meter is full', () => {
+    const commander = createDefaultCommander();
+    commander.laserMounts.front = 'military_laser';
+    const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
+    state.player.laserHeat = 97;
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
+
+    expect(state.projectiles).toHaveLength(0);
+    expect(state.player.laserHeat).toBe(state.player.maxLaserHeat);
+    expect(state.messages.some((message) => message.text === 'LASER OVERHEAT')).toBe(true);
   });
 
   it('recharges shields on the classic cadence and only above half energy', () => {

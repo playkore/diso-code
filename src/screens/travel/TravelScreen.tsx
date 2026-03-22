@@ -52,6 +52,12 @@ export function TravelScreen() {
                 <span className="travel-screen__hud-meter-fill" style={{ width: `${travel.hud.shieldRatio * 100}%`, backgroundColor: travel.hud.shieldColor }} />
               </span>
             </div>
+            <div className="travel-screen__hud-line travel-screen__hud-line--bars">
+              <span className="travel-screen__hud-label">Heat</span>
+              <span className="travel-screen__hud-meter">
+                <span className="travel-screen__hud-meter-fill" style={{ width: `${travel.hud.heatRatio * 100}%`, backgroundColor: travel.hud.heatColor }} />
+              </span>
+            </div>
             <div className="travel-screen__hud-line">Jump Drive: <span style={{ color: travel.hud.jumpColor }}>{travel.hud.jump}</span></div>
             <div className="travel-screen__hud-line">Hyperspace: <span style={{ color: travel.hud.hyperspaceColor }}>{travel.hud.hyperspace}</span></div>
             <div className="travel-screen__hud-line">Legal: <span style={{ color: travel.hud.legalColor }}>{travel.hud.legal}</span></div>

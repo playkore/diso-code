@@ -20,11 +20,14 @@ describe('travel drive status', () => {
     const state = createCombatState([0, 0, 0]);
     state.player.energy = 160;
     state.player.shield = 128;
+    state.player.laserHeat = 80;
     const hud = getHudState(state, 'PLAYING', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false });
     expect(hud.energyBanks[0]).toBe(1);
     expect(hud.energyBanks[1]).toBe(1);
     expect(hud.energyBanks[2]).toBeCloseTo(0.5098, 3);
     expect(hud.energyBanks[3]).toBe(0);
     expect(hud.shieldRatio).toBeCloseTo(128 / 255, 5);
+    expect(hud.heatRatio).toBe(0.8);
+    expect(hud.heatColor).toBe('#ff5555');
   });
 });

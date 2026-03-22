@@ -41,6 +41,8 @@ const INITIAL_HUD = {
   energyColor: CGA_GREEN,
   shieldRatio: 1,
   shieldColor: CGA_GREEN,
+  heatRatio: 0,
+  heatColor: CGA_GREEN,
   jump: 'READY',
   jumpColor: CGA_GREEN,
   hyperspace: 'SAFE ZONE',
@@ -161,6 +163,8 @@ export function useTravelSession(
       previous.energyColor === next.energyColor &&
       previous.shieldRatio === next.shieldRatio &&
       previous.shieldColor === next.shieldColor &&
+      previous.heatRatio === next.heatRatio &&
+      previous.heatColor === next.heatColor &&
       previous.energyBanks.length === next.energyBanks.length &&
       previous.energyBanks.every((ratio, index) => ratio === next.energyBanks[index]) &&
       previous.jump === next.jump &&
@@ -340,6 +344,8 @@ export function useTravelSession(
         energyColor: nextHud.energyColor,
         shieldRatio: nextHud.shieldRatio,
         shieldColor: nextHud.shieldColor,
+        heatRatio: nextHud.heatRatio,
+        heatColor: nextHud.heatColor,
         jump: nextHud.jump,
         jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
         hyperspace: nextHud.hyperspace,

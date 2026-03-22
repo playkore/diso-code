@@ -6,7 +6,7 @@ import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
 import { firePlayerLasers } from './weapons/playerWeapons';
-import { rechargePlayerDefense, stepParticles } from './state';
+import { clampLaserHeat, rechargePlayerDefense, stepParticles } from './state';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
 import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCombatState } from './types';
@@ -38,6 +38,7 @@ export function stepTravelCombat(
   }
 
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
+  state.player.laserHeat = clampLaserHeat(state.player.laserHeat - state.player.laserHeatCooldownRate * (dt / 60), state.player.maxLaserHeat);
   rechargePlayerDefense(state, dt);
 
   if (input.activateEcm) {

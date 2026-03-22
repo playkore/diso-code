@@ -33,6 +33,8 @@ export function clampByte(value: number): number {
 
 export const PLAYER_MAX_ENERGY = 255;
 export const PLAYER_MAX_SHIELD = 255;
+export const PLAYER_MAX_LASER_HEAT = 100;
+export const PLAYER_LASER_COOL_RATE = 12;
 export const ELITE_RECHARGE_INTERVAL = (8 / 50) * 60;
 export const ELITE_SHIELD_RECHARGE_THRESHOLD = 127;
 
@@ -46,6 +48,10 @@ export function clampShield(value: number, maxShield: number): number {
 
 export function clampEnergy(value: number, maxEnergy: number): number {
   return Math.max(0, Math.min(maxEnergy, value));
+}
+
+export function clampLaserHeat(value: number, maxLaserHeat: number): number {
+  return Math.max(0, Math.min(maxLaserHeat, value));
 }
 
 /**
@@ -183,6 +189,9 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       energyPerBank: Math.ceil(maxEnergy / init.energyBanks),
       shield: PLAYER_MAX_SHIELD,
       maxShield: PLAYER_MAX_SHIELD,
+      laserHeat: 0,
+      maxLaserHeat: PLAYER_MAX_LASER_HEAT,
+      laserHeatCooldownRate: PLAYER_LASER_COOL_RATE,
       maxSpeed,
       fireCooldown: 0,
       tallyKills: 0,
@@ -316,19 +325,37 @@ export function getLaserProjectileProfile(laserId: LaserId) {
 
 /**
  * Laser energy cost stays detached from projectile damage so balance tweaks can
- * preserve the documented "tiered draw" behavior while remaining visible on a
- * 4 x 64 bank HUD. The values intentionally drain in bank-sized chunks rather
- * than tiny single digits, otherwise firing is hard to read at a glance.
+ * preserve the documented "tiered draw" behavior without overwhelming the
+ * classic recharge loop. Heat, not energy, is meant to be the primary limiter.
  */
 export function getLaserEnergyCost(laserId: LaserId) {
   switch (laserId) {
     case 'military_laser':
     case 'mining_laser':
-      return 24;
+      return 1.2;
     case 'beam_laser':
+      return 0.8;
+    case 'pulse_laser':
+    default:
+      return 0.4;
+  }
+}
+
+/**
+ * Heat is tracked as one shared weapon temperature. Each firing batch raises
+ * that meter, even when multiple mounts are installed, and the meter cools
+ * continuously while the ship is not adding more heat.
+ */
+export function getLaserHeatPerShot(laserId: LaserId) {
+  switch (laserId) {
+    case 'military_laser':
+      return 12;
+    case 'beam_laser':
+      return 10;
+    case 'mining_laser':
       return 16;
     case 'pulse_laser':
     default:
-      return 8;
+      return 6;
   }
 }

@@ -1,4 +1,4 @@
-import { getLaserEnergyCost, getLaserProjectileProfile, projectileId, pushMessage, spendPlayerEnergy } from '../state';
+import { clampLaserHeat, getLaserEnergyCost, getLaserHeatPerShot, getLaserProjectileProfile, projectileId, pushMessage, spendPlayerEnergy } from '../state';
 import type { TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../shipCatalog';
 
@@ -50,6 +50,7 @@ export function firePlayerLasers(state: TravelCombatState) {
   }
 
   let totalCost = 0;
+  let totalHeat = 0;
   const mountedLasers: Array<{ mount: LaserMountPosition; laserId: LaserId }> = [];
   for (const mount of firingMounts) {
     const laserId = state.playerLoadout.laserMounts[mount];
@@ -58,12 +59,21 @@ export function firePlayerLasers(state: TravelCombatState) {
     }
     mountedLasers.push({ mount, laserId });
     totalCost += getLaserEnergyCost(laserId);
+    totalHeat += getLaserHeatPerShot(laserId);
+  }
+
+  if (state.player.laserHeat >= state.player.maxLaserHeat || state.player.laserHeat + totalHeat > state.player.maxLaserHeat) {
+    state.player.laserHeat = state.player.maxLaserHeat;
+    pushMessage(state, 'LASER OVERHEAT', 900);
+    return false;
   }
 
   if (!spendPlayerEnergy(state, totalCost)) {
     pushMessage(state, 'ENERGY LOW', 900);
     return false;
   }
+
+  state.player.laserHeat = clampLaserHeat(state.player.laserHeat + totalHeat, state.player.maxLaserHeat);
 
   for (const { mount, laserId } of mountedLasers) {
     spawnPlayerLaser(state, mount, laserId);
