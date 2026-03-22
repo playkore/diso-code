@@ -744,7 +744,8 @@ button:disabled {
 
 .travel-screen__message {
   position: absolute;
-  top: 18%;
+  /* Keep transient alerts below the upper-right radar across short and tall viewports. */
+  top: clamp(15.5rem, 31%, 21rem);
   left: 50%;
   width: min(100%, 34rem);
   transform: translateX(-50%);

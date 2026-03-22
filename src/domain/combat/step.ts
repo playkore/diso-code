@@ -1,5 +1,5 @@
 import { tryRareEncounter } from './encounters/spawnRules';
-import { canAutoDock, LOCAL_JUMP_SPEED_MULTIPLIER } from './navigation';
+import { canAutoDock, LOCAL_JUMP_SPEED_MULTIPLIER, RADAR_SHIP_RANGE } from './navigation';
 import { stepEnemy } from './ai';
 import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
@@ -11,6 +11,27 @@ import type { LaserMountPosition } from '../shipCatalog';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
 import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCombatState } from './types';
+
+const MAX_ACTIVE_ENEMIES = 12;
+const ENEMY_DESPAWN_DISTANCE = RADAR_SHIP_RANGE * 3;
+const ENEMY_DESPAWN_LIFETIME = 60 * 45;
+
+/**
+ * Ambient contacts are short-lived by design. Once a non-mission ship has
+ * drifted well beyond scanner relevance or has lingered for too long, we drop
+ * it so new encounters can rotate in instead of accumulating forever.
+ */
+function shouldDespawnEnemy(state: TravelCombatState, enemy: TravelCombatState['enemies'][number]) {
+  if (enemy.missionTag) {
+    return false;
+  }
+  if (enemy.roles.cop && state.encounter.stationHostile) {
+    return false;
+  }
+
+  const distanceFromPlayer = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
+  return distanceFromPlayer > ENEMY_DESPAWN_DISTANCE || enemy.lifetime >= ENEMY_DESPAWN_LIFETIME;
+}
 
 /**
  * Advances one real-time combat frame.
@@ -114,7 +135,13 @@ export function stepTravelCombat(
     }
   }
 
-  if (state.encounter.stationHostile && state.station && state.enemies.filter((enemy) => enemy.roles.cop).length < 2 && random.nextByte() >= 240) {
+  if (
+    state.encounter.stationHostile &&
+    state.station &&
+    state.enemies.length < MAX_ACTIVE_ENEMIES &&
+    state.enemies.filter((enemy) => enemy.roles.cop).length < 2 &&
+    random.nextByte() >= 240
+  ) {
     spawnCop(state, random, true);
   }
 
@@ -124,6 +151,12 @@ export function stepTravelCombat(
       continue;
     }
     if (stepEnemy(state, enemy, dt, random)) {
+      state.enemies.splice(index, 1);
+      continue;
+    }
+
+    enemy.lifetime += dt;
+    if (shouldDespawnEnemy(state, enemy)) {
       state.enemies.splice(index, 1);
     }
   }

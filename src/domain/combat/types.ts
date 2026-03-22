@@ -153,6 +153,13 @@ export interface CombatEnemy {
   fireCooldown: number;
   missileCooldown: number;
   isFiringLaser: boolean;
+  /**
+   * Age in classic 60 Hz ticks.
+   *
+   * Encounter cleanup uses this instead of wall-clock timestamps so tests and
+   * live gameplay share the exact same despawn thresholds.
+   */
+  lifetime: number;
   missionTag?: 'constrictor' | 'thargoid-plans';
 }
 

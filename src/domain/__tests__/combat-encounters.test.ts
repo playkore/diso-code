@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createDeterministicRandomSource, getAvailablePackHunters, getBlueprintAvailability, selectBlueprintFile, stepTravelCombat } from '../travelCombat';
+import { createDeterministicRandomSource, getAvailablePackHunters, getBlueprintAvailability, getCombatBlueprint, selectBlueprintFile, stepTravelCombat } from '../travelCombat';
 import { TP_MISSION_FLAGS } from '../missions';
 import { createCombatState } from './combatTestUtils';
 
@@ -38,5 +38,54 @@ describe('travel combat encounters', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', { luxuries: 12, computers: 8 }, rng);
     expect(state.enemies.some((enemy) => enemy.roles.pirate || enemy.roles.hostile)).toBe(true);
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(false);
+  });
+
+  it('caps pirate encounters so repeated rare ticks do not accumulate endless packs', () => {
+    const bytes = new Array(128).fill(255);
+    const rng = createDeterministicRandomSource(bytes);
+    const state = createCombatState(bytes, { government: 0, techLevel: 12 });
+
+    for (let i = 0; i < 12; i += 1) {
+      stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
+    }
+
+    expect(state.enemies.filter((enemy) => enemy.roles.pirate || enemy.roles.hostile).length).toBeLessThanOrEqual(4);
+    expect(state.enemies.length).toBeLessThanOrEqual(12);
+  });
+
+  it('despawns stale ambient pirates once they drift out of encounter range', () => {
+    const state = createCombatState([0, 0, 0, 0]);
+    const blueprint = getCombatBlueprint('sidewinder');
+    state.enemies.push({
+      id: 1,
+      kind: 'ship',
+      blueprintId: blueprint.id,
+      label: blueprint.label,
+      behavior: blueprint.behavior,
+      x: 2_000,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      energy: blueprint.maxEnergy,
+      maxEnergy: blueprint.maxEnergy,
+      laserPower: blueprint.laserPower,
+      missiles: blueprint.missiles,
+      targetableArea: blueprint.targetableArea,
+      laserRange: blueprint.laserRange,
+      topSpeed: blueprint.topSpeed,
+      acceleration: blueprint.acceleration,
+      turnRate: blueprint.turnRate,
+      roles: { ...blueprint.roles },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 0,
+      missileCooldown: 0,
+      isFiringLaser: false,
+      lifetime: 0
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
+    expect(state.enemies).toHaveLength(0);
   });
 });

@@ -7,6 +7,37 @@ import { getCargoPirateInterest } from '../scoring/salvage';
 import { spawnCop, spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
 import type { BlueprintFileId, RandomSource, TravelCombatState } from '../types';
 
+const MAX_ACTIVE_ENEMIES = 12;
+const MAX_ACTIVE_PIRATES = 4;
+const MAX_ACTIVE_COPS = 3;
+const MAX_ACTIVE_TRADERS = 2;
+
+function getActivePirateCount(state: TravelCombatState) {
+  return state.enemies.filter((enemy) => enemy.roles.pirate || enemy.roles.hostile).length;
+}
+
+function getFreeEnemySlots(state: TravelCombatState) {
+  return Math.max(0, MAX_ACTIVE_ENEMIES - state.enemies.length);
+}
+
+/**
+ * Global caps intentionally keep combat in the classic "small rotating
+ * encounter" space instead of letting the simulation accumulate a backlog of
+ * unresolved ships.
+ */
+function canSpawnEnemy(state: TravelCombatState, role: 'pirate' | 'cop' | 'trader') {
+  if (getFreeEnemySlots(state) <= 0) {
+    return false;
+  }
+  if (role === 'pirate') {
+    return getActivePirateCount(state) < MAX_ACTIVE_PIRATES;
+  }
+  if (role === 'cop') {
+    return state.enemies.filter((enemy) => enemy.roles.cop).length < MAX_ACTIVE_COPS;
+  }
+  return state.enemies.filter((enemy) => enemy.roles.trader || enemy.roles.docking).length < MAX_ACTIVE_TRADERS;
+}
+
 /**
  * Encounter spawning overview
  * --------------------------
@@ -59,8 +90,16 @@ export function selectBlueprintFile(params: {
  * slow down subsequent dangerous spawns for a short time.
  */
 function spawnPackPirates(state: TravelCombatState, random: RandomSource) {
-  const size = (random.nextByte() & 3) + 1;
-  state.encounter.ev = size - 1;
+  const remainingPirateSlots = Math.max(0, MAX_ACTIVE_PIRATES - getActivePirateCount(state));
+  const remainingEnemySlots = getFreeEnemySlots(state);
+  const maxSpawnSize = Math.min(4, remainingPirateSlots, remainingEnemySlots);
+  if (maxSpawnSize <= 0) {
+    return;
+  }
+
+  const requestedSize = (random.nextByte() & 3) + 1;
+  const size = Math.min(requestedSize, maxSpawnSize);
+  state.encounter.ev = Math.max(state.encounter.ev, size - 1);
   const available = getAvailablePackHunters(state.encounter.activeBlueprintFile);
   const sequence = getPackSequence();
   for (let i = 0; i < size; i += 1) {
@@ -78,6 +117,9 @@ function spawnPackPirates(state: TravelCombatState, random: RandomSource) {
  * Spawns a single notable hostile contact chosen from the "lone bounty" table.
  */
 function spawnLoneBounty(state: TravelCombatState, random: RandomSource) {
+  if (!canSpawnEnemy(state, 'pirate')) {
+    return;
+  }
   const candidate = getLoneBountySequence()[random.nextByte() & 3] ?? 'cobra-mk3-pirate';
   const available = new Set(getBlueprintAvailability(state.encounter.activeBlueprintFile));
   const blueprintId = available.has(candidate) ? candidate : 'fer-de-lance';
@@ -90,6 +132,9 @@ function spawnLoneBounty(state: TravelCombatState, random: RandomSource) {
  * station approach, safe-zone and legal-response rules.
  */
 function spawnBenignTrader(state: TravelCombatState, random: RandomSource) {
+  if (!canSpawnEnemy(state, 'trader')) {
+    return;
+  }
   const blueprintId = (random.nextByte() & 1) === 0 ? 'cobra-mk3-trader' : 'python-trader';
   spawnEnemyFromBlueprint(state, blueprintId, random, {
     roles: { trader: true, innocent: true, docking: true, hostile: false },
@@ -149,14 +194,14 @@ function deepSpaceCopShouldSpawn(state: TravelCombatState, random: RandomSource,
 export function tryRareEncounter(state: TravelCombatState, random: RandomSource, cargo: Record<string, number>) {
   state.encounter.mcnt += 1;
 
-  if (!state.witchspace && state.encounter.benignCooldown <= 0 && random.nextByte() < 33 && state.enemies.length < 6) {
+  if (!state.witchspace && state.encounter.benignCooldown <= 0 && random.nextByte() < 33 && canSpawnEnemy(state, 'trader')) {
     spawnBenignTrader(state, random);
     state.encounter.benignCooldown = 2;
   } else {
     state.encounter.benignCooldown = Math.max(0, state.encounter.benignCooldown - 1);
   }
 
-  if (deepSpaceCopShouldSpawn(state, random, cargo) && state.enemies.filter((enemy) => enemy.roles.cop).length < 3) {
+  if (deepSpaceCopShouldSpawn(state, random, cargo) && canSpawnEnemy(state, 'cop')) {
     spawnCop(state, random, true);
   }
 
@@ -184,7 +229,7 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
   }
 
   const pirateInterest = getCargoPirateInterest(cargo);
-  if (pirateInterest > 0 && state.enemies.filter((enemy) => enemy.roles.pirate || enemy.roles.hostile).length < 2 && random.nextByte() < pirateInterest) {
+  if (pirateInterest > 0 && canSpawnEnemy(state, 'pirate') && random.nextByte() < pirateInterest) {
     if (random.nextByte() >= 96) {
       spawnPackPirates(state, random);
     } else {
@@ -193,6 +238,9 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
     return;
   }
 
+  if (!canSpawnEnemy(state, 'pirate')) {
+    return;
+  }
   if (random.nextByte() >= 100) {
     spawnPackPirates(state, random);
   } else {
