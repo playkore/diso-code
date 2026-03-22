@@ -619,6 +619,27 @@ button:disabled {
   background: var(--cga-green);
 }
 
+.travel-screen__hud-heat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 0.18rem 0.45rem;
+}
+
+.travel-screen__hud-heat-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.travel-screen__hud-heat-cell--inactive {
+  opacity: 0.55;
+}
+
+.travel-screen__hud-heat-label {
+  width: 0.55rem;
+  color: var(--cga-yellow);
+}
+
 .travel-screen__hud-subtle {
   color: #ffff55;
   opacity: 1;

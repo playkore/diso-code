@@ -1,5 +1,5 @@
 import { getLegalStatus } from '../commander';
-import type { LaserId } from '../shipCatalog';
+import type { LaserId, LaserMountPosition } from '../shipCatalog';
 import { selectBlueprintFile } from './encounters/spawnRules';
 import type { RandomSource, TravelCombatInit, TravelCombatState } from './types';
 
@@ -52,6 +52,19 @@ export function clampEnergy(value: number, maxEnergy: number): number {
 
 export function clampLaserHeat(value: number, maxLaserHeat: number): number {
   return Math.max(0, Math.min(maxLaserHeat, value));
+}
+
+/**
+ * Laser heat is tracked per mount so each arc can cut out and recover on its
+ * own without forcing unrelated mounts to share one thermal budget.
+ */
+export function createLaserHeatState(value = 0): Record<LaserMountPosition, number> {
+  return {
+    front: value,
+    rear: value,
+    left: value,
+    right: value
+  };
 }
 
 /**
@@ -189,7 +202,7 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       energyPerBank: Math.ceil(maxEnergy / init.energyBanks),
       shield: PLAYER_MAX_SHIELD,
       maxShield: PLAYER_MAX_SHIELD,
-      laserHeat: 0,
+      laserHeat: createLaserHeatState(),
       maxLaserHeat: PLAYER_MAX_LASER_HEAT,
       laserHeatCooldownRate: PLAYER_LASER_COOL_RATE,
       maxSpeed,

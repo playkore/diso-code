@@ -1,6 +1,7 @@
 import { getLegalStatus, type CommanderState } from '../../domain/commander';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
+import type { LaserMountPosition } from '../../domain/shipCatalog';
 
 /**
  * Maps combat simulation data into HUD-friendly strings.
@@ -11,6 +12,10 @@ import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
 export interface TravelDriveStatus {
   jump: string;
   hyperspace: string;
+}
+
+function getHeatColor(heatRatio: number) {
+  return heatRatio >= 0.8 ? '#ff5555' : heatRatio >= 0.45 ? '#ffff55' : '#55ff55';
 }
 
 export function getDriveStatus(flightState: FlightPhase, options: { jumpBlocked: boolean; hyperspaceBlocked: boolean; jumpCompleted: boolean }): TravelDriveStatus {
@@ -29,16 +34,23 @@ export function getHudState(
   const drives = getDriveStatus(flightState, options);
   const energyRatio = state.player.maxEnergy > 0 ? state.player.energy / state.player.maxEnergy : 0;
   const shieldRatio = state.player.maxShield > 0 ? state.player.shield / state.player.maxShield : 0;
-  const heatRatio = state.player.maxLaserHeat > 0 ? state.player.laserHeat / state.player.maxLaserHeat : 0;
-  const heatColor = heatRatio >= 0.8 ? '#ff5555' : heatRatio >= 0.45 ? '#ffff55' : '#55ff55';
+  const laserHeat = (['front', 'rear', 'left', 'right'] as LaserMountPosition[]).map((mount) => {
+    const installed = Boolean(state.playerLoadout.laserMounts[mount]);
+    const heatRatio = installed && state.player.maxLaserHeat > 0 ? state.player.laserHeat[mount] / state.player.maxLaserHeat : 0;
+    return {
+      mount,
+      installed,
+      ratio: Math.max(0, Math.min(1, heatRatio)),
+      color: getHeatColor(heatRatio)
+    };
+  });
   return {
     score: String(state.score),
     energyBanks: getSegmentedBankRatios(state.player.energy, state.player.maxEnergy, state.player.energyBanks),
     energyColor: getCgaBarFillColor(energyRatio),
     shieldRatio: Math.max(0, Math.min(1, shieldRatio)),
     shieldColor: getCgaBarFillColor(shieldRatio),
-    heatRatio: Math.max(0, Math.min(1, heatRatio)),
-    heatColor,
+    laserHeat,
     jump: drives.jump,
     hyperspace: drives.hyperspace,
     legal: `${getLegalStatus(state.legalValue)} ${state.legalValue}`,

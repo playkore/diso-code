@@ -205,7 +205,7 @@ export interface CombatPlayer {
   energyPerBank: number;
   shield: number;
   maxShield: number;
-  laserHeat: number;
+  laserHeat: Record<LaserMountPosition, number>;
   maxLaserHeat: number;
   laserHeatCooldownRate: number;
   maxSpeed: number;

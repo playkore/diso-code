@@ -20,14 +20,20 @@ describe('travel drive status', () => {
     const state = createCombatState([0, 0, 0]);
     state.player.energy = 160;
     state.player.shield = 128;
-    state.player.laserHeat = 80;
+    state.player.laserHeat.front = 80;
+    state.player.laserHeat.rear = 30;
+    state.playerLoadout.laserMounts.rear = 'beam_laser';
     const hud = getHudState(state, 'PLAYING', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false });
     expect(hud.energyBanks[0]).toBe(1);
     expect(hud.energyBanks[1]).toBe(1);
     expect(hud.energyBanks[2]).toBeCloseTo(0.5098, 3);
     expect(hud.energyBanks[3]).toBe(0);
     expect(hud.shieldRatio).toBeCloseTo(128 / 255, 5);
-    expect(hud.heatRatio).toBe(0.8);
-    expect(hud.heatColor).toBe('#ff5555');
+    expect(hud.laserHeat).toEqual([
+      { mount: 'front', installed: true, ratio: 0.8, color: '#ff5555' },
+      { mount: 'rear', installed: true, ratio: 0.3, color: '#55ff55' },
+      { mount: 'left', installed: false, ratio: 0, color: '#55ff55' },
+      { mount: 'right', installed: false, ratio: 0, color: '#55ff55' }
+    ]);
   });
 });

@@ -284,31 +284,39 @@ describe('travel combat weapons', () => {
     }
 
     expect(state.player.energy).toBe(startingEnergy);
-    expect(state.player.laserHeat).toBeGreaterThan(0);
+    expect(state.player.laserHeat.front).toBeGreaterThan(0);
   });
 
-  it('tracks one shared laser heat meter and cools it over time', () => {
+  it('tracks heat per mount and cools each mount independently over time', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'beam_laser';
+    commander.laserMounts.rear = 'military_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.laserHeat).toBe(6);
+    expect(state.player.laserHeat.front).toBe(6);
+    expect(state.player.laserHeat.rear).toBe(4);
+    expect(state.player.laserHeat.left).toBe(0);
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 60, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.laserHeat).toBe(0);
+    expect(state.player.laserHeat.front).toBe(0);
+    expect(state.player.laserHeat.rear).toBe(0);
   });
 
-  it('blocks firing when the shared heat meter is full', () => {
+  it('blocks only overheated mounts while cooler mounts continue firing', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'military_laser';
+    commander.laserMounts.rear = 'beam_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
-    state.player.laserHeat = 97;
+    state.player.laserHeat.front = 97;
+    state.player.laserHeat.rear = 0;
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
 
-    expect(state.projectiles).toHaveLength(0);
-    expect(state.player.laserHeat).toBe(state.player.maxLaserHeat);
+    expect(state.projectiles).toHaveLength(1);
+    expect(state.projectiles[0].damage).toBe(16);
+    expect(state.player.laserHeat.front).toBe(state.player.maxLaserHeat);
+    expect(state.player.laserHeat.rear).toBe(6);
     expect(state.messages.some((message) => message.text === 'LASER OVERHEAT')).toBe(true);
   });
 

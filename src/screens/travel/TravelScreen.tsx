@@ -1,6 +1,7 @@
 import { Profiler, useRef, type ProfilerOnRenderCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/travelCombat';
+import type { LaserMountPosition } from '../../domain/shipCatalog';
 import { useGameStore } from '../../store/useGameStore';
 import { formatLightYears } from '../../utils/distance';
 import { TravelPerfOverlay } from './TravelPerfOverlay';
@@ -29,6 +30,15 @@ export function TravelScreen() {
       <span className="travel-screen__hud-bank-fill" style={{ width: `${ratio * 100}%`, backgroundColor: travel.hud.energyColor }} />
     </span>
   ));
+  const mountLabels: Record<LaserMountPosition, string> = { front: 'F', rear: 'A', left: 'L', right: 'R' };
+  const laserHeat = travel.hud.laserHeat.map((entry) => (
+    <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
+      <span className="travel-screen__hud-heat-label">{mountLabels[entry.mount as LaserMountPosition]}</span>
+      <span className="travel-screen__hud-meter">
+        <span className="travel-screen__hud-meter-fill" style={{ width: `${entry.ratio * 100}%`, backgroundColor: entry.color }} />
+      </span>
+    </span>
+  ));
 
   return (
     <Profiler id="travel-screen" onRender={handleRender}>
@@ -54,9 +64,7 @@ export function TravelScreen() {
             </div>
             <div className="travel-screen__hud-line travel-screen__hud-line--bars">
               <span className="travel-screen__hud-label">Heat</span>
-              <span className="travel-screen__hud-meter">
-                <span className="travel-screen__hud-meter-fill" style={{ width: `${travel.hud.heatRatio * 100}%`, backgroundColor: travel.hud.heatColor }} />
-              </span>
+              <span className="travel-screen__hud-heat-grid">{laserHeat}</span>
             </div>
             <div className="travel-screen__hud-line">Jump Drive: <span style={{ color: travel.hud.jumpColor }}>{travel.hud.jump}</span></div>
             <div className="travel-screen__hud-line">Hyperspace: <span style={{ color: travel.hud.hyperspaceColor }}>{travel.hud.hyperspace}</span></div>

@@ -50,7 +50,7 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
       energyPerBank: 64,
       shield: 255,
       maxShield: 255,
-      laserHeat: 0,
+      laserHeat: { front: 0, rear: 0, left: 0, right: 0 },
       maxLaserHeat: 100,
       laserHeatCooldownRate: 12,
       maxSpeed: 8,

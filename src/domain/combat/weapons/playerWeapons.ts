@@ -39,8 +39,9 @@ export function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosi
 }
 
 /**
- * Firing all installed mounts is treated as one energy commitment so mixed
- * loadouts either fire together or fail cleanly with a low-energy warning.
+ * Each installed laser mount owns its own heat budget. The fire-control pass
+ * therefore filters mounts by their individual overheat state, then spends
+ * energy and adds heat only for the arcs that are actually able to fire.
  */
 export function firePlayerLasers(state: TravelCombatState) {
   const firingMounts = getPlayerFiringMounts(state);
@@ -50,33 +51,40 @@ export function firePlayerLasers(state: TravelCombatState) {
   }
 
   let totalCost = 0;
-  let totalHeat = 0;
+  let anyOverheated = false;
   const mountedLasers: Array<{ mount: LaserMountPosition; laserId: LaserId }> = [];
   for (const mount of firingMounts) {
     const laserId = state.playerLoadout.laserMounts[mount];
     if (!laserId) {
       continue;
     }
+    const nextHeat = state.player.laserHeat[mount] + getLaserHeatPerShot(laserId);
+    if (state.player.laserHeat[mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+      state.player.laserHeat[mount] = state.player.maxLaserHeat;
+      anyOverheated = true;
+      continue;
+    }
     mountedLasers.push({ mount, laserId });
     totalCost += getLaserEnergyCost(laserId);
-    totalHeat += getLaserHeatPerShot(laserId);
   }
 
-  if (state.player.laserHeat >= state.player.maxLaserHeat || state.player.laserHeat + totalHeat > state.player.maxLaserHeat) {
-    state.player.laserHeat = state.player.maxLaserHeat;
-    pushMessage(state, 'LASER OVERHEAT', 900);
+  if (mountedLasers.length === 0) {
+    if (anyOverheated) {
+      pushMessage(state, 'LASER OVERHEAT', 900);
+    }
     return false;
   }
-
   if (!spendPlayerEnergy(state, totalCost)) {
     pushMessage(state, 'ENERGY LOW', 900);
     return false;
   }
 
-  state.player.laserHeat = clampLaserHeat(state.player.laserHeat + totalHeat, state.player.maxLaserHeat);
-
   for (const { mount, laserId } of mountedLasers) {
+    state.player.laserHeat[mount] = clampLaserHeat(state.player.laserHeat[mount] + getLaserHeatPerShot(laserId), state.player.maxLaserHeat);
     spawnPlayerLaser(state, mount, laserId);
+  }
+  if (anyOverheated) {
+    pushMessage(state, 'LASER OVERHEAT', 900);
   }
   return true;
 }
