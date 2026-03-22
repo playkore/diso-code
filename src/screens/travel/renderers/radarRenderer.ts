@@ -51,18 +51,8 @@ export function drawRadar(
   ctx.fillText('DOCK RADAR', radarX + 12, radarY + 18);
   ctx.fillText(sessionLabel.toUpperCase(), radarX + 12, radarY + 34);
 
-  ctx.save();
-  ctx.translate(radarCenterX, radarCenterY);
-  ctx.rotate(state.player.angle + Math.PI / 2);
-  ctx.strokeStyle = CGA_GREEN;
-  ctx.beginPath();
-  ctx.moveTo(0, -14);
-  ctx.lineTo(9, 10);
-  ctx.lineTo(0, 5);
-  ctx.lineTo(-9, 10);
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
+  // The main viewport already carries the player's facing marker, so the radar
+  // stays focused on contact positions instead of duplicating the ship glyph.
 
   if (state.station) {
     const dx = state.station.x - state.player.x;
