@@ -35,6 +35,7 @@ export function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: numb
       station,
       dx,
       dy,
+      dist,
       dt,
       enemy.aggression > 0 ? 1 : 0.4,
       mustAvoidSafeZone && station ? getSafeZoneAvoidanceAngle(station, enemy) : undefined

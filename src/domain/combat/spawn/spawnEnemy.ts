@@ -39,6 +39,8 @@ export function spawnEnemyFromBlueprint(
     fireCooldown: overrides.fireCooldown ?? random.nextFloat() * 40,
     missileCooldown: overrides.missileCooldown ?? 90 + random.nextFloat() * 60,
     isFiringLaser: false,
+    hostileAttackPhase: overrides.hostileAttackPhase ?? 'approach',
+    hostileStrafeSign: overrides.hostileStrafeSign ?? (((overrides.id ?? state.nextId) & 1) === 0 ? 1 : -1),
     lifetime: overrides.lifetime ?? 0,
     missionTag: overrides.missionTag
   };

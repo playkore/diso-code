@@ -98,6 +98,14 @@ export interface CombatShipRoles {
 }
 
 /**
+ * Hostile ships now fly repeated attack runs rather than parking on the
+ * player's nose forever. The phases are intentionally small:
+ * - `approach`: line up and press the attack
+ * - `breakaway`: peel to a chosen side and reset for another pass
+ */
+export type HostileAttackPhase = 'approach' | 'breakaway';
+
+/**
  * Immutable definition of a ship archetype.
  *
  * A blueprint answers "what kind of thing can be spawned?" and contains:
@@ -153,6 +161,15 @@ export interface CombatEnemy {
   fireCooldown: number;
   missileCooldown: number;
   isFiringLaser: boolean;
+  /**
+   * Attack-run state for hostile ships.
+   *
+   * These fields are optional so older fixtures can omit them, but live spawns
+   * always initialize them. The strafe sign is stable per enemy so repeated
+   * passes feel deliberate instead of jittering left/right every frame.
+   */
+  hostileAttackPhase?: HostileAttackPhase;
+  hostileStrafeSign?: -1 | 1;
   /**
    * Age in classic 60 Hz ticks.
    *

@@ -183,4 +183,85 @@ describe('travel combat hostile AI', () => {
 
     expect(state.enemies[0].energy).toBe(37);
   });
+
+  it('breaks hostile ships to the side after a frontal attack run', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0]);
+    state.player.x = 0;
+    state.player.y = 0;
+    state.enemies.push({
+      id: 11,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      behavior: 'hostile',
+      x: 120,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 70,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 44,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    for (let index = 0; index < 40; index += 1) {
+      stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+    }
+
+    expect(state.enemies[0].hostileAttackPhase).toBe('breakaway');
+    expect(Math.abs(state.enemies[0].y)).toBeGreaterThan(20);
+    expect(state.enemies[0].x).toBeLessThan(120);
+  });
+
+  it('keeps hostile ships moving during close frontal passes instead of stopping dead', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0]);
+    state.player.x = 0;
+    state.player.y = 0;
+    state.enemies.push({
+      id: 12,
+      kind: 'ship',
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      behavior: 'hostile',
+      x: 100,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: Math.PI,
+      energy: 70,
+      maxEnergy: 70,
+      laserPower: 2,
+      missiles: 0,
+      targetableArea: 210,
+      laserRange: 290,
+      topSpeed: 6,
+      acceleration: 0.11,
+      turnRate: 0.05,
+      roles: { hostile: true, pirate: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 0,
+      missileCooldown: 999,
+      isFiringLaser: false
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+
+    expect(Math.hypot(state.enemies[0].vx, state.enemies[0].vy)).toBeGreaterThan(0.03);
+    expect(state.enemies[0].x).toBeLessThan(100);
+  });
 });
