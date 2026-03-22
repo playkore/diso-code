@@ -2,9 +2,11 @@ import { create } from 'zustand';
 import { createDefaultCommander } from '../domain/commander';
 import {
   createInitialGameState,
+  loadPersistedDockedSession,
   loadInstantTravelEnabled,
   loadPersistedSaveStates,
   loadTravelPerfOverlayEnabled,
+  persistDockedSession,
   persistInstantTravelEnabled,
   persistTravelPerfOverlayEnabled
 } from './gameStateFactory';
@@ -17,6 +19,23 @@ import type { GameStore } from './storeTypes';
 import { createUiMessage, withUiMessage } from './uiMessages';
 
 export type { GameStore, SaveSlotId, SaveState, TravelCompletionReport } from './storeTypes';
+
+/**
+ * Reduces the docked portion of the store to the fields that define the
+ * refresh-restorable session. Activity log chatter is intentionally excluded so
+ * notification spam does not trigger extra writes.
+ */
+function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'travelSession' | 'ui'>) {
+  if (state.travelSession) {
+    return null;
+  }
+  return JSON.stringify({
+    activeTab: state.ui.activeTab,
+    commander: state.commander,
+    universe: state.universe,
+    marketSession: state.market.session
+  });
+}
 
 /**
  * Global application store
@@ -45,20 +64,22 @@ export const useGameStore = create<GameStore>((set, get, api) => {
   // 3. rehydrate persisted save slots and player settings
   const initialCommander = createDefaultCommander();
   const initialState = createInitialGameState(initialCommander);
+  const persistedDockedSession = loadPersistedDockedSession();
   const persistedSaveStates = loadPersistedSaveStates();
   const instantTravelEnabled = loadInstantTravelEnabled();
   const showTravelPerfOverlay = loadTravelPerfOverlayEnabled();
+  const bootState = persistedDockedSession?.restoredState ?? initialState;
 
   return {
     // Base state for a fresh session before any user actions occur.
-    universe: initialState.universe,
-    commander: initialState.commander,
-    market: initialState.market,
-    missions: initialState.missions,
+    universe: bootState.universe,
+    commander: bootState.commander,
+    market: bootState.market,
+    missions: bootState.missions,
     travelSession: null,
     saveStates: persistedSaveStates,
     ui: {
-      activeTab: 'market',
+      activeTab: persistedDockedSession?.activeTab ?? 'market',
       compactMode: true,
       instantTravelEnabled,
       showTravelPerfOverlay,
@@ -105,4 +126,15 @@ export const useGameStore = create<GameStore>((set, get, api) => {
     ...createMissionSlice(set, get, api),
     ...createSaveLoadSlice(set, get, api)
   };
+});
+
+let lastDockedSessionSignature = getDockedSessionSignature(useGameStore.getState());
+
+useGameStore.subscribe((state) => {
+  const nextDockedSessionSignature = getDockedSessionSignature(state);
+  if (!nextDockedSessionSignature || nextDockedSessionSignature === lastDockedSessionSignature) {
+    return;
+  }
+  lastDockedSessionSignature = nextDockedSessionSignature;
+  persistDockedSession(state);
 });

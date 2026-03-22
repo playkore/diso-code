@@ -3,25 +3,11 @@ import { getAutoDockCommand } from '../combat/station/autoDock';
 import { getStationSlotAngle } from '../travelCombat';
 
 describe('auto-dock steering', () => {
-  it('orbits outside the hull when the slot is on the far side of the station', () => {
-    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0.005, safeZoneRadius: 360 };
-    const command = getAutoDockCommand(station, {
-      x: 0,
-      y: -170,
-      vx: 0,
-      vy: 0,
-      angle: 0
-    });
-
-    expect(command.mode).toBe('orbit');
-    expect(command.turn).not.toBe(0);
-  });
-
-  it('steers toward the hold point once it has reached the slot side', () => {
-    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+  it('faces the station center during the radial approach', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0.005, rotSpeed: 0.005, safeZoneRadius: 360 };
     const command = getAutoDockCommand(station, {
       x: 120,
-      y: 220,
+      y: 180,
       vx: 0,
       vy: 0,
       angle: 0
@@ -29,16 +15,62 @@ describe('auto-dock steering', () => {
 
     expect(command.mode).toBe('approach');
     expect(command.turn).not.toBe(0);
+    expect(command.thrust).toBe(1);
+  });
+
+  it('releases thrust early enough to brake near the wall', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    const command = getAutoDockCommand(station, {
+      x: 0,
+      y: 120,
+      vx: 0,
+      vy: -1,
+      angle: -Math.PI / 2
+    });
+
+    expect(command.mode).toBe('approach');
+    expect(command.thrust).toBe(0);
+  });
+
+  it('waits on the wall until the door lines up exactly in front', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0.12, rotSpeed: 0.005, safeZoneRadius: 360 };
+    const slotAngle = getStationSlotAngle(station.angle);
+    const playerAngle = slotAngle + 0.22;
+    const command = getAutoDockCommand(station, {
+      x: Math.cos(playerAngle) * 90,
+      y: Math.sin(playerAngle) * 90,
+      vx: 0,
+      vy: 0,
+      angle: playerAngle + Math.PI
+    });
+
+    expect(command.mode).toBe('wait');
+    expect(command.thrust).toBe(0);
+  });
+
+  it('enters wait even with small sideways drift once radial motion has stopped', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0.12, rotSpeed: 0.005, safeZoneRadius: 360 };
+    const slotAngle = getStationSlotAngle(station.angle);
+    const playerAngle = slotAngle + 0.22;
+    const command = getAutoDockCommand(station, {
+      x: Math.cos(playerAngle) * 90,
+      y: Math.sin(playerAngle) * 90,
+      vx: -0.2,
+      vy: 0.2,
+      angle: playerAngle + Math.PI
+    });
+
+    expect(command.mode).toBe('wait');
   });
 
   it('turns nose-in and advances through the slot once lined up', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);
     const command = getAutoDockCommand(station, {
-      x: Math.cos(slotAngle) * 110,
-      y: Math.sin(slotAngle) * 110,
-      vx: 0.5,
-      vy: 0.5,
+      x: Math.cos(slotAngle) * 90,
+      y: Math.sin(slotAngle) * 90,
+      vx: 0.2,
+      vy: 0,
       angle: slotAngle + Math.PI
     });
 

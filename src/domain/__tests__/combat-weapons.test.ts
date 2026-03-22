@@ -68,6 +68,7 @@ describe('travel combat weapons', () => {
     commander.installedEquipment.ecm = true;
     const state = createCombatState([0, 0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
     state.projectiles.push({ id: 5, kind: 'missile', owner: 'enemy', x: 20, y: 0, vx: 0, vy: 0, damage: 22, life: 20 });
+    state.projectiles.push({ id: 6, kind: 'missile', owner: 'enemy', x: 500, y: 0, vx: 0, vy: 0, damage: 22, life: 20 });
     state.enemies.push({
       id: 9,
       kind: 'ship',
@@ -96,9 +97,25 @@ describe('travel combat weapons', () => {
       isFiringLaser: false
     });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, activateEcm: true }, 1, 'PLAYING', {}, rng);
-    expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
+    expect(state.projectiles).toEqual([
+      expect.objectContaining({ id: 6, kind: 'missile', owner: 'enemy' })
+    ]);
     expect(state.encounter.ecmTimer).toBeGreaterThan(0);
-    expect(state.player.energy).toBe(state.player.maxEnergy);
+    expect(state.player.energy).toBe(state.player.maxEnergy - state.player.energyPerBank);
+  });
+
+  it('keeps enemy missiles faster than the player while homing toward the ship', () => {
+    const state = createCombatState([0, 0, 0]);
+    state.player.vx = 6;
+    state.projectiles.push({ id: 12, kind: 'missile', owner: 'enemy', x: 120, y: 120, vx: 0, vy: 0, damage: 22, life: 20 });
+
+    moveProjectiles(state, 1, createDeterministicRandomSource([0, 0, 0]));
+
+    const missile = state.projectiles[0];
+    const speed = Math.hypot(missile.vx, missile.vy);
+    expect(speed).toBeGreaterThan(state.player.maxSpeed);
+    expect(missile.vx).toBeLessThan(0);
+    expect(missile.vy).toBeLessThan(0);
   });
 
   it('consumes energy bombs and destroys every ship visible on radar', () => {

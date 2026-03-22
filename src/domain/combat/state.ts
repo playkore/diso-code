@@ -150,18 +150,17 @@ export function spendPlayerEnergy(state: TravelCombatState, amount: number) {
  *
  * Each recharge event:
  * - adds 1 energy, or 2 with the extra energy unit
- * - drains 1 energy if ECM is currently active
  * - converts 1 energy into 1 shield only when energy is above 127
+ *
+ * ECM still has an active timer for UI feedback and temporary launch
+ * suppression, but its energy cost is paid up front when the pilot presses the
+ * control rather than hidden inside the recharge loop.
  */
 export function rechargePlayerDefense(state: TravelCombatState, dt: number) {
   state.player.rechargeTickAccumulator += dt;
   while (state.player.rechargeTickAccumulator >= ELITE_RECHARGE_INTERVAL) {
     state.player.rechargeTickAccumulator -= ELITE_RECHARGE_INTERVAL;
     state.player.energy = clampEnergy(state.player.energy + state.player.energyRechargePerTick, state.player.maxEnergy);
-
-    if (state.encounter.ecmTimer > 0) {
-      state.player.energy = clampEnergy(state.player.energy - 1, state.player.maxEnergy);
-    }
 
     if (state.player.shield < state.player.maxShield && state.player.energy > ELITE_SHIELD_RECHARGE_THRESHOLD) {
       state.player.shield = clampShield(state.player.shield + state.player.shieldRechargePerTick, state.player.maxShield);

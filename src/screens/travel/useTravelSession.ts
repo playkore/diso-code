@@ -76,6 +76,10 @@ interface BombUiState {
   visible: boolean;
 }
 
+interface EcmUiState {
+  visible: boolean;
+}
+
 const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
@@ -158,12 +162,16 @@ export function useTravelSession(
   const [bomb, setBomb] = useState<BombUiState>({
     visible: commander.installedEquipment.energy_bomb
   });
+  const [ecm, setEcm] = useState<EcmUiState>({
+    visible: commander.installedEquipment.ecm
+  });
   const [perf, setPerf] = useState(EMPTY_PERF_SNAPSHOT);
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
   const autoDockRef = useRef(autoDock);
   const bombRef = useRef(bomb);
+  const ecmRef = useRef(ecm);
   const perfRef = useRef<PerfAccumulator>(createPerfAccumulator(typeof performance === 'undefined' ? 0 : performance.now()));
   const {
     inputRef,
@@ -250,6 +258,14 @@ export function useTravelSession(
     }
     bombRef.current = next;
     setBomb(next);
+  };
+
+  const setEcmState = (next: EcmUiState) => {
+    if (ecmRef.current.visible === next.visible) {
+      return;
+    }
+    ecmRef.current = next;
+    setEcm(next);
   };
 
   const publishPerfSnapshot = useCallback((now: number) => {
@@ -421,6 +437,11 @@ export function useTravelSession(
       // it disappears immediately after the single-use charge is spent.
       setBombState({
         visible: nextHud.bombVisible
+      });
+      // ECM is a purchased subsystem rather than a consumable, so visibility
+      // mirrors equipment ownership and does not depend on transient flight state.
+      setEcmState({
+        visible: combatState.playerLoadout.installedEquipment.ecm
       });
       setHyperspaceHiddenState(jumpCompleted);
       // The DOCK control is a purchased capability. Once owned, it stays on
@@ -619,6 +640,28 @@ export function useTravelSession(
       }
 
       const autoDockCommand = autoDockActive && combatState.station ? getAutoDockCommand(combatState.station, combatState.player) : null;
+      if (autoDockActive && autoDockCommand && combatState.station) {
+        // Console tracing is intentionally left in place for live debugging of
+        // the docking computer's state machine and slot-angle expectations.
+        console.log('[auto-dock]', {
+          state: autoDockCommand.mode,
+          rotationAngle: autoDockCommand.debug.currentSlotAngle,
+          expectedRotationAngle: autoDockCommand.debug.expectedSlotAngle,
+          playerRadialAngle: autoDockCommand.debug.playerRadialAngle,
+          slotOffset: autoDockCommand.debug.slotOffset,
+          projectedSlotOffset: autoDockCommand.debug.projectedSlotOffset,
+          onStageRing: autoDockCommand.debug.onStageRing,
+          withinWaitBand: autoDockCommand.debug.withinWaitBand,
+          readyToWait: autoDockCommand.debug.readyToWait,
+          canEnterWait: autoDockCommand.debug.canEnterWait,
+          doorInFront: autoDockCommand.debug.doorInFront,
+          distanceFromStation: autoDockCommand.debug.distanceFromStation,
+          stageRadius: autoDockCommand.debug.stageRadius,
+          stageRadiusError: autoDockCommand.debug.stageRadiusError,
+          radialSpeed: autoDockCommand.debug.radialSpeed,
+          tangentialSpeed: autoDockCommand.debug.tangentialSpeed
+        });
+      }
       const result = stepTravelCombat(
         combatState,
         {
@@ -797,6 +840,7 @@ export function useTravelSession(
     hyperspaceHidden,
     autoDock,
     bomb,
+    ecm,
     perf,
     recordReactCommit,
     joystickView,

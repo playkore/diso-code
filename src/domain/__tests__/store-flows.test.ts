@@ -2,10 +2,31 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createDefaultCommander, normalizeCommanderState } from '../commander';
 import { getJumpFuelCost } from '../fuel';
 import { getSystemDistance } from '../galaxyCatalog';
+import { DOCKED_SESSION_STORAGE_KEY, loadPersistedDockedSession } from '../../store/gameStateFactory';
 import { useGameStore } from '../../store/useGameStore';
 
 describe('outfitting store flows', () => {
+  const createLocalStorageMock = () => {
+    const storage = new Map<string, string>();
+    return {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storage.set(key, value);
+      },
+      removeItem: (key: string) => {
+        storage.delete(key);
+      },
+      clear: () => {
+        storage.clear();
+      }
+    };
+  };
+
   beforeEach(() => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: createLocalStorageMock() }
+    });
     const commander = normalizeCommanderState(createDefaultCommander());
     useGameStore.setState((state) => ({
       ...state,
@@ -18,7 +39,11 @@ describe('outfitting store flows', () => {
         economy: 5,
         marketFluctuation: 0
       },
-      travelSession: null
+      travelSession: null,
+      ui: {
+        ...state.ui,
+        activeTab: 'market'
+      }
     }));
   });
 
@@ -78,5 +103,38 @@ describe('outfitting store flows', () => {
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
     expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
     expect(useGameStore.getState().commander.fuel).toBe(expectedFuel);
+  });
+
+  it('persists the last docked session for refresh recovery', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Diso', cash: 4242 }),
+      universe: {
+        ...state.universe,
+        currentSystem: 'Diso',
+        nearbySystems: ['Lave'],
+        economy: 6
+      }
+    }));
+    useGameStore.getState().setActiveTab('missions');
+
+    const persistedRaw = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
+    expect(persistedRaw).toBeTruthy();
+
+    const restoredSession = loadPersistedDockedSession();
+    expect(restoredSession?.activeTab).toBe('missions');
+    expect(restoredSession?.restoredState.commander.currentSystem).toBe('Diso');
+    expect(restoredSession?.restoredState.commander.cash).toBe(4242);
+  });
+
+  it('keeps the last docked autosave while travel is in progress', () => {
+    useGameStore.getState().setActiveTab('equipment');
+    const persistedBeforeTravel = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
+
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+
+    expect(window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY)).toBe(persistedBeforeTravel);
+    expect(loadPersistedDockedSession()?.activeTab).toBe('equipment');
+    expect(loadPersistedDockedSession()?.restoredState.commander.currentSystem).toBe('Lave');
   });
 });

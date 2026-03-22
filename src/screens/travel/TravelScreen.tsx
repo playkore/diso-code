@@ -1,5 +1,6 @@
 import { Profiler, useRef, type ProfilerOnRenderCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { getRouteForTab } from '../../appRoutes';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/travelCombat';
 import type { LaserMountPosition } from '../../domain/shipCatalog';
 import { useGameStore } from '../../store/useGameStore';
@@ -13,6 +14,7 @@ export function TravelScreen() {
   const commander = useGameStore((state) => state.commander);
   const completeTravel = useGameStore((state) => state.completeTravel);
   const showTravelPerfOverlay = useGameStore((state) => state.ui.showTravelPerfOverlay);
+  const activeTab = useGameStore((state) => state.ui.activeTab);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
@@ -22,7 +24,9 @@ export function TravelScreen() {
   };
 
   if (!session) {
-    return <Navigate to="/star-map" replace />;
+    // A browser refresh during flight restores the last docked autosave instead
+    // of trying to rebuild the transient simulation runtime.
+    return <Navigate to={getRouteForTab(activeTab)} replace />;
   }
 
   const energyBanks = travel.hud.energyBanks.map((ratio, index) => (
@@ -138,9 +142,11 @@ export function TravelScreen() {
             <button type="button" className="travel-screen__button travel-screen__button--fire" {...travel.fireButtonHandlers}>
               FIRE
             </button>
-            <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--ecm" {...travel.ecmButtonHandlers}>
-              ECM
-            </button>
+            {travel.ecm.visible ? (
+              <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--ecm" {...travel.ecmButtonHandlers}>
+                ECM
+              </button>
+            ) : null}
             {travel.bomb.visible ? (
               <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--bomb" {...travel.bombButtonHandlers}>
                 BOMB

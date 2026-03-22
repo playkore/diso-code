@@ -49,6 +49,21 @@ describe('travel combat station rules', () => {
     expect(docking.canDock).toBe(true);
   });
 
+  it('counts the visible docking-door mouth as docked', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    const slotAngle = getStationSlotAngle(station.angle);
+    const player = {
+      x: Math.cos(slotAngle) * 81,
+      y: Math.sin(slotAngle) * 81,
+      vx: 0.3,
+      vy: 0.3,
+      angle: slotAngle + Math.PI
+    };
+    const docking = assessDockingApproach(station, player);
+    expect(docking.isInDockingGap).toBe(true);
+    expect(docking.canDock).toBe(true);
+  });
+
   it('collides when crossing the ring away from the visible split', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);

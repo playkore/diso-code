@@ -9,7 +9,7 @@ import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
 import { createUiMessage, withUiMessage } from './uiMessages';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
-import type { MarketState, MissionsState } from './types';
+import type { AppTab, MarketState, MissionsState } from './types';
 
 /**
  * Store factory helpers
@@ -34,10 +34,16 @@ import type { MarketState, MissionsState } from './types';
 export const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
 export const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
 export const SETTINGS_STORAGE_KEY = 'diso-code:settings';
+export const DOCKED_SESSION_STORAGE_KEY = 'diso-code:docked-session';
 
 interface PersistedSettings {
   instantTravelEnabled?: boolean;
   showTravelPerfOverlay?: boolean;
+}
+
+interface PersistedDockedSession {
+  activeTab: AppTab;
+  json: string;
 }
 
 /**
@@ -223,6 +229,68 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
       missionLog: getMissionMessagesForDocking(missionProgress)
     }
   };
+}
+
+/**
+ * Validates a persisted tab before it is trusted to drive navigation.
+ */
+function isAppTab(value: unknown): value is AppTab {
+  return (
+    value === 'market' ||
+    value === 'equipment' ||
+    value === 'inventory' ||
+    value === 'system-data' ||
+    value === 'star-map' ||
+    value === 'missions' ||
+    value === 'save-load'
+  );
+}
+
+/**
+ * Persists the last fully docked session so a browser refresh can rehydrate
+ * the commander, economy, and current station without forcing the player to
+ * use a manual save slot. Real-time travel state is deliberately excluded
+ * because the flight runtime is an in-memory simulation rather than a stable
+ * snapshot format.
+ */
+export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'ui'>) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  const savedAt = new Date().toISOString();
+  const payload: PersistedDockedSession = {
+    activeTab: state.ui.activeTab,
+    json: serializeGameJson(createSnapshot(state), savedAt)
+  };
+  window.localStorage.setItem(DOCKED_SESSION_STORAGE_KEY, JSON.stringify(payload));
+}
+
+/**
+ * Loads the last docked session snapshot. Corrupt autosave data is discarded
+ * wholesale so startup always falls back to a clean new-game bootstrap.
+ */
+export function loadPersistedDockedSession() {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return null;
+  }
+  const raw = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as PersistedDockedSession;
+    if (!isAppTab(parsed.activeTab)) {
+      throw new Error('Invalid docked session tab.');
+    }
+    const gameSave = loadGameJson(parsed.json);
+    return {
+      activeTab: parsed.activeTab,
+      restoredState: restoreSnapshot(gameSave.snapshot)
+    };
+  } catch {
+    window.localStorage.removeItem(DOCKED_SESSION_STORAGE_KEY);
+    return null;
+  }
 }
 
 /**

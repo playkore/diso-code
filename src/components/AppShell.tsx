@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { TAB_ROUTE_MAP } from '../appRoutes';
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
@@ -17,7 +18,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'market',
     label: 'Market',
-    to: '/',
+    to: TAB_ROUTE_MAP.market,
     icon: (
       <NavIcon>
         <path d="M5 9.5h14l-1.2 7.5H6.2z" />
@@ -29,7 +30,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'equipment',
     label: 'Equipment',
-    to: '/equipment',
+    to: TAB_ROUTE_MAP.equipment,
     icon: (
       <NavIcon>
         <path d="M8 8l8 8" />
@@ -43,7 +44,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'inventory',
     label: 'Inventory',
-    to: '/inventory',
+    to: TAB_ROUTE_MAP.inventory,
     icon: (
       <NavIcon>
         <rect x="7" y="4.5" width="10" height="15" rx="1.5" />
@@ -56,7 +57,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'system-data',
     label: 'System',
-    to: '/system-data',
+    to: TAB_ROUTE_MAP['system-data'],
     icon: (
       <NavIcon>
         <circle cx="12" cy="12" r="7.5" />
@@ -68,7 +69,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'star-map',
     label: 'Star Map',
-    to: '/star-map',
+    to: TAB_ROUTE_MAP['star-map'],
     icon: (
       <NavIcon>
         <circle cx="6.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
@@ -82,7 +83,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'missions',
     label: 'Missions',
-    to: '/missions',
+    to: TAB_ROUTE_MAP.missions,
     icon: (
       <NavIcon>
         <path d="M12 4.5l2.2 4.6l5.1.7l-3.7 3.6l.9 5.1L12 16.1L7.5 18.5l.9-5.1l-3.7-3.6l5.1-.7z" />
@@ -92,7 +93,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   {
     tab: 'save-load',
     label: 'Save/Load',
-    to: '/save-load',
+    to: TAB_ROUTE_MAP['save-load'],
     icon: (
       <NavIcon>
         <path d="M6 5h9l3 3v11H6z" />

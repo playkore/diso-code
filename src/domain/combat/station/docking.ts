@@ -8,6 +8,10 @@ import type { CombatPlayer, CombatStation, DockingAssessment } from '../types';
  * face back toward the hangar opening, and slow below the allowed entry speed.
  * Anything that reaches the station hull outside that gap is treated as a
  * collision instead.
+ *
+ * A completed dock is recognized at the visible mouth of the slot rather than
+ * deep inside the station model. That keeps the trigger aligned with what the
+ * player sees on screen, especially now that auto-dock flies a full approach.
  */
 export function getStationSlotAngle(stationAngle: number): number {
   return stationAngle + Math.PI / 2;
@@ -27,7 +31,7 @@ export function assessDockingApproach(
   const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
   const isInDockingGap = distance < station.radius + 6 && isInsideSlot;
   const collidesWithHull = distance < station.radius - 5 && !isInDockingGap;
-  const canDock = distance < station.radius - 18 && isInDockingGap && isFacingHangar && speed < 3.6;
+  const canDock = distance < station.radius + 2 && isInDockingGap && isFacingHangar && speed < 3.6;
 
   return {
     slotAngle,
