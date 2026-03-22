@@ -37,8 +37,10 @@ import type { TravelPerfSnapshot } from './TravelPerfOverlay';
  */
 const INITIAL_HUD = {
   score: '0',
-  shields: '100',
-  shieldsColor: CGA_GREEN,
+  energyBanks: [1, 1, 1, 1],
+  energyColor: CGA_GREEN,
+  shieldRatio: 1,
+  shieldColor: CGA_GREEN,
   jump: 'READY',
   jumpColor: CGA_GREEN,
   hyperspace: 'SAFE ZONE',
@@ -156,8 +158,11 @@ export function useTravelSession(
     const previous = hudRef.current;
     if (
       previous.score === next.score &&
-      previous.shields === next.shields &&
-      previous.shieldsColor === next.shieldsColor &&
+      previous.energyColor === next.energyColor &&
+      previous.shieldRatio === next.shieldRatio &&
+      previous.shieldColor === next.shieldColor &&
+      previous.energyBanks.length === next.energyBanks.length &&
+      previous.energyBanks.every((ratio, index) => ratio === next.energyBanks[index]) &&
       previous.jump === next.jump &&
       previous.jumpColor === next.jumpColor &&
       previous.hyperspace === next.hyperspace &&
@@ -290,6 +295,8 @@ export function useTravelSession(
         techLevel: originSystem.techLevel,
         missionTP: commander.missionTP,
         missionVariant: commander.missionVariant,
+        energyBanks: commander.energyBanks,
+        energyPerBank: commander.energyPerBank,
         laserMounts: commander.laserMounts,
         installedEquipment: commander.installedEquipment,
         missilesInstalled: commander.missilesInstalled
@@ -329,8 +336,10 @@ export function useTravelSession(
       const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
       setHudState({
         score: nextHud.score,
-        shields: nextHud.shields,
-        shieldsColor: combatState.player.shields <= 30 ? CGA_RED : CGA_GREEN,
+        energyBanks: nextHud.energyBanks,
+        energyColor: nextHud.energyColor,
+        shieldRatio: nextHud.shieldRatio,
+        shieldColor: nextHud.shieldColor,
         jump: nextHud.jump,
         jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
         hyperspace: nextHud.hyperspace,
@@ -425,6 +434,8 @@ export function useTravelSession(
           techLevel: originSystem.techLevel,
           missionTP: commander.missionTP,
           missionVariant: commander.missionVariant,
+          energyBanks: commander.energyBanks,
+          energyPerBank: commander.energyPerBank,
           laserMounts: commander.laserMounts,
           installedEquipment: commander.installedEquipment,
           missilesInstalled: commander.missilesInstalled
@@ -574,7 +585,7 @@ export function useTravelSession(
         const docking = assessDockingApproach(combatState.station, combatState.player);
         if (docking.distance < combatState.station.radius + 15) {
           if (docking.collidesWithHull) {
-            combatState.player.shields -= 20;
+            combatState.player.energy = Math.max(0, combatState.player.energy - 20);
             combatState.player.vx *= -1.5;
             combatState.player.vy *= -1.5;
             showMessage('COLLISION WARNING', 1000);

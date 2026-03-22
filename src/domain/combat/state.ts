@@ -31,11 +31,20 @@ export function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.trunc(value)));
 }
 
+export const PLAYER_MAX_SHIELD = 100;
+export const ECM_ENERGY_COST = 32;
+export const SHIELD_RECHARGE_RATE = 1;
+
 /**
- * Shields should never drop below zero or exceed their configured maximum.
+ * Player defensive stats are still modeled as byte-like values, so every write
+ * goes through explicit clamps to preserve Elite-style bounds.
  */
-export function clampShields(value: number, maxShields: number): number {
-  return Math.max(0, Math.min(maxShields, value));
+export function clampShield(value: number, maxShield: number): number {
+  return Math.max(0, Math.min(maxShield, value));
+}
+
+export function clampEnergy(value: number, maxEnergy: number): number {
+  return Math.max(0, Math.min(maxEnergy, value));
 }
 
 /**
@@ -76,10 +85,69 @@ function getPlayerMaxSpeed(_laserMounts: TravelCombatInit['laserMounts']): numbe
 }
 
 /**
- * Extra energy unit affects shield recharge during flight.
+ * Extra energy unit doubles passive bank regeneration during flight.
  */
-function getPlayerRechargeRate(installedEquipment: TravelCombatInit['installedEquipment']): number {
-  return installedEquipment.extra_energy_unit ? 0.2 : 0.09;
+function getPlayerEnergyRegenRate(installedEquipment: TravelCombatInit['installedEquipment']): number {
+  return installedEquipment.extra_energy_unit ? 2 : 1;
+}
+
+/**
+ * Damage always strips the shared shield first and then spills the remainder
+ * into the banked energy reserve. This keeps one canonical damage pipeline for
+ * lasers, missiles, and collision logic.
+ */
+export function applyPlayerDamage(state: TravelCombatState, damage: number) {
+  const appliedDamage = Math.max(0, damage);
+  if (appliedDamage <= 0) {
+    return;
+  }
+
+  const absorbedByShield = Math.min(state.player.shield, appliedDamage);
+  state.player.shield = clampShield(state.player.shield - absorbedByShield, state.player.maxShield);
+  const overflow = appliedDamage - absorbedByShield;
+  if (overflow > 0) {
+    state.player.energy = clampEnergy(state.player.energy - overflow, state.player.maxEnergy);
+  }
+}
+
+/**
+ * Some systems spend energy instantly rather than waiting for incoming damage.
+ * Returning a boolean keeps callers honest about the affordability check.
+ */
+export function spendPlayerEnergy(state: TravelCombatState, amount: number) {
+  const cost = Math.max(0, amount);
+  if (state.player.energy < cost) {
+    return false;
+  }
+  state.player.energy = clampEnergy(state.player.energy - cost, state.player.maxEnergy);
+  return true;
+}
+
+/**
+ * The travel loop only regenerates once the player stops firing. While the
+ * trigger is held down, sustained laser output should visibly walk the energy
+ * banks downward instead of being canceled out by passive recovery.
+ *
+ * Once firing stops, banks regenerate first and the shield then siphons charge
+ * back from those banks. That ordering matches the intended "energy funds
+ * recovery" feel while avoiding free shield regeneration.
+ */
+export function rechargePlayerDefense(state: TravelCombatState, dt: number, options: { firing: boolean }) {
+  if (options.firing) {
+    return;
+  }
+  state.player.energy = clampEnergy(state.player.energy + state.player.energyRegenRate * dt, state.player.maxEnergy);
+  if (state.player.shield >= state.player.maxShield || state.player.energy <= 0) {
+    return;
+  }
+
+  const shieldGap = state.player.maxShield - state.player.shield;
+  const transfer = Math.min(shieldGap, state.player.shieldRechargeRate * dt, state.player.energy);
+  if (transfer <= 0) {
+    return;
+  }
+  state.player.shield = clampShield(state.player.shield + transfer, state.player.maxShield);
+  state.player.energy = clampEnergy(state.player.energy - transfer, state.player.maxEnergy);
 }
 
 /**
@@ -93,6 +161,7 @@ function getPlayerRechargeRate(installedEquipment: TravelCombatInit['installedEq
  */
 export function createTravelCombatState(init: TravelCombatInit, random: RandomSource): TravelCombatState {
   const maxSpeed = getPlayerMaxSpeed(init.laserMounts);
+  const maxEnergy = init.energyBanks * init.energyPerBank;
   const activeBlueprintFile = selectBlueprintFile({
     government: init.government,
     techLevel: init.techLevel,
@@ -108,12 +177,17 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       vy: 0,
       angle: -Math.PI / 2,
       radius: 12,
-      shields: 100,
-      maxShields: 100,
+      energy: maxEnergy,
+      maxEnergy,
+      energyBanks: init.energyBanks,
+      energyPerBank: init.energyPerBank,
+      shield: PLAYER_MAX_SHIELD,
+      maxShield: PLAYER_MAX_SHIELD,
       maxSpeed,
       fireCooldown: 0,
       tallyKills: 0,
-      rechargeRate: getPlayerRechargeRate(init.installedEquipment)
+      energyRegenRate: getPlayerEnergyRegenRate(init.installedEquipment),
+      shieldRechargeRate: SHIELD_RECHARGE_RATE
     },
     playerLoadout: {
       laserMounts: { ...init.laserMounts },
@@ -236,5 +310,24 @@ export function getLaserProjectileProfile(laserId: LaserId) {
     case 'pulse_laser':
     default:
       return { damage: 12, speed: 14, life: 18, cooldown: 12 };
+  }
+}
+
+/**
+ * Laser energy cost stays detached from projectile damage so balance tweaks can
+ * preserve the documented "tiered draw" behavior while remaining visible on a
+ * 4 x 64 bank HUD. The values intentionally drain in bank-sized chunks rather
+ * than tiny single digits, otherwise firing is hard to read at a glance.
+ */
+export function getLaserEnergyCost(laserId: LaserId) {
+  switch (laserId) {
+    case 'military_laser':
+    case 'mining_laser':
+      return 24;
+    case 'beam_laser':
+      return 16;
+    case 'pulse_laser':
+    default:
+      return 8;
   }
 }

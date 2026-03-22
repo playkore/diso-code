@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getEnemyHealthBarState } from './projectilesRenderer';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './constants';
+import { getCgaBarFillColor, getSegmentedBankRatios } from './bars';
 import type { CombatEnemy } from '../../../domain/travelCombat';
 
 function createEnemy(overrides: Partial<CombatEnemy> = {}): CombatEnemy {
@@ -62,5 +63,19 @@ describe('getEnemyHealthBarState', () => {
     expect(getEnemyHealthBarState(createEnemy({ energy: 55 }))?.fillColor).toBe(CGA_GREEN);
     expect(getEnemyHealthBarState(createEnemy({ energy: 28 }))?.fillColor).toBe(CGA_YELLOW);
     expect(getEnemyHealthBarState(createEnemy({ energy: 20 }))?.fillColor).toBe(CGA_RED);
+  });
+});
+
+describe('travel bar helpers', () => {
+  it('splits energy into segmented banks for HUD and overlays alike', () => {
+    expect(getSegmentedBankRatios(256, 256, 4)).toEqual([1, 1, 1, 1]);
+    expect(getSegmentedBankRatios(160, 256, 4)).toEqual([1, 1, 0.5, 0]);
+    expect(getSegmentedBankRatios(0, 256, 4)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('uses the same CGA thresholds for player and enemy bars', () => {
+    expect(getCgaBarFillColor(0.9)).toBe(CGA_GREEN);
+    expect(getCgaBarFillColor(0.5)).toBe(CGA_YELLOW);
+    expect(getCgaBarFillColor(0.2)).toBe(CGA_RED);
   });
 });

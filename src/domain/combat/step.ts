@@ -5,8 +5,8 @@ import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
-import { getPlayerFiringMounts, spawnPlayerLaser } from './weapons/playerWeapons';
-import { clampShields, stepParticles } from './state';
+import { firePlayerLasers } from './weapons/playerWeapons';
+import { rechargePlayerDefense, stepParticles } from './state';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
 import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCombatState } from './types';
@@ -38,7 +38,7 @@ export function stepTravelCombat(
   }
 
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
-  state.player.shields = clampShields(state.player.shields + state.player.rechargeRate * dt, state.player.maxShields);
+  rechargePlayerDefense(state, dt, { firing: input.fire });
 
   if (input.activateEcm) {
     activatePlayerEcm(state);
@@ -92,17 +92,7 @@ export function stepTravelCombat(
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
     if (input.fire && state.player.fireCooldown <= 0) {
-      const firingMounts = getPlayerFiringMounts(state);
-      if (firingMounts.length === 0) {
-        state.lastPlayerArc = 'front';
-      } else {
-        for (const mount of firingMounts) {
-          const laserId = state.playerLoadout.laserMounts[mount];
-          if (laserId) {
-            spawnPlayerLaser(state, mount, laserId);
-          }
-        }
-      }
+      firePlayerLasers(state);
     }
   }
 
@@ -142,8 +132,8 @@ export function stepTravelCombat(
 
   return {
     state,
-    playerDestroyed: state.player.shields <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
-    playerEscaped: state.player.shields <= 0 && state.playerLoadout.installedEquipment.escape_pod,
+    playerDestroyed: state.player.energy <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
+    playerEscaped: state.player.energy <= 0 && state.playerLoadout.installedEquipment.escape_pod,
     autoDocked: Boolean(
       // Auto-dock is intentionally conservative: the docking computer only
       // resolves the final approach after the player requests it, owns the

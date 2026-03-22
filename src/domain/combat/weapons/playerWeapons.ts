@@ -1,4 +1,4 @@
-import { getLaserProjectileProfile, projectileId } from '../state';
+import { getLaserEnergyCost, getLaserProjectileProfile, projectileId, pushMessage, spendPlayerEnergy } from '../state';
 import type { TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../shipCatalog';
 
@@ -36,4 +36,37 @@ export function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosi
   });
   state.player.fireCooldown = profile.cooldown;
   state.lastPlayerArc = mount;
+}
+
+/**
+ * Firing all installed mounts is treated as one energy commitment so mixed
+ * loadouts either fire together or fail cleanly with a low-energy warning.
+ */
+export function firePlayerLasers(state: TravelCombatState) {
+  const firingMounts = getPlayerFiringMounts(state);
+  if (firingMounts.length === 0) {
+    state.lastPlayerArc = 'front';
+    return false;
+  }
+
+  let totalCost = 0;
+  const mountedLasers: Array<{ mount: LaserMountPosition; laserId: LaserId }> = [];
+  for (const mount of firingMounts) {
+    const laserId = state.playerLoadout.laserMounts[mount];
+    if (!laserId) {
+      continue;
+    }
+    mountedLasers.push({ mount, laserId });
+    totalCost += getLaserEnergyCost(laserId);
+  }
+
+  if (!spendPlayerEnergy(state, totalCost)) {
+    pushMessage(state, 'ENERGY LOW', 900);
+    return false;
+  }
+
+  for (const { mount, laserId } of mountedLasers) {
+    spawnPlayerLaser(state, mount, laserId);
+  }
+  return true;
 }

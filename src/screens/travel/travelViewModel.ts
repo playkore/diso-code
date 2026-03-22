@@ -1,5 +1,6 @@
 import { getLegalStatus, type CommanderState } from '../../domain/commander';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
+import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
 
 /**
  * Maps combat simulation data into HUD-friendly strings.
@@ -26,9 +27,14 @@ export function getHudState(
 ) {
   const hostileCount = state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
   const drives = getDriveStatus(flightState, options);
+  const energyRatio = state.player.maxEnergy > 0 ? state.player.energy / state.player.maxEnergy : 0;
+  const shieldRatio = state.player.maxShield > 0 ? state.player.shield / state.player.maxShield : 0;
   return {
     score: String(state.score),
-    shields: String(Math.max(0, Math.round(state.player.shields))),
+    energyBanks: getSegmentedBankRatios(state.player.energy, state.player.maxEnergy, state.player.energyBanks),
+    energyColor: getCgaBarFillColor(energyRatio),
+    shieldRatio: Math.max(0, Math.min(1, shieldRatio)),
+    shieldColor: getCgaBarFillColor(shieldRatio),
     jump: drives.jump,
     hyperspace: drives.hyperspace,
     legal: `${getLegalStatus(state.legalValue)} ${state.legalValue}`,
@@ -45,6 +51,8 @@ export function createCombatInit(commander: CommanderState, originSystem: { gove
     techLevel: originSystem.techLevel,
     missionTP: commander.missionTP,
     missionVariant: commander.missionVariant,
+    energyBanks: commander.energyBanks,
+    energyPerBank: commander.energyPerBank,
     laserMounts: commander.laserMounts,
     installedEquipment: commander.installedEquipment,
     missilesInstalled: commander.missilesInstalled

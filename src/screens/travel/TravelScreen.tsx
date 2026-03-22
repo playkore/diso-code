@@ -24,6 +24,12 @@ export function TravelScreen() {
     return <Navigate to="/star-map" replace />;
   }
 
+  const energyBanks = travel.hud.energyBanks.map((ratio, index) => (
+    <span key={`energy-bank-${index}`} className="travel-screen__hud-bank">
+      <span className="travel-screen__hud-bank-fill" style={{ width: `${ratio * 100}%`, backgroundColor: travel.hud.energyColor }} />
+    </span>
+  ));
+
   return (
     <Profiler id="travel-screen" onRender={handleRender}>
       <section className="travel-screen">
@@ -36,7 +42,16 @@ export function TravelScreen() {
               Fuel: {formatLightYears(session.fuelCost)} <span className="travel-screen__hud-subtle">on arrival jump</span>
             </div>
             <div className="travel-screen__hud-line">Score: <span>{travel.hud.score}</span></div>
-            <div className="travel-screen__hud-line">Shields: <span style={{ color: travel.hud.shieldsColor }}>{travel.hud.shields}</span>%</div>
+            <div className="travel-screen__hud-line travel-screen__hud-line--bars">
+              <span className="travel-screen__hud-label">Energy</span>
+              <span className="travel-screen__hud-banks">{energyBanks}</span>
+            </div>
+            <div className="travel-screen__hud-line travel-screen__hud-line--bars">
+              <span className="travel-screen__hud-label">Shield</span>
+              <span className="travel-screen__hud-meter">
+                <span className="travel-screen__hud-meter-fill" style={{ width: `${travel.hud.shieldRatio * 100}%`, backgroundColor: travel.hud.shieldColor }} />
+              </span>
+            </div>
             <div className="travel-screen__hud-line">Jump Drive: <span style={{ color: travel.hud.jumpColor }}>{travel.hud.jump}</span></div>
             <div className="travel-screen__hud-line">Hyperspace: <span style={{ color: travel.hud.hyperspaceColor }}>{travel.hud.hyperspace}</span></div>
             <div className="travel-screen__hud-line">Legal: <span style={{ color: travel.hud.legalColor }}>{travel.hud.legal}</span></div>

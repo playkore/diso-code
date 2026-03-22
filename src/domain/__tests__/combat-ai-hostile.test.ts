@@ -72,8 +72,9 @@ describe('travel combat hostile AI', () => {
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 0;
     state.player.y = 0;
-    state.player.shields = 70;
-    state.player.rechargeRate = 0;
+    state.player.shield = 70;
+    state.player.energyRegenRate = 0;
+    state.player.shieldRechargeRate = 0;
     state.enemies.push({
       id: 8,
       kind: 'ship',
@@ -103,7 +104,7 @@ describe('travel combat hostile AI', () => {
     });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
     expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(377.5);
-    expect(state.player.shields).toBe(70);
+    expect(state.player.shield).toBe(70);
     expect(state.enemies[0].isFiringLaser).toBe(false);
   });
 

@@ -13,6 +13,8 @@ export function createCombatState(
       techLevel: 7,
       missionTP: 0,
       missionVariant: 'classic',
+      energyBanks: commander.energyBanks,
+      energyPerBank: commander.energyPerBank,
       laserMounts: commander.laserMounts,
       installedEquipment: commander.installedEquipment,
       missilesInstalled: commander.missilesInstalled,

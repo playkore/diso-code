@@ -570,6 +570,55 @@ button:disabled {
   font-weight: 700;
 }
 
+.travel-screen__hud-line--bars {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.travel-screen__hud-label {
+  min-width: 3.7rem;
+}
+
+.travel-screen__hud-banks {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 0.12rem;
+}
+
+.travel-screen__hud-bank {
+  position: relative;
+  width: 0.6rem;
+  height: 0.45rem;
+  border: 1px solid var(--cga-yellow);
+  background: var(--cga-black);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.travel-screen__hud-bank-fill {
+  display: block;
+  height: 100%;
+  background: var(--cga-green);
+}
+
+.travel-screen__hud-meter {
+  position: relative;
+  display: inline-block;
+  width: 3.4rem;
+  height: 0.45rem;
+  border: 1px solid var(--cga-yellow);
+  background: var(--cga-black);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.travel-screen__hud-meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--cga-green);
+}
+
 .travel-screen__hud-subtle {
   color: #ffff55;
   opacity: 1;

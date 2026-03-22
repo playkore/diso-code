@@ -199,12 +199,17 @@ export interface CombatPlayer {
   vy: number;
   angle: number;
   radius: number;
-  shields: number;
-  maxShields: number;
+  energy: number;
+  maxEnergy: number;
+  energyBanks: number;
+  energyPerBank: number;
+  shield: number;
+  maxShield: number;
   maxSpeed: number;
   fireCooldown: number;
   tallyKills: number;
-  rechargeRate: number;
+  energyRegenRate: number;
+  shieldRechargeRate: number;
 }
 
 /**
@@ -299,6 +304,8 @@ export interface TravelCombatInit {
   techLevel: number;
   missionTP: number;
   missionVariant: MissionVariant;
+  energyBanks: number;
+  energyPerBank: number;
   laserMounts: LaserMountState;
   installedEquipment: InstalledEquipmentState;
   missilesInstalled: number;

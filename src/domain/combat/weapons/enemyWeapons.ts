@@ -1,6 +1,5 @@
-import { pushMessage, projectileId, spawnParticles } from '../state';
+import { applyPlayerDamage, pushMessage, projectileId, spawnParticles } from '../state';
 import { spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
-import { clampShields } from '../state';
 import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
 /**
@@ -99,7 +98,7 @@ export function tryEnemyLaserAttack(state: TravelCombatState, enemy: CombatEnemy
     return;
   }
 
-  state.player.shields = clampShields(state.player.shields - enemy.laserPower, state.player.maxShields);
+  applyPlayerDamage(state, enemy.laserPower);
   enemy.vx *= 0.5;
   enemy.vy *= 0.5;
   spawnParticles(state, state.player.x, state.player.y, '#ff5555');

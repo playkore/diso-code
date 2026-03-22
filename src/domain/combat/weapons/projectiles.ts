@@ -1,14 +1,14 @@
 import { stepEnemyMissile } from '../ai/missileAi';
 import { destroyEnemy } from '../scoring/salvage';
 import { getLegalValueAfterCombat, updateLegalStatus } from '../scoring/legalStatus';
-import { clampShields, pushMessage, spawnParticles } from '../state';
+import { applyPlayerDamage, pushMessage, spawnParticles } from '../state';
 import type { RandomSource, TravelCombatState } from '../types';
 
 /**
  * Projectile simulation and collision side effects.
  *
  * This pass owns all transient projectile state after firing: homing missiles,
- * hit detection, station safe-zone penalties, shield damage, and cleanup.
+ * hit detection, station safe-zone penalties, player shield/energy damage, and cleanup.
  */
 export function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
@@ -47,10 +47,11 @@ export function moveProjectiles(state: TravelCombatState, dt: number, random: Ra
         }
       }
     } else if (Math.hypot(projectile.x - state.player.x, projectile.y - state.player.y) < state.player.radius + (projectile.kind === 'missile' ? 6 : 0)) {
-      state.player.shields = clampShields(state.player.shields - projectile.damage, state.player.maxShields);
+      const shieldBeforeHit = state.player.shield;
+      applyPlayerDamage(state, projectile.damage);
       hit = true;
       spawnParticles(state, projectile.x, projectile.y, '#ff5555');
-      if (projectile.kind === 'missile' && state.player.shields > 0) {
+      if (projectile.kind === 'missile' && shieldBeforeHit > 0) {
         pushMessage(state, 'MISSILE IMPACT', 900);
       }
     }

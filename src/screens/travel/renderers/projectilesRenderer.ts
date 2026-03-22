@@ -1,5 +1,6 @@
 import type { CombatEnemy, TravelCombatState } from '../../../domain/travelCombat';
-import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW } from './constants';
+import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
+import { getCgaBarFillColor, getSegmentedBankRatios } from './bars';
 import { getEnemyColor, getEnemyShape, getProjectileColor, drawWireframe } from './shipsRenderer';
 
 /**
@@ -20,13 +21,12 @@ export function getEnemyHealthBarState(enemy: CombatEnemy): EnemyHealthBarState 
   }
 
   const ratio = Math.max(0, Math.min(1, enemy.maxEnergy > 0 ? enemy.energy / enemy.maxEnergy : 0));
-  // Elite-style energy is displayed as four banks. We map the continuous enemy
-  // energy ratio into per-bank fill levels so the HUD communicates collapse
-  // bank-by-bank instead of as a single monolithic hit-point bar.
-  const bankRatios = Array.from({ length: 4 }, (_unused, bankIndex) => Math.max(0, Math.min(1, ratio * 4 - bankIndex)));
+  // Enemy overlays use the exact same bank decomposition as the player HUD so
+  // the fight reads as one shared energy language across the whole screen.
+  const bankRatios = getSegmentedBankRatios(enemy.energy, enemy.maxEnergy, 4);
   return {
     bankRatios,
-    fillColor: ratio <= 0.3 ? CGA_RED : ratio <= 0.65 ? CGA_YELLOW : CGA_GREEN
+    fillColor: getCgaBarFillColor(ratio)
   };
 }
 
