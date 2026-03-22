@@ -103,7 +103,9 @@ describe('travel combat hostile AI', () => {
       isFiringLaser: false
     });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
-    expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(377.5);
+    // Pirates should now stay outside two full safe-zone radii instead of only
+    // bouncing off the single-ring station perimeter.
+    expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(737.5);
     expect(state.player.shield).toBe(70);
     expect(state.enemies[0].isFiringLaser).toBe(false);
   });

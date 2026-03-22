@@ -2,9 +2,22 @@ import type { CombatEnemy, CombatStation } from '../types';
 
 export const SAFE_ZONE_ENEMY_MARGIN = 18;
 export const SAFE_ZONE_AVOIDANCE_DISTANCE = 96;
+export const PIRATE_SAFE_ZONE_RADIUS_MULTIPLIER = 2;
 
 export function getDistanceFromStation(station: CombatStation, x: number, y: number): number {
   return Math.hypot(x - station.x, y - station.y);
+}
+
+/**
+ * Hostile traffic does not all share the same perimeter around the station.
+ *
+ * Pirates now keep a wider buffer so they never drift into the station approach
+ * corridor: they must stay outside two full safe-zone radii. Other excluded
+ * ships still use the original single safe-zone boundary plus the usual margin.
+ */
+export function getEnemySafeZoneBoundary(station: CombatStation, enemy: CombatEnemy): number {
+  const exclusionRadius = enemy.roles.pirate ? station.safeZoneRadius * PIRATE_SAFE_ZONE_RADIUS_MULTIPLIER : station.safeZoneRadius;
+  return exclusionRadius + SAFE_ZONE_ENEMY_MARGIN;
 }
 
 export function getSafeZoneEscapeAngle(station: CombatStation, enemy: CombatEnemy): number {
@@ -17,7 +30,7 @@ export function getSafeZoneEscapeAngle(station: CombatStation, enemy: CombatEnem
 }
 
 export function keepEnemyOutsideSafeZone(station: CombatStation, enemy: CombatEnemy) {
-  const safeZoneBoundary = station.safeZoneRadius + SAFE_ZONE_ENEMY_MARGIN;
+  const safeZoneBoundary = getEnemySafeZoneBoundary(station, enemy);
   const distanceFromStation = getDistanceFromStation(station, enemy.x, enemy.y);
   if (distanceFromStation >= safeZoneBoundary) {
     return;

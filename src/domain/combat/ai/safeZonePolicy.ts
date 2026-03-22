@@ -1,4 +1,4 @@
-import { getDistanceFromStation, getSafeZoneEscapeAngle, keepEnemyOutsideSafeZone, SAFE_ZONE_AVOIDANCE_DISTANCE, SAFE_ZONE_ENEMY_MARGIN } from '../station/safeZone';
+import { getDistanceFromStation, getEnemySafeZoneBoundary, getSafeZoneEscapeAngle, keepEnemyOutsideSafeZone, SAFE_ZONE_AVOIDANCE_DISTANCE } from '../station/safeZone';
 import type { CombatEnemy, CombatStation } from '../types';
 
 export function isEnemyExcludedFromSafeZone(enemy: CombatEnemy): boolean {
@@ -17,7 +17,9 @@ export function isStationTraffic(enemy: CombatEnemy): boolean {
 }
 
 export function getSafeZoneContext(station: CombatStation | null, enemy: CombatEnemy) {
-  const safeZoneBoundary = station ? station.safeZoneRadius + SAFE_ZONE_ENEMY_MARGIN : 0;
+  // The boundary is role-aware because pirates use a larger exclusion ring than
+  // other hostile traffic near the station.
+  const safeZoneBoundary = station ? getEnemySafeZoneBoundary(station, enemy) : 0;
   const enemyExcludedFromSafeZone = station ? isEnemyExcludedFromSafeZone(enemy) : false;
   const distanceFromStation = station ? getDistanceFromStation(station, enemy.x, enemy.y) : Number.POSITIVE_INFINITY;
   const mustAvoidSafeZone = Boolean(
