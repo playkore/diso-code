@@ -77,6 +77,7 @@ export function stepTravelCombat(
         vx: -state.player.vx * 0.5,
         vy: -state.player.vy * 0.5,
         life: 10,
+        maxLife: 10,
         color: '#55ff55'
       });
     }

@@ -140,9 +140,14 @@ export function drawProjectilesAndParticles(ctx: CanvasRenderingContext2D, state
   }
 
   for (const particle of state.particles) {
+    // Particles expand as they age so the engine trail reads as exhaust fire
+    // instead of a static chain of dots.
+    const lifeRatio = particle.maxLife > 0 ? Math.max(0, Math.min(1, particle.life / particle.maxLife)) : 0;
+    const ageRatio = 1 - lifeRatio;
+    const size = particle.color === '#55ff55' ? 1.4 + ageRatio * 3.2 : 1.8 + ageRatio * 1.6;
     ctx.fillStyle = particle.color;
     ctx.shadowBlur = 5;
     ctx.shadowColor = particle.color;
-    ctx.fillRect(particle.x - camX, particle.y - camY, 2, 2);
+    ctx.fillRect(particle.x - camX - size / 2, particle.y - camY - size / 2, size, size);
   }
 }

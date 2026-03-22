@@ -183,6 +183,7 @@ export interface CombatParticle {
   vx: number;
   vy: number;
   life: number;
+  maxLife: number;
   color: string;
 }
 

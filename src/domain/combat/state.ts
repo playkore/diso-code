@@ -268,12 +268,14 @@ export function pushMessage(state: TravelCombatState, text: string, duration = 1
  */
 export function spawnParticles(state: TravelCombatState, x: number, y: number, color: string) {
   for (let i = 0; i < 12; i += 1) {
+    const life = 20 + Math.random() * 12;
     state.particles.push({
       x,
       y,
       vx: (Math.random() - 0.5) * 8,
       vy: (Math.random() - 0.5) * 8,
-      life: 20 + Math.random() * 12,
+      life,
+      maxLife: life,
       color
     });
   }
