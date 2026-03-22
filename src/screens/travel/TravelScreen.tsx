@@ -56,7 +56,7 @@ export function TravelScreen() {
                   <span className="travel-screen__hud-key">Route</span>
                   <span className="travel-screen__hud-value">{session.originSystem} -&gt; {session.destinationSystem}</span>
                 </span>
-                <span className="travel-screen__hud-stat">
+                <span className="travel-screen__hud-stat travel-screen__hud-stat--right-anchor">
                   <span className="travel-screen__hud-key">Fuel</span>
                   <span className="travel-screen__hud-value">{formatLightYears(session.fuelCost)}</span>
                 </span>

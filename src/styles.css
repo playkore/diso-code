@@ -463,6 +463,11 @@ button:disabled {
     min-width: 0;
   }
 
+  .travel-screen__hud-stat--right-anchor,
+  .travel-screen__hud-stat--heat {
+    margin-left: 0;
+  }
+
   .travel-screen__telemetry {
     top: 7.55rem;
     left: 0.55rem;
@@ -583,6 +588,7 @@ button:disabled {
   position: absolute;
   top: 0.8rem;
   left: 0.8rem;
+  right: 1rem;
   color: #55ff55;
   text-shadow: none;
   pointer-events: none;
@@ -595,7 +601,8 @@ button:disabled {
 }
 
 .travel-screen__hud-panel {
-  min-width: min(38rem, calc(100vw - 14rem));
+  width: 100%;
+  min-width: 0;
 }
 
 .travel-screen__hud-row {
@@ -622,12 +629,17 @@ button:disabled {
   min-width: 16rem;
 }
 
+.travel-screen__hud-stat--right-anchor {
+  margin-left: auto;
+}
+
 .travel-screen__hud-stat--bar {
   gap: 0.42rem;
 }
 
 .travel-screen__hud-stat--heat {
   align-items: flex-start;
+  margin-left: auto;
 }
 
 .travel-screen__hud-key {
