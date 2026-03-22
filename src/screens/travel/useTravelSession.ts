@@ -67,6 +67,25 @@ interface TravelRefs {
   viewportRef: RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Flight setup snapshot captured from the commander store.
+ *
+ * The combat effect must depend only on fields that define the active flight
+ * simulation. Store updates such as live cash rewards should not rebuild the
+ * whole session and silently respawn the ship near the station.
+ */
+interface CombatCommanderSnapshot {
+  cargo: CommanderState['cargo'];
+  legalValue: CommanderState['legalValue'];
+  missionTP: CommanderState['missionTP'];
+  missionVariant: CommanderState['missionVariant'];
+  energyBanks: CommanderState['energyBanks'];
+  energyPerBank: CommanderState['energyPerBank'];
+  laserMounts: CommanderState['laserMounts'];
+  installedEquipment: CommanderState['installedEquipment'];
+  missilesInstalled: CommanderState['missilesInstalled'];
+}
+
 interface AutoDockUiState {
   visible: boolean;
   enabled: boolean;
@@ -150,7 +169,7 @@ function createPerfAccumulator(now: number): PerfAccumulator {
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
-  commander: CommanderState,
+  commander: CombatCommanderSnapshot,
   grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: Parameters<ReturnType<typeof import('../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
   navigate: (to: string, options?: { replace?: boolean }) => void

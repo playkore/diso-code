@@ -1,5 +1,6 @@
 import { Profiler, useRef, type ProfilerOnRenderCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { shallow } from 'zustand/shallow';
 import { getRouteForTab } from '../../appRoutes';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/travelCombat';
 import type { LaserMountPosition } from '../../domain/shipCatalog';
@@ -12,7 +13,21 @@ import { useTravelSession } from './useTravelSession';
 export function TravelScreen() {
   const navigate = useNavigate();
   const session = useGameStore((state) => state.travelSession);
-  const commander = useGameStore((state) => state.commander);
+  const commanderCash = useGameStore((state) => state.commander.cash);
+  const combatCommander = useGameStore(
+    (state) => ({
+      cargo: state.commander.cargo,
+      legalValue: state.commander.legalValue,
+      missionTP: state.commander.missionTP,
+      missionVariant: state.commander.missionVariant,
+      energyBanks: state.commander.energyBanks,
+      energyPerBank: state.commander.energyPerBank,
+      laserMounts: state.commander.laserMounts,
+      installedEquipment: state.commander.installedEquipment,
+      missilesInstalled: state.commander.missilesInstalled
+    }),
+    shallow
+  );
   const grantCombatCredits = useGameStore((state) => state.grantCombatCredits);
   const completeTravel = useGameStore((state) => state.completeTravel);
   const showTravelPerfOverlay = useGameStore((state) => state.ui.showTravelPerfOverlay);
@@ -20,7 +35,7 @@ export function TravelScreen() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  const travel = useTravelSession({ canvasRef, viewportRef }, session, commander, grantCombatCredits, completeTravel, navigate);
+  const travel = useTravelSession({ canvasRef, viewportRef }, session, combatCommander, grantCombatCredits, completeTravel, navigate);
   const handleRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
     travel.recordReactCommit(actualDuration);
   };
@@ -70,7 +85,7 @@ export function TravelScreen() {
                 </span>
                 <span className="travel-screen__hud-stat">
                   <span className="travel-screen__hud-key">Credits</span>
-                  <span className="travel-screen__hud-value">{formatCredits(commander.cash)}</span>
+                  <span className="travel-screen__hud-value">{formatCredits(commanderCash)}</span>
                 </span>
               </div>
               <div className="travel-screen__hud-row travel-screen__hud-row--systems">
