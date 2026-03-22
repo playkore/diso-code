@@ -31,10 +31,10 @@ export function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.trunc(value)));
 }
 
-export const PLAYER_MAX_SHIELD = 100;
-export const ECM_ENERGY_COST = 32;
-export const SHIELD_RECHARGE_RATE = 1;
-export const SHIELD_RECHARGE_DELAY = 45;
+export const PLAYER_MAX_ENERGY = 255;
+export const PLAYER_MAX_SHIELD = 255;
+export const ELITE_RECHARGE_INTERVAL = (8 / 50) * 60;
+export const ELITE_SHIELD_RECHARGE_THRESHOLD = 127;
 
 /**
  * Player defensive stats are still modeled as byte-like values, so every write
@@ -86,16 +86,15 @@ function getPlayerMaxSpeed(_laserMounts: TravelCombatInit['laserMounts']): numbe
 }
 
 /**
- * Extra energy unit doubles passive bank regeneration during flight.
+ * Elite recharges one energy point on each classic recharge event, or two when
+ * the extra energy unit is installed.
  */
-function getPlayerEnergyRegenRate(installedEquipment: TravelCombatInit['installedEquipment']): number {
+function getPlayerEnergyRechargePerTick(installedEquipment: TravelCombatInit['installedEquipment']): number {
   return installedEquipment.extra_energy_unit ? 2 : 1;
 }
 
 /**
- * Damage always strips the shared shield first and then spills the remainder
- * into the banked energy reserve. This keeps one canonical damage pipeline for
- * lasers, missiles, and collision logic.
+ * Damage follows Elite's original ordering: shield first, then energy overflow.
  */
 export function applyPlayerDamage(state: TravelCombatState, damage: number) {
   const appliedDamage = Math.max(0, damage);
@@ -105,9 +104,6 @@ export function applyPlayerDamage(state: TravelCombatState, damage: number) {
 
   const absorbedByShield = Math.min(state.player.shield, appliedDamage);
   state.player.shield = clampShield(state.player.shield - absorbedByShield, state.player.maxShield);
-  // Any successful hit resets the shield recharge timer so incoming fire keeps
-  // pressure on the player instead of letting the bar climb back immediately.
-  state.player.shieldRechargeDelay = SHIELD_RECHARGE_DELAY;
   const overflow = appliedDamage - absorbedByShield;
   if (overflow > 0) {
     state.player.energy = clampEnergy(state.player.energy - overflow, state.player.maxEnergy);
@@ -115,8 +111,8 @@ export function applyPlayerDamage(state: TravelCombatState, damage: number) {
 }
 
 /**
- * Some systems spend energy instantly rather than waiting for incoming damage.
- * Returning a boolean keeps callers honest about the affordability check.
+ * Some systems still spend energy immediately in this clone, even though Elite
+ * also has time-based drains such as ECM while active.
  */
 export function spendPlayerEnergy(state: TravelCombatState, amount: number) {
   const cost = Math.max(0, amount);
@@ -128,31 +124,30 @@ export function spendPlayerEnergy(state: TravelCombatState, amount: number) {
 }
 
 /**
- * The travel loop only regenerates once the player stops firing. While the
- * trigger is held down, sustained laser output should visibly walk the energy
- * banks downward instead of being canceled out by passive recovery.
+ * Elite updates energy and shield charging on a fixed cadence: once every
+ * eight 50 Hz ticks. We emulate that cadence in the 60 fps render loop by
+ * accumulating frame time and replaying one or more classic recharge events.
  *
- * Once firing stops, banks regenerate first and the shield then siphons charge
- * back from those banks. That ordering matches the intended "energy funds
- * recovery" feel while avoiding free shield regeneration.
+ * Each recharge event:
+ * - adds 1 energy, or 2 with the extra energy unit
+ * - drains 1 energy if ECM is currently active
+ * - converts 1 energy into 1 shield only when energy is above 127
  */
-export function rechargePlayerDefense(state: TravelCombatState, dt: number, options: { firing: boolean }) {
-  state.player.shieldRechargeDelay = Math.max(0, state.player.shieldRechargeDelay - dt);
-  if (options.firing) {
-    return;
-  }
-  state.player.energy = clampEnergy(state.player.energy + state.player.energyRegenRate * dt, state.player.maxEnergy);
-  if (state.player.shield >= state.player.maxShield || state.player.energy <= 0 || state.player.shieldRechargeDelay > 0) {
-    return;
-  }
+export function rechargePlayerDefense(state: TravelCombatState, dt: number) {
+  state.player.rechargeTickAccumulator += dt;
+  while (state.player.rechargeTickAccumulator >= ELITE_RECHARGE_INTERVAL) {
+    state.player.rechargeTickAccumulator -= ELITE_RECHARGE_INTERVAL;
+    state.player.energy = clampEnergy(state.player.energy + state.player.energyRechargePerTick, state.player.maxEnergy);
 
-  const shieldGap = state.player.maxShield - state.player.shield;
-  const transfer = Math.min(shieldGap, state.player.shieldRechargeRate * dt, state.player.energy);
-  if (transfer <= 0) {
-    return;
+    if (state.encounter.ecmTimer > 0) {
+      state.player.energy = clampEnergy(state.player.energy - 1, state.player.maxEnergy);
+    }
+
+    if (state.player.shield < state.player.maxShield && state.player.energy > ELITE_SHIELD_RECHARGE_THRESHOLD) {
+      state.player.shield = clampShield(state.player.shield + state.player.shieldRechargePerTick, state.player.maxShield);
+      state.player.energy = clampEnergy(state.player.energy - 1, state.player.maxEnergy);
+    }
   }
-  state.player.shield = clampShield(state.player.shield + transfer, state.player.maxShield);
-  state.player.energy = clampEnergy(state.player.energy - transfer, state.player.maxEnergy);
 }
 
 /**
@@ -166,7 +161,7 @@ export function rechargePlayerDefense(state: TravelCombatState, dt: number, opti
  */
 export function createTravelCombatState(init: TravelCombatInit, random: RandomSource): TravelCombatState {
   const maxSpeed = getPlayerMaxSpeed(init.laserMounts);
-  const maxEnergy = init.energyBanks * init.energyPerBank;
+  const maxEnergy = PLAYER_MAX_ENERGY;
   const activeBlueprintFile = selectBlueprintFile({
     government: init.government,
     techLevel: init.techLevel,
@@ -185,15 +180,15 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       energy: maxEnergy,
       maxEnergy,
       energyBanks: init.energyBanks,
-      energyPerBank: init.energyPerBank,
+      energyPerBank: Math.ceil(maxEnergy / init.energyBanks),
       shield: PLAYER_MAX_SHIELD,
       maxShield: PLAYER_MAX_SHIELD,
       maxSpeed,
       fireCooldown: 0,
       tallyKills: 0,
-      energyRegenRate: getPlayerEnergyRegenRate(init.installedEquipment),
-      shieldRechargeRate: SHIELD_RECHARGE_RATE,
-      shieldRechargeDelay: 0
+      energyRechargePerTick: getPlayerEnergyRechargePerTick(init.installedEquipment),
+      shieldRechargePerTick: 1,
+      rechargeTickAccumulator: 0
     },
     playerLoadout: {
       laserMounts: { ...init.laserMounts },
@@ -315,7 +310,7 @@ export function getLaserProjectileProfile(laserId: LaserId) {
       return { damage: 10, speed: 14, life: 24, cooldown: 14 };
     case 'pulse_laser':
     default:
-      return { damage: 12, speed: 14, life: 18, cooldown: 12 };
+      return { damage: 15, speed: 14, life: 18, cooldown: 12 };
   }
 }
 

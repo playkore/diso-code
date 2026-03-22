@@ -3,7 +3,6 @@ import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt, consumeEscapePod, create
 import { TP_MISSION_FLAGS } from '../missions';
 import { createDefaultCommander } from '../commander';
 import { createCombatState } from './combatTestUtils';
-import { ECM_ENERGY_COST } from '../combat/state';
 import { moveProjectiles } from '../combat/weapons/projectiles';
 
 describe('travel combat weapons', () => {
@@ -59,7 +58,7 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, rng);
     expect(state.projectiles).toHaveLength(3);
-    expect(state.projectiles.map((projectile) => projectile.damage)).toEqual([12, 16, 10]);
+    expect(state.projectiles.map((projectile) => projectile.damage)).toEqual([15, 16, 10]);
     expect(state.lastPlayerArc).toBe('rear');
   });
 
@@ -99,7 +98,7 @@ describe('travel combat weapons', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, activateEcm: true }, 1, 'PLAYING', {}, rng);
     expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
     expect(state.encounter.ecmTimer).toBeGreaterThan(0);
-    expect(state.player.energy).toBe(state.player.maxEnergy - ECM_ENERGY_COST);
+    expect(state.player.energy).toBe(state.player.maxEnergy);
   });
 
   it('consumes energy bombs and preserves mission enemies', () => {
@@ -235,8 +234,8 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0], { energyBanks: 4, energyPerBank: 64 });
     expect(state.player.energyBanks).toBe(4);
     expect(state.player.energyPerBank).toBe(64);
-    expect(state.player.maxEnergy).toBe(256);
-    expect(state.player.energy).toBe(256);
+    expect(state.player.maxEnergy).toBe(255);
+    expect(state.player.energy).toBe(255);
   });
 
   it('lets the shield absorb damage before energy banks collapse', () => {
@@ -252,9 +251,7 @@ describe('travel combat weapons', () => {
     const commander = createDefaultCommander();
     commander.installedEquipment.ecm = true;
     const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
-    state.player.energy = ECM_ENERGY_COST - 1;
-    state.player.energyRegenRate = 0;
-    state.player.shieldRechargeRate = 0;
+    state.player.energy = 0;
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, activateEcm: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.encounter.ecmTimer).toBe(0);
     expect(state.messages.some((message) => message.text === 'ENERGY LOW')).toBe(true);
@@ -271,43 +268,41 @@ describe('travel combat weapons', () => {
     state.projectiles.length = 0;
     state.player.fireCooldown = 0;
     state.player.energy = 3;
-    state.player.energyRegenRate = 0;
-    state.player.shieldRechargeRate = 0;
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.projectiles).toHaveLength(0);
     expect(state.messages.some((message) => message.text === 'ENERGY LOW')).toBe(true);
   });
 
-  it('does not regenerate energy while the player keeps firing', () => {
+  it('still drains energy under sustained fire despite classic recharge ticks', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'pulse_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
     const startingEnergy = state.player.energy;
 
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    const energyAfterFirstShot = state.player.energy;
-    state.player.fireCooldown = 0;
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    for (let frame = 0; frame < 24; frame += 1) {
+      stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    }
 
-    expect(energyAfterFirstShot).toBe(startingEnergy - 8);
-    expect(state.player.energy).toBe(startingEnergy - 16);
-
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.energy).toBe(startingEnergy - 15);
+    expect(state.player.energy).toBe(241);
+    expect(state.player.energy).toBeLessThan(startingEnergy);
   });
 
-  it('delays shield recharge after the player is hit', () => {
+  it('recharges shields on the classic cadence and only above half energy', () => {
     const state = createCombatState([0, 0, 0]);
-    state.player.shield = 40;
-    state.projectiles.push({ id: 30, kind: 'laser', owner: 'enemy', x: 0, y: 0, vx: 0, vy: 0, damage: 10, life: 20 });
+    state.player.shield = 250;
+    state.player.energy = 200;
 
-    moveProjectiles(state, 0, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBe(30);
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 9, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.shield).toBe(250);
 
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.shield).toBe(251);
+    expect(state.player.energy).toBe(200);
+
+    state.player.shield = 250;
+    state.player.energy = 100;
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 10, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBe(30);
-
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 40, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBeGreaterThan(30);
+    expect(state.player.shield).toBe(250);
+    expect(state.player.energy).toBe(101);
   });
 });

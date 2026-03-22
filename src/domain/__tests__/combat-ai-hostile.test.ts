@@ -73,8 +73,8 @@ describe('travel combat hostile AI', () => {
     state.player.x = 0;
     state.player.y = 0;
     state.player.shield = 70;
-    state.player.energyRegenRate = 0;
-    state.player.shieldRechargeRate = 0;
+    state.player.energyRechargePerTick = 0;
+    state.player.shieldRechargePerTick = 0;
     state.enemies.push({
       id: 8,
       kind: 'ship',

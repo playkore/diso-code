@@ -38,7 +38,7 @@ export function stepTravelCombat(
   }
 
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
-  rechargePlayerDefense(state, dt, { firing: input.fire });
+  rechargePlayerDefense(state, dt);
 
   if (input.activateEcm) {
     activatePlayerEcm(state);

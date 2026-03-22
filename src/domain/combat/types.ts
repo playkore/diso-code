@@ -208,9 +208,9 @@ export interface CombatPlayer {
   maxSpeed: number;
   fireCooldown: number;
   tallyKills: number;
-  energyRegenRate: number;
-  shieldRechargeRate: number;
-  shieldRechargeDelay: number;
+  energyRechargePerTick: number;
+  shieldRechargePerTick: number;
+  rechargeTickAccumulator: number;
 }
 
 /**

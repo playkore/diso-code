@@ -1,4 +1,4 @@
-import { ECM_ENERGY_COST, pushMessage, spawnParticles, spendPlayerEnergy } from '../state';
+import { pushMessage, spawnParticles } from '../state';
 import type { TravelCombatState } from '../types';
 
 export function clearEnemyMissiles(state: TravelCombatState) {
@@ -14,7 +14,7 @@ export function activatePlayerEcm(state: TravelCombatState) {
   if (!state.playerLoadout.installedEquipment.ecm) {
     return false;
   }
-  if (!spendPlayerEnergy(state, ECM_ENERGY_COST)) {
+  if (state.player.energy <= 0) {
     pushMessage(state, 'ENERGY LOW', 900);
     return false;
   }
