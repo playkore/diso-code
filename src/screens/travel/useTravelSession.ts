@@ -139,6 +139,8 @@ export function useTravelSession(
     inputRef,
     keysRef,
     joyActiveRef,
+    jumpPointerIdRef,
+    firePointerIdRef,
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
@@ -631,10 +633,14 @@ export function useTravelSession(
       setMessageState(overlayMessage || combatState.messages[0]?.text || '');
 
       if (!keys[' ']) {
-        liveInput.fire = false;
+        // Pointer-held buttons should stay latched until their capture ends;
+        // only keyboard-origin fire input clears immediately on key release.
+        liveInput.fire = firePointerIdRef.current !== null;
       }
       if (!keys.j && !keys.J) {
-        liveInput.jump = false;
+        // Jump hold needs the same treatment as fire so touch/mouse presses can
+        // sustain local jump for as long as the player keeps holding the button.
+        liveInput.jump = jumpPointerIdRef.current !== null;
       }
       if (!keys.h && !keys.H) {
         liveInput.hyperspace = false;
@@ -669,7 +675,7 @@ export function useTravelSession(
       window.removeEventListener('resize', onResize);
       resetInput();
     };
-  }, [commander, completeTravel, inputRef, joyActiveRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
+  }, [commander, completeTravel, firePointerIdRef, inputRef, joyActiveRef, jumpPointerIdRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
 
   return {
     hud,
