@@ -50,6 +50,19 @@ export function getWrappedChartDelta(origin: SystemData, target: SystemData) {
   };
 }
 
+/**
+ * Converts a wrapped chart route into the heading used by the flight model.
+ *
+ * The star charts treat positive Y as "down" on screen, while travel combat
+ * uses the same canvas-style orientation for ship movement. Returning the
+ * wrapped chart angle here lets the jump sequence point toward the same target
+ * direction the player sees on the maps, including seam-crossing shortcuts.
+ */
+export function getWrappedChartHeading(origin: SystemData, target: SystemData): number {
+  const { dx, dy } = getWrappedChartDelta(origin, target);
+  return Math.atan2(dy, dx);
+}
+
 function chartDistance(a: SystemData, b: SystemData): number {
   const { dx, dy } = getWrappedChartDelta(a, b);
   return Math.hypot(dx, dy);
@@ -99,4 +112,20 @@ export function getSystemDistance(systemName: string, targetSystemName: string):
   }
 
   return chartDistance(origin.data, target.data) * 0.4;
+}
+
+/**
+ * Resolves the inter-system heading visible on the charts.
+ *
+ * Consumers use this to align travel visuals with the selected route without
+ * duplicating lookup and toroidal-wrap logic throughout the UI.
+ */
+export function getSystemHeading(systemName: string, targetSystemName: string): number | null {
+  const origin = getSystemByName(systemName);
+  const target = getSystemByName(targetSystemName);
+  if (!origin || !target) {
+    return null;
+  }
+
+  return getWrappedChartHeading(origin.data, target.data);
 }

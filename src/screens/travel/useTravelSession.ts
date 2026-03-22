@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { getSystemByName } from '../../domain/galaxyCatalog';
+import { getSystemByName, getSystemHeading } from '../../domain/galaxyCatalog';
 import { applyLegalFloor, type CommanderState } from '../../domain/commander';
 import {
   assessDockingApproach,
@@ -20,6 +20,7 @@ import type { TravelState } from '../../store/types';
 import { renderCanvas } from './renderCanvas';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { createStars } from './renderers/starsRenderer';
+import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
@@ -34,8 +35,6 @@ import type { TravelPerfSnapshot } from './TravelPerfOverlay';
  * inside the effect so the animation loop can advance them every frame without
  * paying React reconciliation costs.
  */
-const HYPERSPACE_DURATION = 160;
-
 const INITIAL_HUD = {
   score: '0',
   shields: '100',
@@ -400,8 +399,14 @@ export function useTravelSession(
         updateHud();
         return;
       }
+      // Align the ship with the selected chart route so the hyperspace tunnel
+      // launches toward the destination the same way the maps present it.
+      const hyperspaceHeading = getSystemHeading(session.originSystem, session.destinationSystem);
+      if (hyperspaceHeading !== null) {
+        combatState.player.angle = hyperspaceHeading;
+      }
       flightState = 'HYPERSPACE';
-      hyperspaceTimer = HYPERSPACE_DURATION;
+      hyperspaceTimer = getHyperspaceDurationFrames(session.fuelCost);
       showMessage(`HYPERSPACE TO ${session.destinationSystem.toUpperCase()}`, 2000);
       combatState.player.vx = Math.cos(combatState.player.angle) * 5;
       combatState.player.vy = Math.sin(combatState.player.angle) * 5;
@@ -544,7 +549,8 @@ export function useTravelSession(
         // Hyperspace has its own movement profile instead of using
         // `stepTravelCombat`, because the player is locked into a scripted
         // transition until the destination system is activated.
-        const progress = 1 - hyperspaceTimer / HYPERSPACE_DURATION;
+        const totalHyperspaceDuration = getHyperspaceDurationFrames(session.fuelCost);
+        const progress = 1 - hyperspaceTimer / totalHyperspaceDuration;
         const speedFactor = progress < 0.55 ? 1.05 : 0.97;
         combatState.player.vx *= speedFactor;
         combatState.player.vy *= speedFactor;
