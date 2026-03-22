@@ -295,4 +295,19 @@ describe('travel combat weapons', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.player.energy).toBe(startingEnergy - 15);
   });
+
+  it('delays shield recharge after the player is hit', () => {
+    const state = createCombatState([0, 0, 0]);
+    state.player.shield = 40;
+    state.projectiles.push({ id: 30, kind: 'laser', owner: 'enemy', x: 0, y: 0, vx: 0, vy: 0, damage: 10, life: 20 });
+
+    moveProjectiles(state, 0, createDeterministicRandomSource([0]));
+    expect(state.player.shield).toBe(30);
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 10, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.shield).toBe(30);
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 40, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.shield).toBeGreaterThan(30);
+  });
 });

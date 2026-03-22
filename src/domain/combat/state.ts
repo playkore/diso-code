@@ -34,6 +34,7 @@ export function clampByte(value: number): number {
 export const PLAYER_MAX_SHIELD = 100;
 export const ECM_ENERGY_COST = 32;
 export const SHIELD_RECHARGE_RATE = 1;
+export const SHIELD_RECHARGE_DELAY = 45;
 
 /**
  * Player defensive stats are still modeled as byte-like values, so every write
@@ -104,6 +105,9 @@ export function applyPlayerDamage(state: TravelCombatState, damage: number) {
 
   const absorbedByShield = Math.min(state.player.shield, appliedDamage);
   state.player.shield = clampShield(state.player.shield - absorbedByShield, state.player.maxShield);
+  // Any successful hit resets the shield recharge timer so incoming fire keeps
+  // pressure on the player instead of letting the bar climb back immediately.
+  state.player.shieldRechargeDelay = SHIELD_RECHARGE_DELAY;
   const overflow = appliedDamage - absorbedByShield;
   if (overflow > 0) {
     state.player.energy = clampEnergy(state.player.energy - overflow, state.player.maxEnergy);
@@ -133,11 +137,12 @@ export function spendPlayerEnergy(state: TravelCombatState, amount: number) {
  * recovery" feel while avoiding free shield regeneration.
  */
 export function rechargePlayerDefense(state: TravelCombatState, dt: number, options: { firing: boolean }) {
+  state.player.shieldRechargeDelay = Math.max(0, state.player.shieldRechargeDelay - dt);
   if (options.firing) {
     return;
   }
   state.player.energy = clampEnergy(state.player.energy + state.player.energyRegenRate * dt, state.player.maxEnergy);
-  if (state.player.shield >= state.player.maxShield || state.player.energy <= 0) {
+  if (state.player.shield >= state.player.maxShield || state.player.energy <= 0 || state.player.shieldRechargeDelay > 0) {
     return;
   }
 
@@ -187,7 +192,8 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       fireCooldown: 0,
       tallyKills: 0,
       energyRegenRate: getPlayerEnergyRegenRate(init.installedEquipment),
-      shieldRechargeRate: SHIELD_RECHARGE_RATE
+      shieldRechargeRate: SHIELD_RECHARGE_RATE,
+      shieldRechargeDelay: 0
     },
     playerLoadout: {
       laserMounts: { ...init.laserMounts },

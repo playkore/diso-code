@@ -210,6 +210,7 @@ export interface CombatPlayer {
   tallyKills: number;
   energyRegenRate: number;
   shieldRechargeRate: number;
+  shieldRechargeDelay: number;
 }
 
 /**
