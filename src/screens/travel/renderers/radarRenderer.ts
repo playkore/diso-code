@@ -17,8 +17,10 @@ export function drawRadar(
 ) {
   const radarWidth = 156;
   const radarHeight = 156;
-  const radarX = cw - radarWidth - 18;
-  const radarY = 82;
+  // The redesigned HUD expects the radar to sit inside the right HUD column
+  // above the touch controls, so it stays pinned to the canvas' right edge.
+  const radarX = Math.max(18, cw - radarWidth - 16);
+  const radarY = 84;
   const radarCenterX = radarX + radarWidth / 2;
   const radarCenterY = radarY + radarHeight / 2;
   const radarRadius = 48;
