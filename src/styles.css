@@ -827,7 +827,8 @@ button:disabled {
 
 .travel-screen__button--hyperspace {
   right: 1.4rem;
-  bottom: 10.8rem;
+  /* Keep hyperspace clearly separated from jump so touch targets do not crowd each other. */
+  bottom: 11.5rem;
   width: 5rem;
   height: 3rem;
   font-size: 0.74rem;
