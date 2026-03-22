@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createDefaultCommander } from '../commander';
 import { assessDockingApproach, createDeterministicRandomSource, enterArrivalSpace, getStationSlotAngle, stepTravelCombat } from '../travelCombat';
 import { createCombatState } from './combatTestUtils';
 
@@ -62,5 +63,34 @@ describe('travel combat station rules', () => {
     expect(docking.isInsideSlot).toBe(false);
     expect(docking.collidesWithHull).toBe(true);
     expect(docking.canDock).toBe(false);
+  });
+
+  it('allows auto-dock only inside the station safe zone', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0]);
+    const commander = createDefaultCommander();
+    const state = createCombatState([0, 0, 0], {
+      installedEquipment: { ...commander.installedEquipment, docking_computer: true }
+    });
+    state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    state.player.x = 400;
+    state.player.y = 0;
+
+    const outsideSafeZone = stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, autoDock: true }, 1, 'PLAYING', {}, rng);
+    expect(outsideSafeZone.autoDocked).toBe(false);
+
+    state.player.x = 200;
+    const insideSafeZone = stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, autoDock: true }, 1, 'PLAYING', {}, rng);
+    expect(insideSafeZone.autoDocked).toBe(true);
+  });
+
+  it('rejects auto-dock when the docking computer is not installed', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0]);
+    const state = createCombatState([0, 0, 0]);
+    state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    state.player.x = 200;
+    state.player.y = 0;
+
+    const result = stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, autoDock: true }, 1, 'PLAYING', {}, rng);
+    expect(result.autoDocked).toBe(false);
   });
 });

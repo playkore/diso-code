@@ -144,9 +144,18 @@ export function TravelScreen() {
             <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--bomb" {...travel.bombButtonHandlers}>
               BOMB
             </button>
-            <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--dock" {...travel.dockButtonHandlers}>
-              DOCK
-            </button>
+            {travel.autoDock.visible ? (
+              <button
+                type="button"
+                aria-disabled={!travel.autoDock.enabled}
+                className={`travel-screen__button travel-screen__button--aux travel-screen__button--dock${
+                  travel.autoDock.enabled ? '' : ' travel-screen__button--dock-disabled'
+                }`}
+                {...(travel.autoDock.enabled ? travel.dockButtonHandlers : {})}
+              >
+                DOCK
+              </button>
+            ) : null}
           </div>
 
           <div className="travel-screen__help">

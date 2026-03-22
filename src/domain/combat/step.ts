@@ -1,5 +1,5 @@
 import { tryRareEncounter } from './encounters/spawnRules';
-import { LOCAL_JUMP_SPEED_MULTIPLIER } from './navigation';
+import { canAutoDock, LOCAL_JUMP_SPEED_MULTIPLIER } from './navigation';
 import { stepEnemy } from './ai';
 import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
@@ -145,11 +145,12 @@ export function stepTravelCombat(
     autoDocked: Boolean(
       // Auto-dock is intentionally conservative: the docking computer only
       // resolves the final approach after the player requests it, owns the
-      // equipment, is near the station, and has cleared all hostile traffic.
+      // equipment, is inside the station safe zone, and has cleared all
+      // hostile traffic.
       input.autoDock &&
-      state.playerLoadout.installedEquipment.docking_computer &&
-      state.station &&
+      canAutoDock(state) &&
       state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length === 0 &&
+      state.station &&
       assessDockingApproach(state.station, state.player).distance <= state.station.safeZoneRadius
     )
   };

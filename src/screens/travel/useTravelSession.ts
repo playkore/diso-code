@@ -10,6 +10,7 @@ import {
   enterStationSpace,
   getPlayerCombatSnapshot,
   isMassNearby,
+  canAutoDock,
   isPlayerInStationSafeZone,
   setCombatSystemContext,
   stepTravelCombat,
@@ -62,6 +63,11 @@ const INITIAL_HUD = {
 interface TravelRefs {
   canvasRef: RefObject<HTMLCanvasElement | null>;
   viewportRef: RefObject<HTMLDivElement | null>;
+}
+
+interface AutoDockUiState {
+  visible: boolean;
+  enabled: boolean;
 }
 
 const PERF_REPORT_INTERVAL_MS = 500;
@@ -138,10 +144,12 @@ export function useTravelSession(
   const [hud, setHud] = useState(INITIAL_HUD);
   const [message, setMessage] = useState('');
   const [hyperspaceHidden, setHyperspaceHidden] = useState(false);
+  const [autoDock, setAutoDock] = useState<AutoDockUiState>({ visible: commander.installedEquipment.docking_computer, enabled: false });
   const [perf, setPerf] = useState(EMPTY_PERF_SNAPSHOT);
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
+  const autoDockRef = useRef(autoDock);
   const perfRef = useRef<PerfAccumulator>(createPerfAccumulator(typeof performance === 'undefined' ? 0 : performance.now()));
   const {
     inputRef,
@@ -208,6 +216,14 @@ export function useTravelSession(
     }
     hyperspaceHiddenRef.current = next;
     setHyperspaceHidden(next);
+  };
+
+  const setAutoDockState = (next: AutoDockUiState) => {
+    if (autoDockRef.current.visible === next.visible && autoDockRef.current.enabled === next.enabled) {
+      return;
+    }
+    autoDockRef.current = next;
+    setAutoDock(next);
   };
 
   const publishPerfSnapshot = useCallback((now: number) => {
@@ -347,6 +363,7 @@ export function useTravelSession(
     const updateHud = () => {
       const jumpBlocked = isMassNearby(combatState);
       const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
+      const autoDockAllowed = canAutoDock(combatState);
       const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
       setHudState({
         score: nextHud.score,
@@ -367,6 +384,12 @@ export function useTravelSession(
         arcColor: combatState.playerLoadout.laserMounts[combatState.lastPlayerArc] ? CGA_YELLOW : CGA_RED
       });
       setHyperspaceHiddenState(jumpCompleted);
+      // The DOCK control is a purchased capability. Once owned, it stays on
+      // screen so the player can see when station position enables it again.
+      setAutoDockState({
+        visible: combatState.playerLoadout.installedEquipment.docking_computer,
+        enabled: autoDockAllowed
+      });
     };
 
     const showMessage = (text: string, duration: number) => {
@@ -520,7 +543,7 @@ export function useTravelSession(
       liveInput.hyperspace = keys.h || keys.H || liveInput.hyperspace;
       liveInput.activateEcm = keys.e || keys.E || liveInput.activateEcm;
       liveInput.triggerEnergyBomb = keys.b || keys.B || liveInput.triggerEnergyBomb;
-      liveInput.autoDock = keys.d || keys.D || liveInput.autoDock;
+      liveInput.autoDock = autoDockRef.current.enabled && (keys.d || keys.D || liveInput.autoDock);
 
       if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || liveInput.thrust > 0 || Math.abs(liveInput.turn) > 0.1)) {
         flightState = 'PLAYING';
@@ -560,9 +583,17 @@ export function useTravelSession(
         random
       );
 
+      const hostileContacts = combatState.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
+
       if (result.autoDocked) {
         completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
         return;
+      }
+
+      if (liveInput.autoDock && autoDockRef.current.enabled && hostileContacts > 0 && flightState !== 'HYPERSPACE') {
+        // Auto-dock only resolves once the station approach is secure. Surface
+        // the blocker immediately so the button never appears unresponsive.
+        showMessage('AUTO-DOCK BLOCKED BY HOSTILES', 900);
       }
 
       if ((flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') && liveInput.jump) {
@@ -571,6 +602,10 @@ export function useTravelSession(
 
       if ((flightState === 'READY' || flightState === 'PLAYING') && liveInput.hyperspace) {
         startHyperspace();
+      }
+
+      if ((keys.d || keys.D) && autoDockRef.current.visible && !autoDockRef.current.enabled && flightState !== 'HYPERSPACE') {
+        showMessage('AUTO-DOCK REQUIRES SAFE ZONE', 900);
       }
 
       if (flightState === 'HYPERSPACE') {
@@ -707,6 +742,7 @@ export function useTravelSession(
     hud,
     message,
     hyperspaceHidden,
+    autoDock,
     perf,
     recordReactCommit,
     joystickView,
