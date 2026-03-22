@@ -254,6 +254,7 @@ export interface CombatEncounterState {
   safeZone: boolean;
   stationHostile: boolean;
   ecmTimer: number;
+  ecmFlashTimer: number;
   bombEffectTimer: number;
   copsNearby: number;
   benignCooldown: number;

@@ -2,7 +2,7 @@ import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 import { drawProjectilesAndParticles, drawShips } from './renderers/projectilesRenderer';
 import { drawRadar } from './renderers/radarRenderer';
 import { drawShips as _unused } from './renderers/projectilesRenderer';
-import { CGA_RED } from './renderers/constants';
+import { CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { drawPlayer } from './renderers/shipsRenderer';
 import { drawStars, type StarPoint } from './renderers/starsRenderer';
 import { drawStation } from './renderers/stationRenderer';
@@ -35,6 +35,9 @@ export function renderCanvas(
   // decay curve is intentionally front-loaded so the blast hits hard, then
   // gets out of the way before it obscures piloting for too long.
   const bombEffectRatio = Math.max(0, Math.min(1, combatState.encounter.bombEffectTimer / 18));
+  // ECM is communicated as a separate yellow pulse so the player gets an
+  // immediate acknowledgement distinct from the bomb's destructive blast.
+  const ecmFlashRatio = Math.max(0, Math.min(1, combatState.encounter.ecmFlashTimer / 10));
   const shakeStrength = bombEffectRatio * bombEffectRatio * 10;
   const shakeX = (Math.random() * 2 - 1) * shakeStrength;
   const shakeY = (Math.random() * 2 - 1) * shakeStrength;
@@ -64,6 +67,12 @@ export function renderCanvas(
   if (bombEffectRatio > 0) {
     ctx.fillStyle = CGA_RED;
     ctx.globalAlpha = 0.12 + bombEffectRatio * 0.26;
+    ctx.fillRect(-shakeX, -shakeY, cw, ch);
+  }
+
+  if (ecmFlashRatio > 0) {
+    ctx.fillStyle = CGA_YELLOW;
+    ctx.globalAlpha = 0.1 + ecmFlashRatio * 0.22;
     ctx.fillRect(-shakeX, -shakeY, cw, ch);
   }
 

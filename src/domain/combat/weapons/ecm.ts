@@ -3,6 +3,7 @@ import type { TravelCombatState } from '../types';
 
 const ECM_EFFECT_RADIUS = 360;
 const ECM_ACTIVE_WINDOW = 80;
+const ECM_FLASH_WINDOW = 10;
 
 /**
  * ECM is a local defensive pulse in this prototype. Only missiles close enough
@@ -37,6 +38,9 @@ export function activatePlayerEcm(state: TravelCombatState) {
     pushMessage(state, 'ENERGY LOW', 900);
     return false;
   }
+  // The screen flash is intentionally much shorter than the gameplay effect so
+  // pilots get instant tactile feedback without masking incoming contacts.
+  state.encounter.ecmFlashTimer = ECM_FLASH_WINDOW;
   state.encounter.ecmTimer = ECM_ACTIVE_WINDOW;
   const clearedMissiles = clearEnemyMissiles(state);
   pushMessage(state, clearedMissiles > 0 ? 'ECM ACTIVE' : 'ECM CLEAR', 900);

@@ -230,7 +230,11 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       ev: 0,
       safeZone: false,
       stationHostile: false,
+      // ECM keeps a separate flash timer so the renderer can show the control
+      // feedback as a quick yellow pulse without coupling the effect to the
+      // longer missile-suppression window.
       ecmTimer: 0,
+      ecmFlashTimer: 0,
       bombEffectTimer: 0,
       copsNearby: 0,
       benignCooldown: 0,
