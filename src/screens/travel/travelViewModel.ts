@@ -34,8 +34,6 @@ export function getHudState(
   const drives = getDriveStatus(flightState, options);
   const energyRatio = state.player.maxEnergy > 0 ? state.player.energy / state.player.maxEnergy : 0;
   const shieldRatio = state.player.maxShield > 0 ? state.player.shield / state.player.maxShield : 0;
-  const velocityXRatio = state.player.maxSpeed > 0 ? Math.max(-1, Math.min(1, state.player.vx / state.player.maxSpeed)) : 0;
-  const velocityYRatio = state.player.maxSpeed > 0 ? Math.max(-1, Math.min(1, state.player.vy / state.player.maxSpeed)) : 0;
   const laserHeat = (['front', 'rear', 'left', 'right'] as LaserMountPosition[]).map((mount) => {
     const installed = Boolean(state.playerLoadout.laserMounts[mount]);
     const heatRatio = installed && state.player.maxLaserHeat > 0 ? state.player.laserHeat[mount] / state.player.maxLaserHeat : 0;
@@ -52,8 +50,6 @@ export function getHudState(
     energyColor: getCgaBarFillColor(energyRatio),
     shieldRatio: Math.max(0, Math.min(1, shieldRatio)),
     shieldColor: getCgaBarFillColor(shieldRatio),
-    velocityXRatio,
-    velocityYRatio,
     laserHeat,
     jump: drives.jump,
     hyperspace: drives.hyperspace,

@@ -1,11 +1,9 @@
 import { Profiler, useRef, type ProfilerOnRenderCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/travelCombat';
-import { cargoUsedTonnes } from '../../domain/commander';
 import type { LaserMountPosition } from '../../domain/shipCatalog';
 import { useGameStore } from '../../store/useGameStore';
 import { formatLightYears } from '../../utils/distance';
-import { formatCredits } from '../../utils/money';
 import { TravelPerfOverlay } from './TravelPerfOverlay';
 import { useTravelSession } from './useTravelSession';
 
@@ -27,22 +25,20 @@ export function TravelScreen() {
     return <Navigate to="/star-map" replace />;
   }
 
-  const cargoUsed = cargoUsedTonnes(commander.cargo);
-  const fuelRatio = commander.maxFuel > 0 ? Math.max(0, Math.min(1, commander.fuel / commander.maxFuel)) : 0;
-  const axisMarkerX = `${(travel.hud.velocityXRatio + 1) * 50}%`;
-  const axisMarkerY = `${(travel.hud.velocityYRatio + 1) * 50}%`;
+  const energyBanks = travel.hud.energyBanks.map((ratio, index) => (
+    <span key={`energy-bank-${index}`} className="travel-screen__hud-bank">
+      <span className="travel-screen__hud-bank-fill" style={{ width: `${ratio * 100}%`, backgroundColor: travel.hud.energyColor }} />
+    </span>
+  ));
   const mountLabels: Record<LaserMountPosition, string> = { front: 'F', rear: 'A', left: 'L', right: 'R' };
-  const sliderRows: Array<{ label: string; ratio: number; color: string; inactive?: boolean }> = [
-    { label: 'Shield', ratio: travel.hud.shieldRatio, color: travel.hud.shieldColor, inactive: false },
-    { label: 'Fuel', ratio: fuelRatio, color: fuelRatio > 0.65 ? '#55ff55' : fuelRatio > 0.3 ? '#ffff55' : '#ff5555', inactive: false },
-    ...travel.hud.energyBanks.map((ratio, index) => ({ label: `Energy ${index + 1}`, ratio, color: travel.hud.energyColor })),
-    ...travel.hud.laserHeat.map((entry) => ({
-      label: `Laser ${mountLabels[entry.mount as LaserMountPosition]}`,
-      ratio: entry.ratio,
-      color: entry.installed ? entry.color : '#000000',
-      inactive: !entry.installed
-    }))
-  ];
+  const laserHeat = travel.hud.laserHeat.map((entry) => (
+    <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
+      <span className="travel-screen__hud-heat-label">{mountLabels[entry.mount as LaserMountPosition]}</span>
+      <span className="travel-screen__hud-meter">
+        <span className="travel-screen__hud-meter-fill" style={{ width: `${entry.ratio * 100}%`, backgroundColor: entry.color }} />
+      </span>
+    </span>
+  ));
 
   return (
     <Profiler id="travel-screen" onRender={handleRender}>
@@ -51,120 +47,35 @@ export function TravelScreen() {
           <canvas ref={canvasRef} className="travel-screen__canvas" />
 
           <div className="travel-screen__hud">
-            {/* The travel HUD mirrors the mock's "telemetry strip + slider wing"
-                layout so the arcade view reads like a single instrument panel. */}
-            <section className="travel-screen__hud-top-strip" aria-label="Secondary flight telemetry">
-              <div className="travel-screen__telemetry-chip travel-screen__telemetry-chip--route">
-                <span className="travel-screen__telemetry-label">Route</span>
-                <span className="travel-screen__telemetry-value">
-                  {session.originSystem} -&gt; {session.destinationSystem}
-                </span>
-              </div>
-              <div className="travel-screen__telemetry-chip">
-                <span className="travel-screen__telemetry-label">Score</span>
-                <span className="travel-screen__telemetry-value">{travel.hud.score.padStart(4, '0')}</span>
-              </div>
-              <div className="travel-screen__telemetry-chip">
-                <span className="travel-screen__telemetry-label">Jump</span>
-                <span className="travel-screen__telemetry-value" style={{ color: travel.hud.jumpColor }}>
-                  {travel.hud.jump}
-                </span>
-              </div>
-              <div className="travel-screen__telemetry-chip">
-                <span className="travel-screen__telemetry-label">Hyper</span>
-                <span className="travel-screen__telemetry-value" style={{ color: travel.hud.hyperspaceColor }}>
-                  {travel.hud.hyperspace}
-                </span>
-              </div>
-              <div className="travel-screen__telemetry-chip">
-                <span className="travel-screen__telemetry-label">Legal</span>
-                <span className="travel-screen__telemetry-value" style={{ color: travel.hud.legalColor }}>
-                  {travel.hud.legal}
-                </span>
-              </div>
-              <div className="travel-screen__telemetry-chip">
-                <span className="travel-screen__telemetry-label">Threat</span>
-                <span className="travel-screen__telemetry-value" style={{ color: travel.hud.threatColor }}>
-                  {travel.hud.threat}
-                </span>
-              </div>
-              <div className="travel-screen__telemetry-chip">
-                <span className="travel-screen__telemetry-label">Arc</span>
-                <span className="travel-screen__telemetry-value" style={{ color: travel.hud.arcColor }}>
-                  {travel.hud.arc}
-                </span>
-              </div>
-            </section>
-
-            <section className="travel-screen__hud-frame" aria-label="Primary travel HUD">
-              <section className="travel-screen__hud-wing" aria-label="Flight systems sliders">
-                {sliderRows.slice(0, 6).map((row) => (
-                  <div key={row.label} className={`travel-screen__hud-row${row.inactive ? ' travel-screen__hud-row--inactive' : ''}`}>
-                    <span className="travel-screen__hud-row-label">{row.label}</span>
-                    <span className="travel-screen__hud-fill-bar" aria-hidden="true">
-                      <span className="travel-screen__hud-fill-bar-fill" style={{ width: `${row.ratio * 100}%`, backgroundColor: row.color }} />
-                    </span>
-                  </div>
-                ))}
-                <div className="travel-screen__hud-row travel-screen__hud-row--axis">
-                  <span className="travel-screen__hud-row-label">Speed X</span>
-                  <span className="travel-screen__hud-axis-bar" aria-hidden="true">
-                    <span className="travel-screen__hud-axis-center" />
-                    <span className="travel-screen__hud-axis-marker" style={{ left: axisMarkerX }} />
-                  </span>
-                </div>
-                <div className="travel-screen__hud-row travel-screen__hud-row--axis">
-                  <span className="travel-screen__hud-row-label">Speed Y</span>
-                  <span className="travel-screen__hud-axis-bar" aria-hidden="true">
-                    <span className="travel-screen__hud-axis-center" />
-                    <span className="travel-screen__hud-axis-marker" style={{ left: axisMarkerY }} />
-                  </span>
-                </div>
-                {sliderRows.slice(6).map((row) => (
-                  <div key={row.label} className={`travel-screen__hud-row${row.inactive ? ' travel-screen__hud-row--inactive' : ''}`}>
-                    <span className="travel-screen__hud-row-label">{row.label}</span>
-                    <span className="travel-screen__hud-fill-bar" aria-hidden="true">
-                      <span className="travel-screen__hud-fill-bar-fill" style={{ width: `${row.ratio * 100}%`, backgroundColor: row.color }} />
-                    </span>
-                  </div>
-                ))}
-              </section>
-
-              <section className="travel-screen__hud-center" aria-label="Radar readouts">
-                <header className="travel-screen__hud-center-message">{travel.message || 'Cruise'}</header>
-                <div className="travel-screen__hud-radar-readouts">
-                  <div className="travel-screen__hud-radar-readout">
-                    <span className="travel-screen__hud-radar-readout-label">Missiles</span>
-                    <span className="travel-screen__hud-radar-readout-value">
-                      {commander.missilesInstalled} / {commander.missileCapacity}
-                    </span>
-                  </div>
-                  <div className="travel-screen__hud-radar-readout">
-                    <span className="travel-screen__hud-radar-readout-label">Cargo</span>
-                    <span className="travel-screen__hud-radar-readout-value">
-                      {cargoUsed} / {commander.cargoCapacity} t
-                    </span>
-                  </div>
-                  <div className="travel-screen__hud-radar-readout">
-                    <span className="travel-screen__hud-radar-readout-label">Credits</span>
-                    <span className="travel-screen__hud-radar-readout-value">{formatCredits(commander.cash)}</span>
-                  </div>
-                  <div className="travel-screen__hud-radar-readout">
-                    <span className="travel-screen__hud-radar-readout-label">Fuel</span>
-                    <span className="travel-screen__hud-radar-readout-value">
-                      {formatLightYears(commander.fuel)} / {formatLightYears(commander.maxFuel)}
-                    </span>
-                  </div>
-                  <div className="travel-screen__hud-radar-readout">
-                    <span className="travel-screen__hud-radar-readout-label">Jump Cost</span>
-                    <span className="travel-screen__hud-radar-readout-value">{formatLightYears(session.fuelCost)}</span>
-                  </div>
-                </div>
-              </section>
-            </section>
+            <div className="travel-screen__hud-line">Route: {session.originSystem} -&gt; {session.destinationSystem}</div>
+            <div className="travel-screen__hud-line">
+              Fuel: {formatLightYears(session.fuelCost)} <span className="travel-screen__hud-subtle">on arrival jump</span>
+            </div>
+            <div className="travel-screen__hud-line">Score: <span>{travel.hud.score}</span></div>
+            <div className="travel-screen__hud-line travel-screen__hud-line--bars">
+              <span className="travel-screen__hud-label">Energy</span>
+              <span className="travel-screen__hud-banks">{energyBanks}</span>
+            </div>
+            <div className="travel-screen__hud-line travel-screen__hud-line--bars">
+              <span className="travel-screen__hud-label">Shield</span>
+              <span className="travel-screen__hud-meter">
+                <span className="travel-screen__hud-meter-fill" style={{ width: `${travel.hud.shieldRatio * 100}%`, backgroundColor: travel.hud.shieldColor }} />
+              </span>
+            </div>
+            <div className="travel-screen__hud-line travel-screen__hud-line--bars">
+              <span className="travel-screen__hud-label">Heat</span>
+              <span className="travel-screen__hud-heat-grid">{laserHeat}</span>
+            </div>
+            <div className="travel-screen__hud-line">Jump Drive: <span style={{ color: travel.hud.jumpColor }}>{travel.hud.jump}</span></div>
+            <div className="travel-screen__hud-line">Hyperspace: <span style={{ color: travel.hud.hyperspaceColor }}>{travel.hud.hyperspace}</span></div>
+            <div className="travel-screen__hud-line">Legal: <span style={{ color: travel.hud.legalColor }}>{travel.hud.legal}</span></div>
+            <div className="travel-screen__hud-line">Threat: <span style={{ color: travel.hud.threatColor }}>{travel.hud.threat}</span></div>
+            <div className="travel-screen__hud-line">Arc: <span style={{ color: travel.hud.arcColor }}>{travel.hud.arc}</span></div>
           </div>
 
           {showTravelPerfOverlay ? <TravelPerfOverlay perf={travel.perf} /> : null}
+
+          <div className="travel-screen__message">{travel.message}</div>
 
           <div className="travel-screen__controls">
             <div

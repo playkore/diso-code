@@ -41,8 +41,6 @@ const INITIAL_HUD = {
   energyColor: CGA_GREEN,
   shieldRatio: 1,
   shieldColor: CGA_GREEN,
-  velocityXRatio: 0,
-  velocityYRatio: 0,
   laserHeat: [
     { mount: 'front', installed: true, ratio: 0, color: CGA_GREEN },
     { mount: 'rear', installed: false, ratio: 0, color: CGA_GREEN },
@@ -169,8 +167,6 @@ export function useTravelSession(
       previous.energyColor === next.energyColor &&
       previous.shieldRatio === next.shieldRatio &&
       previous.shieldColor === next.shieldColor &&
-      previous.velocityXRatio === next.velocityXRatio &&
-      previous.velocityYRatio === next.velocityYRatio &&
       previous.laserHeat.length === next.laserHeat.length &&
       previous.laserHeat.every(
         (entry, index) =>
@@ -358,8 +354,6 @@ export function useTravelSession(
         energyColor: nextHud.energyColor,
         shieldRatio: nextHud.shieldRatio,
         shieldColor: nextHud.shieldColor,
-        velocityXRatio: nextHud.velocityXRatio,
-        velocityYRatio: nextHud.velocityYRatio,
         laserHeat: nextHud.laserHeat,
         jump: nextHud.jump,
         jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
