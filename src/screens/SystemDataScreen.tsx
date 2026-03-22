@@ -1,27 +1,6 @@
 import { getSystemByName } from '../domain/galaxyCatalog';
+import { getSystemFacts } from '../domain/systemPresentation';
 import { useGameStore } from '../store/useGameStore';
-
-const ECONOMY_LABELS = [
-  'Rich Industrial',
-  'Average Industrial',
-  'Poor Industrial',
-  'Mainly Industrial',
-  'Mainly Agricultural',
-  'Rich Agricultural',
-  'Average Agricultural',
-  'Poor Agricultural'
-] as const;
-
-const GOVERNMENT_LABELS = [
-  'Anarchy',
-  'Feudal',
-  'Multi-Government',
-  'Dictatorship',
-  'Communist',
-  'Confederacy',
-  'Democracy',
-  'Corporate State'
-] as const;
 
 export function SystemDataScreen() {
   const universe = useGameStore((state) => state.universe);
@@ -36,6 +15,11 @@ export function SystemDataScreen() {
     );
   }
 
+  // The dedicated system screen and the star-map selection panel intentionally
+  // share one formatter so every place that surfaces procedural system metadata
+  // uses the same wording and fallback behavior.
+  const facts = getSystemFacts(system);
+
   return (
     <section className="screen">
       <h2>Data on System</h2>
@@ -43,23 +27,19 @@ export function SystemDataScreen() {
         <dt>Name</dt>
         <dd>{system.name}</dd>
         <dt>Economy</dt>
-        <dd>{ECONOMY_LABELS[system.economy] ?? 'Unknown'}</dd>
+        <dd>{facts.economy}</dd>
         <dt>Government</dt>
-        <dd>{GOVERNMENT_LABELS[system.government] ?? 'Unknown'}</dd>
+        <dd>{facts.government}</dd>
         <dt>Tech Level</dt>
-        <dd>{system.techLevel}</dd>
+        <dd>{facts.techLevel}</dd>
         <dt>Population</dt>
-        <dd>{system.population}</dd>
+        <dd>{facts.population}</dd>
         <dt>Productivity</dt>
-        <dd>{system.productivity} M CR</dd>
+        <dd>{facts.productivity}</dd>
         <dt>Average Radius</dt>
-        <dd>{system.radius} km</dd>
+        <dd>{facts.averageRadius}</dd>
         <dt>Species</dt>
-        <dd>{system.species}</dd>
-        <dt>Chart Position</dt>
-        <dd>
-          {system.x}, {system.y >> 1}
-        </dd>
+        <dd>{facts.species}</dd>
       </dl>
     </section>
   );

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getGalaxySystems, getSystemByName, getSystemDistance, getVisibleSystems, getWrappedChartDelta } from '../domain/galaxyCatalog';
 import { MAX_FUEL, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
+import { getSystemFacts } from '../domain/systemPresentation';
 import { useGameStore } from '../store/useGameStore';
 import { formatLightYears } from '../utils/distance';
 
@@ -74,6 +75,8 @@ export function StarMapScreen() {
   );
 
   const selectedPoint = starPoints.find((star) => star.name === selectedSystem) ?? null;
+  const selectedSystemData = selectedSystem ? getSystemByName(selectedSystem)?.data ?? null : null;
+  const selectedSystemFacts = selectedSystemData ? getSystemFacts(selectedSystemData) : null;
   const selectedDistance = selectedSystem ? getJumpFuelCost(getSystemDistance(universe.currentSystem, selectedSystem)) : null;
   const fuelAfterJump = selectedDistance === null ? null : Math.max(0, currentFuel - selectedDistance);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
@@ -157,7 +160,8 @@ export function StarMapScreen() {
       </div>
       {mapMode === 'local' && selectedSystem && selectedPoint ? (
         <div className="star-map__actions">
-          {/* Selection is explicit: the player chooses a destination first, then commits to travel from the details panel. */}
+          {/* Selection is explicit: the player chooses a destination first, reviews
+              its procedural metadata, and then commits to travel from the same panel. */}
           <p>
             Selected destination: <strong>{selectedSystem}</strong>
           </p>
@@ -166,6 +170,24 @@ export function StarMapScreen() {
             {' · '}
             Fuel after jump: <strong>{fuelAfterJump !== null ? formatLightYears(fuelAfterJump) : 'Unknown'}</strong>
           </p>
+          {selectedSystemFacts ? (
+            <dl className="detail-grid star-map__details">
+              <dt>Economy</dt>
+              <dd>{selectedSystemFacts.economy}</dd>
+              <dt>Government</dt>
+              <dd>{selectedSystemFacts.government}</dd>
+              <dt>Tech Level</dt>
+              <dd>{selectedSystemFacts.techLevel}</dd>
+              <dt>Population</dt>
+              <dd>{selectedSystemFacts.population}</dd>
+              <dt>Productivity</dt>
+              <dd>{selectedSystemFacts.productivity}</dd>
+              <dt>Average Radius</dt>
+              <dd>{selectedSystemFacts.averageRadius}</dd>
+              <dt>Species</dt>
+              <dd>{selectedSystemFacts.species}</dd>
+            </dl>
+          ) : null}
           <button
             type="button"
             disabled={!selectedPoint.inRange}

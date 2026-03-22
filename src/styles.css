@@ -561,6 +561,15 @@ button:disabled {
   margin: 0;
 }
 
+.star-map__details {
+  margin: 0;
+}
+
+.star-map__details dt,
+.star-map__details dd {
+  margin: 0;
+}
+
 .travel-screen {
   height: 100dvh;
   background: #000;
