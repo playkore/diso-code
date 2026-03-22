@@ -84,6 +84,7 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
       safeZone: false,
       stationHostile: false,
       ecmTimer: 0,
+      bombEffectTimer: 0,
       copsNearby: 0,
       benignCooldown: 0,
       activeBlueprintFile: 'A'

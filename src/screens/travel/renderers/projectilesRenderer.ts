@@ -144,7 +144,7 @@ export function drawProjectilesAndParticles(ctx: CanvasRenderingContext2D, state
     // instead of a static chain of dots.
     const lifeRatio = particle.maxLife > 0 ? Math.max(0, Math.min(1, particle.life / particle.maxLife)) : 0;
     const ageRatio = 1 - lifeRatio;
-    const size = particle.color === '#55ff55' ? 1.4 + ageRatio * 3.2 : 1.8 + ageRatio * 1.6;
+    const size = particle.color === '#55ff55' ? particle.size + ageRatio * 2.8 : particle.size + ageRatio * 1.8;
     ctx.fillStyle = particle.color;
     ctx.shadowBlur = 5;
     ctx.shadowColor = particle.color;

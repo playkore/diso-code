@@ -39,6 +39,7 @@ export function stepTravelCombat(
   }
 
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
+  state.encounter.bombEffectTimer = Math.max(0, state.encounter.bombEffectTimer - dt);
   for (const mount of ['front', 'rear', 'left', 'right'] as LaserMountPosition[]) {
     state.player.laserHeat[mount] = clampLaserHeat(
       state.player.laserHeat[mount] - state.player.laserHeatCooldownRate * (dt / 60),
@@ -78,7 +79,8 @@ export function stepTravelCombat(
         vy: -state.player.vy * 0.5,
         life: 10,
         maxLife: 10,
-        color: '#55ff55'
+        color: '#55ff55',
+        size: 1.4
       });
     }
 

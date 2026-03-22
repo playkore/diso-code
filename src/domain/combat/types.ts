@@ -185,6 +185,7 @@ export interface CombatParticle {
   life: number;
   maxLife: number;
   color: string;
+  size: number;
 }
 
 /**
@@ -245,6 +246,7 @@ export interface CombatEncounterState {
   safeZone: boolean;
   stationHostile: boolean;
   ecmTimer: number;
+  bombEffectTimer: number;
   copsNearby: number;
   benignCooldown: number;
   activeBlueprintFile: BlueprintFileId;

@@ -3,7 +3,21 @@ import { getAutoDockCommand } from '../combat/station/autoDock';
 import { getStationSlotAngle } from '../travelCombat';
 
 describe('auto-dock steering', () => {
-  it('steers toward the station hold point before committing to the slot', () => {
+  it('orbits outside the hull when the slot is on the far side of the station', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0.005, safeZoneRadius: 360 };
+    const command = getAutoDockCommand(station, {
+      x: 0,
+      y: -170,
+      vx: 0,
+      vy: 0,
+      angle: 0
+    });
+
+    expect(command.mode).toBe('orbit');
+    expect(command.turn).not.toBe(0);
+  });
+
+  it('steers toward the hold point once it has reached the slot side', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const command = getAutoDockCommand(station, {
       x: 120,

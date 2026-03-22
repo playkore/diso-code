@@ -217,6 +217,8 @@ describe('travel combat weapons', () => {
     });
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false, triggerEnergyBomb: true }, 1, 'PLAYING', {}, rng);
     expect(state.playerLoadout.installedEquipment.energy_bomb).toBe(false);
+    expect(state.encounter.bombEffectTimer).toBeGreaterThan(0);
+    expect(state.particles.length).toBeGreaterThan(20);
     expect(state.enemies.some((enemy) => enemy.blueprintId === 'sidewinder')).toBe(false);
     expect(state.enemies.some((enemy) => enemy.missionTag === 'constrictor')).toBe(false);
     expect(state.enemies.some((enemy) => enemy.blueprintId === 'mamba')).toBe(false);

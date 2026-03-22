@@ -577,15 +577,13 @@ export function useTravelSession(
       }
 
       const manualSteeringRequested = Math.abs(liveInput.turn) > 0.08 || liveInput.thrust > 0.08;
-      const hostileContacts = combatState.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
-
       if (autoDockActive && manualSteeringRequested) {
         autoDockActive = false;
         showMessage('AUTO-DOCK CANCELLED', 900);
       }
-      if (autoDockActive && (!canAutoDock(combatState) || hostileContacts > 0 || flightState === 'HYPERSPACE' || flightState === 'JUMPING')) {
+      if (autoDockActive && (!canAutoDock(combatState) || flightState === 'HYPERSPACE' || flightState === 'JUMPING')) {
         autoDockActive = false;
-        showMessage(hostileContacts > 0 ? 'AUTO-DOCK BLOCKED BY HOSTILES' : 'AUTO-DOCK CANCELLED', 900);
+        showMessage('AUTO-DOCK CANCELLED', 900);
       }
 
       liveInput.fire = keys[' '] || liveInput.fire;
@@ -595,7 +593,7 @@ export function useTravelSession(
       liveInput.triggerEnergyBomb = keys.b || keys.B || liveInput.triggerEnergyBomb;
       liveInput.autoDock = autoDockRef.current.enabled && (keys.d || keys.D || liveInput.autoDock);
 
-      if (liveInput.autoDock && autoDockRef.current.enabled && hostileContacts === 0 && !autoDockActive && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
+      if (liveInput.autoDock && autoDockRef.current.enabled && !autoDockActive && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
         autoDockActive = true;
         showMessage('AUTO-DOCK ENGAGED', 900);
       }
@@ -646,12 +644,6 @@ export function useTravelSession(
         autoDockActive = false;
         completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
         return;
-      }
-
-      if (liveInput.autoDock && autoDockRef.current.enabled && hostileContacts > 0 && flightState !== 'HYPERSPACE') {
-        // Auto-dock only resolves once the station approach is secure. Surface
-        // the blocker immediately so the button never appears unresponsive.
-        showMessage('AUTO-DOCK BLOCKED BY HOSTILES', 900);
       }
 
       if ((flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') && liveInput.jump) {

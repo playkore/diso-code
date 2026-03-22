@@ -229,6 +229,7 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       safeZone: false,
       stationHostile: false,
       ecmTimer: 0,
+      bombEffectTimer: 0,
       copsNearby: 0,
       benignCooldown: 0,
       activeBlueprintFile
@@ -276,7 +277,31 @@ export function spawnParticles(state: TravelCombatState, x: number, y: number, c
       vy: (Math.random() - 0.5) * 8,
       life,
       maxLife: life,
-      color
+      color,
+      size: 1.6 + Math.random() * 1.4
+    });
+  }
+}
+
+/**
+ * Bomb detonations need a heavier burst than standard kill sparks so each
+ * destroyed ship reads as a distinct explosion during the full-screen flash.
+ */
+export function spawnBombExplosion(state: TravelCombatState, x: number, y: number) {
+  const colors = ['#ff5555', '#ffff55', '#ff5555', '#ffff55', '#55ff55'] as const;
+  for (let i = 0; i < 24; i += 1) {
+    const life = 18 + Math.random() * 16;
+    const speed = 2 + Math.random() * 8;
+    const angle = Math.random() * Math.PI * 2;
+    state.particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life,
+      maxLife: life,
+      color: colors[i % colors.length],
+      size: 2.8 + Math.random() * 3.6
     });
   }
 }

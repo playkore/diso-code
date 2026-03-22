@@ -2,6 +2,7 @@ import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 import { drawProjectilesAndParticles, drawShips } from './renderers/projectilesRenderer';
 import { drawRadar } from './renderers/radarRenderer';
 import { drawShips as _unused } from './renderers/projectilesRenderer';
+import { CGA_RED } from './renderers/constants';
 import { drawPlayer } from './renderers/shipsRenderer';
 import { drawStars, type StarPoint } from './renderers/starsRenderer';
 import { drawStation } from './renderers/stationRenderer';
@@ -30,6 +31,17 @@ export function renderCanvas(
   ch: number,
   systemLabel: string
 ) {
+  // A short bomb-effect timer drives both screen shake and a red flash. The
+  // decay curve is intentionally front-loaded so the blast hits hard, then
+  // gets out of the way before it obscures piloting for too long.
+  const bombEffectRatio = Math.max(0, Math.min(1, combatState.encounter.bombEffectTimer / 18));
+  const shakeStrength = bombEffectRatio * bombEffectRatio * 10;
+  const shakeX = (Math.random() * 2 - 1) * shakeStrength;
+  const shakeY = (Math.random() * 2 - 1) * shakeStrength;
+
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
+
   // The travel screen always renders against a pure black background to stay
   // inside the CGA palette used throughout the prototype.
   ctx.fillStyle = '#000';
@@ -49,6 +61,15 @@ export function renderCanvas(
   }
   drawRadar(ctx, combatState, cw, systemLabel);
 
+  if (bombEffectRatio > 0) {
+    ctx.fillStyle = CGA_RED;
+    ctx.globalAlpha = 0.12 + bombEffectRatio * 0.26;
+    ctx.fillRect(-shakeX, -shakeY, cw, ch);
+  }
+
+  ctx.restore();
+
   // Reset shadow state so the next frame starts from a clean context.
   ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
 }
