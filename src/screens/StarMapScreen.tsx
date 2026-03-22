@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getSystemByName, getSystemDistance, getVisibleSystems } from '../domain/galaxyCatalog';
+import { getGalaxySystems, getSystemByName, getSystemDistance, getVisibleSystems } from '../domain/galaxyCatalog';
 import { MAX_FUEL, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { useGameStore } from '../store/useGameStore';
 import { formatLightYears } from '../utils/distance';
@@ -15,6 +15,11 @@ interface StarPoint {
 
 const MAP_SCALE = 4;
 const MAX_JUMP_RANGE = (7 / 0.4) * MAP_SCALE;
+const GALAXY_MAP_WIDTH = 260;
+const GALAXY_MAP_HEIGHT = 132;
+const GALAXY_MAP_PADDING = 4;
+
+type MapMode = 'local' | 'galaxy';
 
 // The map is centered on the current system. Y is halved to mimic the classic
 // chart aspect ratio used by the original short-range star map.
@@ -34,6 +39,19 @@ function getRelativePoint(currentSystem: string, targetSystem: string, available
   };
 }
 
+function getGalaxyPoint(targetSystem: string, currentSystem: string) {
+  const target = getSystemByName(targetSystem)?.data;
+
+  return {
+    name: targetSystem,
+    // The galaxy overview uses the raw generated coordinates and keeps the same
+    // half-height Y axis as the classic charts so the large map matches local navigation.
+    x: target?.x ?? 0,
+    y: (target?.y ?? 0) / 2,
+    isCurrent: targetSystem === currentSystem
+  };
+}
+
 export function StarMapScreen() {
   const navigate = useNavigate();
   const universe = useGameStore((state) => state.universe);
@@ -41,6 +59,7 @@ export function StarMapScreen() {
   const buyFuel = useGameStore((state) => state.buyFuel);
   const beginTravel = useGameStore((state) => state.beginTravel);
   const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
+  const [mapMode, setMapMode] = useState<MapMode>('local');
 
   useEffect(() => {
     setSelectedSystem(null);
@@ -49,6 +68,10 @@ export function StarMapScreen() {
   const starPoints = useMemo<StarPoint[]>(
     () => getVisibleSystems(universe.currentSystem).map((system) => getRelativePoint(universe.currentSystem, system.data.name, currentFuel)),
     [currentFuel, universe.currentSystem]
+  );
+  const galaxyPoints = useMemo(
+    () => getGalaxySystems().map((system) => getGalaxyPoint(system.data.name, universe.currentSystem)),
+    [universe.currentSystem]
   );
 
   const selectedPoint = starPoints.find((star) => star.name === selectedSystem) ?? null;
@@ -59,42 +82,81 @@ export function StarMapScreen() {
   return (
     <section className="screen">
       <h2>Local Star Map</h2>
-      <div className="star-map" role="img" aria-label={`Map of stars around ${universe.currentSystem}`}>
-        <svg viewBox="-110 -110 220 220" aria-hidden="true">
-          {/* The inner ring reflects current jump fuel, while the outer ring shows the ship's theoretical maximum range. */}
-          <circle className="star-map__range" cx="0" cy="0" r={(currentFuel / 0.4) * MAP_SCALE} />
-          <circle className="star-map__range star-map__range--max" cx="0" cy="0" r={MAX_JUMP_RANGE} />
-          {starPoints.map((star) => (
-            <g
-              key={star.name}
-              transform={`translate(${star.x} ${star.y})`}
-              className={`star-map__point ${star.isCurrent ? 'is-current' : ''} ${selectedSystem === star.name ? 'is-selected' : ''} ${star.inRange ? 'is-in-range' : 'is-out-of-range'}`}
-              onClick={() => {
-                if (!star.isCurrent) {
-                  setSelectedSystem(star.name);
-                }
-              }}
-            >
-              {!star.isCurrent ? <circle className="star-map__target" r="9" /> : null}
-              <circle className={`star-map__star ${star.isCurrent ? 'is-current' : ''}`} r={star.isCurrent ? 4 : 3} />
-              <text className="star-map__label" y={star.isCurrent ? -8 : -6} textAnchor="middle">
-                {star.name}
-              </text>
-            </g>
-          ))}
-        </svg>
+      <div className="segment-control" role="tablist" aria-label="Star map mode">
+        <button
+          type="button"
+          className={`segment-control__button ${mapMode === 'local' ? 'is-active' : ''}`}
+          aria-pressed={mapMode === 'local'}
+          onClick={() => setMapMode('local')}
+        >
+          Local Map
+        </button>
+        <button
+          type="button"
+          className={`segment-control__button ${mapMode === 'galaxy' ? 'is-active' : ''}`}
+          aria-pressed={mapMode === 'galaxy'}
+          onClick={() => setMapMode('galaxy')}
+        >
+          Galaxy Map
+        </button>
       </div>
+      {mapMode === 'local' ? (
+        <div className="star-map" role="img" aria-label={`Map of stars around ${universe.currentSystem}`}>
+          <svg viewBox="-110 -110 220 220" aria-hidden="true">
+            {/* The inner ring reflects current jump fuel, while the outer ring shows the ship's theoretical maximum range. */}
+            <circle className="star-map__range" cx="0" cy="0" r={(currentFuel / 0.4) * MAP_SCALE} />
+            <circle className="star-map__range star-map__range--max" cx="0" cy="0" r={MAX_JUMP_RANGE} />
+            {starPoints.map((star) => (
+              <g
+                key={star.name}
+                transform={`translate(${star.x} ${star.y})`}
+                className={`star-map__point ${star.isCurrent ? 'is-current' : ''} ${selectedSystem === star.name ? 'is-selected' : ''} ${star.inRange ? 'is-in-range' : 'is-out-of-range'}`}
+                onClick={() => {
+                  if (!star.isCurrent) {
+                    setSelectedSystem(star.name);
+                  }
+                }}
+              >
+                {!star.isCurrent ? <circle className="star-map__target" r="9" /> : null}
+                <circle className={`star-map__star ${star.isCurrent ? 'is-current' : ''}`} r={star.isCurrent ? 4 : 3} />
+                <text className="star-map__label" y={star.isCurrent ? -8 : -6} textAnchor="middle">
+                  {star.name}
+                </text>
+              </g>
+            ))}
+          </svg>
+        </div>
+      ) : (
+        <div className="star-map star-map--galaxy" role="img" aria-label={`Galaxy map with current position at ${universe.currentSystem}`}>
+          <svg
+            viewBox={`${-GALAXY_MAP_PADDING} ${-GALAXY_MAP_PADDING} ${GALAXY_MAP_WIDTH + GALAXY_MAP_PADDING * 2} ${GALAXY_MAP_HEIGHT + GALAXY_MAP_PADDING * 2}`}
+            aria-hidden="true"
+          >
+            {/* The galaxy overview is intentionally read-only so travel still happens from the detailed local chart. */}
+            {galaxyPoints.map((star) => (
+              <circle
+                key={star.name}
+                className={`star-map__galaxy-star ${star.isCurrent ? 'is-current' : ''}`}
+                cx={star.x}
+                cy={star.y}
+                r={star.isCurrent ? 2.8 : 1.3}
+              />
+            ))}
+          </svg>
+        </div>
+      )}
       <div className="star-map__actions">
         <p>
           Fuel: <strong>{formatLightYears(currentFuel)}</strong>
           {' / '}
           <strong>{formatLightYears(MAX_FUEL)}</strong>
         </p>
+        {mapMode === 'galaxy' ? <p className="star-map__hint">Galaxy map is informational only. Use Local Map to pick a destination.</p> : null}
         <button type="button" disabled={missingFuelUnits < 1} onClick={() => buyFuel(missingFuelUnits)}>
           Fill Fuel to Full
         </button>
       </div>
-      {selectedSystem && selectedPoint ? (
+      {mapMode === 'local' && selectedSystem && selectedPoint ? (
         <div className="star-map__actions">
           {/* Selection is explicit: the player chooses a destination first, then commits to travel from the details panel. */}
           <p>

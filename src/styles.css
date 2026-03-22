@@ -460,6 +460,10 @@ button:disabled {
   height: auto;
 }
 
+.star-map--galaxy svg {
+  aspect-ratio: 2 / 1;
+}
+
 .star-map__point {
   cursor: default;
 }
@@ -508,10 +512,23 @@ button:disabled {
   font-size: 5.5px;
 }
 
+.star-map__galaxy-star {
+  fill: var(--cga-yellow);
+}
+
+.star-map__galaxy-star.is-current {
+  fill: var(--cga-red);
+}
+
 .star-map__actions {
   margin-top: 0.75rem;
   display: grid;
   gap: 0.45rem;
+}
+
+.star-map__hint {
+  color: var(--cga-yellow);
+  margin: 0;
 }
 
 .travel-screen {
