@@ -40,22 +40,13 @@ function getEnemySectorMount(state: TravelCombatState, enemy: CombatEnemy): Lase
   return 'rear';
 }
 
-function getReachableLaserForEnemy(
+function getTargetSectorLaser(
   state: TravelCombatState,
   enemy: CombatEnemy
-): { mount: LaserMountPosition; laserId: LaserId; distance: number } | null {
+): { mount: LaserMountPosition; laserId: LaserId | null; distance: number } {
   const mount = getEnemySectorMount(state, enemy);
   const laserId = state.playerLoadout.laserMounts[mount];
-  if (!laserId) {
-    return null;
-  }
-
   const distance = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
-  const profile = getLaserProjectileProfile(laserId);
-  if (distance > profile.speed * profile.life) {
-    return null;
-  }
-
   return { mount, laserId, distance };
 }
 
@@ -63,37 +54,78 @@ function findEnemyById(state: TravelCombatState, enemyId: number) {
   return state.enemies.find((enemy) => enemy.id === enemyId) ?? null;
 }
 
+function acquireNearestEnemyLock(state: TravelCombatState): PlayerTargetLock | null {
+  let bestLock: PlayerTargetLock | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const enemy of state.enemies) {
+    const targetSector = getTargetSectorLaser(state, enemy);
+    if (targetSector.distance >= bestDistance) {
+      continue;
+    }
+    bestDistance = targetSector.distance;
+    bestLock = { enemyId: enemy.id, mount: targetSector.mount };
+  }
+  return bestLock;
+}
+
 /**
- * Player lock state is sticky by default: we keep the current target while it
- * remains inside a sector backed by an installed, in-range laser. Only then do
- * we preserve focus; otherwise we fall back to the closest newly reachable foe.
+ * The fire button owns target-lock lifetime:
+ * - press/hold: keep one locked ship, or reacquire if the old one vanished
+ * - release: drop the lock immediately so the indicator disappears
+ *
+ * The stored mount is refreshed every frame because the target may drift into
+ * a different 90-degree sector while the same ship remains locked.
  */
-export function syncPlayerTargetLock(state: TravelCombatState): PlayerTargetLock | null {
+export function syncPlayerTargetLock(state: TravelCombatState, fireHeld: boolean): PlayerTargetLock | null {
+  if (!fireHeld) {
+    state.playerTargetLock = null;
+    return null;
+  }
+
   const currentLock = state.playerTargetLock;
   if (currentLock) {
     const currentEnemy = findEnemyById(state, currentLock.enemyId);
     if (currentEnemy) {
-      const reachable = getReachableLaserForEnemy(state, currentEnemy);
-      if (reachable) {
-        state.playerTargetLock = { enemyId: currentEnemy.id, mount: reachable.mount };
-        return state.playerTargetLock;
-      }
+      const targetSector = getTargetSectorLaser(state, currentEnemy);
+      state.playerTargetLock = { enemyId: currentEnemy.id, mount: targetSector.mount };
+      return state.playerTargetLock;
     }
   }
 
-  let bestLock: PlayerTargetLock | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const enemy of state.enemies) {
-    const reachable = getReachableLaserForEnemy(state, enemy);
-    if (!reachable || reachable.distance >= bestDistance) {
-      continue;
-    }
-    bestDistance = reachable.distance;
-    bestLock = { enemyId: enemy.id, mount: reachable.mount };
-  }
-
+  const bestLock = acquireNearestEnemyLock(state);
   state.playerTargetLock = bestLock;
   return bestLock;
+}
+
+export type PlayerTargetIndicatorState = 'missing-laser' | 'ready' | 'overheated';
+
+/**
+ * Renderer-facing lock status is derived from the same sector ownership logic
+ * as firing so the reticle color always matches weapon availability.
+ */
+export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerTargetIndicatorState | null {
+  const targetLock = state.playerTargetLock;
+  if (!targetLock) {
+    return null;
+  }
+
+  const enemy = findEnemyById(state, targetLock.enemyId);
+  if (!enemy) {
+    return null;
+  }
+
+  const targetSector = getTargetSectorLaser(state, enemy);
+  const laserId = targetSector.laserId;
+  if (!laserId) {
+    return 'missing-laser';
+  }
+
+  const nextHeat = state.player.laserHeat[targetSector.mount] + getLaserHeatPerShot(laserId);
+  if (state.player.laserHeat[targetSector.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+    return 'overheated';
+  }
+
+  return 'ready';
 }
 
 function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId, enemy: CombatEnemy) {
@@ -130,7 +162,7 @@ function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, l
  * mount spends energy and heat to keep that lock engaged.
  */
 export function firePlayerLasers(state: TravelCombatState) {
-  const targetLock = syncPlayerTargetLock(state);
+  const targetLock = state.playerTargetLock;
   if (!targetLock) {
     return false;
   }
@@ -141,15 +173,16 @@ export function firePlayerLasers(state: TravelCombatState) {
     return false;
   }
 
-  const laserId = state.playerLoadout.laserMounts[targetLock.mount];
+  const targetSector = getTargetSectorLaser(state, enemy);
+  state.playerTargetLock = { enemyId: enemy.id, mount: targetSector.mount };
+  const laserId = targetSector.laserId;
   if (!laserId) {
-    state.playerTargetLock = null;
     return false;
   }
 
-  const nextHeat = state.player.laserHeat[targetLock.mount] + getLaserHeatPerShot(laserId);
-  if (state.player.laserHeat[targetLock.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
-    state.player.laserHeat[targetLock.mount] = state.player.maxLaserHeat;
+  const nextHeat = state.player.laserHeat[targetSector.mount] + getLaserHeatPerShot(laserId);
+  if (state.player.laserHeat[targetSector.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+    state.player.laserHeat[targetSector.mount] = state.player.maxLaserHeat;
     pushMessage(state, 'LASER OVERHEAT', 900);
     return false;
   }
@@ -159,10 +192,10 @@ export function firePlayerLasers(state: TravelCombatState) {
     return false;
   }
 
-  state.player.laserHeat[targetLock.mount] = clampLaserHeat(
-    state.player.laserHeat[targetLock.mount] + getLaserHeatPerShot(laserId),
+  state.player.laserHeat[targetSector.mount] = clampLaserHeat(
+    state.player.laserHeat[targetSector.mount] + getLaserHeatPerShot(laserId),
     state.player.maxLaserHeat
   );
-  spawnPlayerLaser(state, targetLock.mount, laserId, enemy);
+  spawnPlayerLaser(state, targetSector.mount, laserId, enemy);
   return true;
 }

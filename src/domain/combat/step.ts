@@ -123,7 +123,7 @@ export function stepTravelCombat(
     state.player.x += state.player.vx * dt;
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
-    syncPlayerTargetLock(state);
+    syncPlayerTargetLock(state, input.fire);
     if (input.fire && state.player.fireCooldown <= 0) {
       firePlayerLasers(state);
     }
@@ -165,7 +165,7 @@ export function stepTravelCombat(
 
   state.encounter.copsNearby = state.enemies.filter((enemy) => enemy.roles.cop).length;
   moveProjectiles(state, dt, random);
-  syncPlayerTargetLock(state);
+  syncPlayerTargetLock(state, input.fire);
   stepParticles(state, dt);
   updateLegalStatus(state);
 

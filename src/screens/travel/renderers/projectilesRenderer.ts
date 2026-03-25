@@ -1,5 +1,6 @@
 import type { CombatEnemy, TravelCombatState } from '../../../domain/travelCombat';
-import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
+import { getPlayerTargetIndicatorState } from '../../../domain/combat/weapons/playerWeapons';
+import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW } from './constants';
 import { getCgaBarFillColor, getSegmentedBankRatios } from './bars';
 import { getEnemyColor, getEnemyShape, getProjectileColor, drawWireframe } from './shipsRenderer';
 
@@ -79,14 +80,14 @@ function drawEnemyHealthBar(ctx: CanvasRenderingContext2D, enemy: CombatEnemy, s
  * The lock indicator uses four short corner chevrons so the target remains
  * readable without obscuring the wireframe or health bar underneath it.
  */
-function drawTargetIndicator(ctx: CanvasRenderingContext2D, screenX: number, screenY: number) {
+function drawTargetIndicator(ctx: CanvasRenderingContext2D, screenX: number, screenY: number, color: string) {
   const arm = 8;
   const gap = 10;
 
   ctx.save();
-  ctx.strokeStyle = CGA_YELLOW;
+  ctx.strokeStyle = color;
   ctx.shadowBlur = 6;
-  ctx.shadowColor = CGA_YELLOW;
+  ctx.shadowColor = color;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(screenX - gap - arm, screenY - gap);
@@ -134,13 +135,17 @@ export function getEnemyLaserTrace(enemy: CombatEnemy, state: TravelCombatState)
 }
 
 export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatState, camX: number, camY: number, showTargetLock = false) {
+  const targetIndicatorState = showTargetLock ? getPlayerTargetIndicatorState(state) : null;
+  const targetIndicatorColor =
+    targetIndicatorState === 'missing-laser' ? CGA_RED : targetIndicatorState === 'overheated' ? CGA_YELLOW : targetIndicatorState === 'ready' ? CGA_GREEN : null;
+
   for (const enemy of state.enemies) {
     const screenX = enemy.x - camX;
     const screenY = enemy.y - camY;
     drawWireframe(ctx, getEnemyShape(enemy), screenX, screenY, enemy.angle, getEnemyColor(enemy.roles, enemy.missionTag));
     drawEnemyHealthBar(ctx, enemy, screenX, screenY);
-    if (showTargetLock && state.playerTargetLock?.enemyId === enemy.id) {
-      drawTargetIndicator(ctx, screenX, screenY);
+    if (showTargetLock && targetIndicatorColor && state.playerTargetLock?.enemyId === enemy.id) {
+      drawTargetIndicator(ctx, screenX, screenY, targetIndicatorColor);
     }
   }
 }
