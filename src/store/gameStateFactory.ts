@@ -3,11 +3,11 @@ import { encodeCommanderBinary256 } from '../domain/commanderPersistence';
 import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/gamePersistence';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
-import { applyDockingMissionState, getMissionMessagesForDocking } from '../domain/missions';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../domain/market';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
 import { createUiMessage, withUiMessage } from './uiMessages';
+import { createInitialMissionState } from './slices/missionSlice';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
 import type { AppTab, MarketState, MissionsState } from './types';
 
@@ -72,9 +72,9 @@ export function refreshItems(session: DockedMarketSession): MarketState {
  * Docking is the canonical moment when mission logs are refreshed.
  */
 export function updateMissionLog(commander: CommanderState): MissionsState {
-  const progress = applyDockingMissionState({ tp: commander.missionTP, variant: commander.missionVariant });
   return {
-    missionLog: getMissionMessagesForDocking(progress)
+    availableContracts: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem), 3124).availableContracts,
+    activeMissionMessages: []
   };
 }
 
@@ -149,9 +149,7 @@ export function createDockedState(
   if (options.spendJumpFuel) {
     nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
   }
-  nextCommander.legalValue = applyLegalFloor(nextCommander.legalValue, nextCommander.cargo);
-  const progress = applyDockingMissionState({ tp: nextCommander.missionTP, variant: nextCommander.missionVariant });
-  nextCommander.missionTP = progress.tp;
+  nextCommander.legalValue = applyLegalFloor(nextCommander.legalValue, nextCommander.cargo, nextCommander.missionCargo);
   const nextSystem = getSystemByName(systemName);
   const nextEconomy = nextSystem?.data.economy ?? state.universe.economy;
   const fluctuation = (state.universe.stardate + systemName.length) & 0xff;
@@ -171,7 +169,8 @@ export function createDockedState(
     commander: nextCommander,
     market: nextMarket,
     missions: {
-      missionLog: getMissionMessagesForDocking(progress)
+      ...createInitialMissionState(systemName, getNearbySystemNames(systemName), state.universe.stardate + (options.stardateDelta ?? 1)),
+      activeMissionMessages: []
     },
     ui: withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
   };
@@ -209,14 +208,7 @@ export function createArrivalState(state: Pick<GameStore, 'universe' | 'commande
  * Rehydrates a saved snapshot into live store-ready state.
  */
 export function restoreSnapshot(snapshot: GameSnapshot) {
-  const missionProgress = applyDockingMissionState({
-    tp: snapshot.commander.missionTP,
-    variant: snapshot.commander.missionVariant
-  });
-  const commander = normalizeCommanderState({
-    ...snapshot.commander,
-    missionTP: missionProgress.tp
-  });
+  const commander = normalizeCommanderState(snapshot.commander);
   return {
     commander,
     universe: {
@@ -225,9 +217,7 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
       nearbySystems: getNearbySystemNames(commander.currentSystem)
     },
     market: refreshItems(snapshot.marketSession),
-    missions: {
-      missionLog: getMissionMessagesForDocking(missionProgress)
-    }
+    missions: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem), snapshot.universe.stardate)
   };
 }
 

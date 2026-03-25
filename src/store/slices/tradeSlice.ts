@@ -1,5 +1,6 @@
-import { cargoUsedTonnes } from '../../domain/commander';
+import { totalCargoUsedTonnes } from '../../domain/commander';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getRefuelCost, MAX_FUEL } from '../../domain/fuel';
+import { applyMissionEvent, evaluateTradeMissionState, getMissionInbox, settleCompletedMissions } from '../../domain/missions';
 import { applyLocalMarketTrade } from '../../domain/market';
 import { formatCredits } from '../../utils/money';
 import { formatLightYears } from '../../utils/distance';
@@ -55,7 +56,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           ui: withUiMessage(state.ui, createUiMessage('error', `Cannot buy ${item.name}`, 'The station has no stock left in this session.'))
         };
       }
-      const cargoUsed = cargoUsedTonnes(state.commander.cargo);
+      const cargoUsed = totalCargoUsedTonnes(state.commander.cargo, state.commander.missionCargo);
       if (item.unit === 't' && cargoUsed + units > state.commander.cargoCapacity) {
         return {
           ui: withUiMessage(state.ui, createUiMessage('error', `Cargo full for ${item.name}`, `Only ${state.commander.cargoCapacity - cargoUsed} t of free space remains.`))
@@ -102,17 +103,37 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
       const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, units);
       const earnings = units * item.price;
       const nextCash = state.commander.cash + earnings;
+      const missionEvents = evaluateTradeMissionState(state.commander.activeMissions, {
+        systemName: state.universe.currentSystem,
+        commodityKey,
+        amount: units
+      });
+      const progressedMissions = missionEvents.reduce((missions, event) => applyMissionEvent(missions, event), state.commander.activeMissions);
+      const settlement = settleCompletedMissions(progressedMissions, state.commander.completedMissions);
       return {
         commander: {
           ...state.commander,
-          cash: nextCash,
+          cash: nextCash + settlement.cashDelta,
           cargo: {
             ...state.commander.cargo,
             [commodityKey]: owned - units
-          }
+          },
+          activeMissions: settlement.activeMissions,
+          completedMissions: settlement.completedMissions
         },
         market: refreshItems(nextSession),
-        ui: withUiMessage(state.ui, createUiMessage('success', `Sold ${units} ${item.name}`, `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`))
+        missions: {
+          ...state.missions,
+          activeMissionMessages: getMissionInbox(settlement.activeMissions, { currentSystem: state.universe.currentSystem })
+        },
+        ui: withUiMessage(
+          state.ui,
+          createUiMessage(
+            'success',
+            `Sold ${units} ${item.name}`,
+            `Earned ${formatCredits(earnings + settlement.cashDelta)}. Balance now ${formatCredits(nextCash + settlement.cashDelta)}.`
+          )
+        )
       };
     })
 });

@@ -18,8 +18,6 @@ export function TravelScreen() {
     (state) => ({
       cargo: state.commander.cargo,
       legalValue: state.commander.legalValue,
-      missionTP: state.commander.missionTP,
-      missionVariant: state.commander.missionVariant,
       energyBanks: state.commander.energyBanks,
       energyPerBank: state.commander.energyPerBank,
       laserMounts: state.commander.laserMounts,

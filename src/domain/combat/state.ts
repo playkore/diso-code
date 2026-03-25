@@ -184,7 +184,7 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
   const activeBlueprintFile = selectBlueprintFile({
     government: init.government,
     techLevel: init.techLevel,
-    missionTP: init.missionTP,
+    missionContext: init.missionContext,
     witchspace: false,
     randomByte: random.nextByte()
   });
@@ -245,11 +245,10 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
     nextId: 1,
     currentGovernment: init.government,
     currentTechLevel: init.techLevel,
-    missionTP: init.missionTP,
-    missionVariant: init.missionVariant,
+    missionContext: init.missionContext,
     witchspace: false,
-    thargoidContactTriggered: false,
-    constrictorSpawned: false,
+    pendingMissionMessages: [],
+    missionSpawnBudget: 0,
     messages: [],
     missionEvents: [],
     salvageCargo: {},

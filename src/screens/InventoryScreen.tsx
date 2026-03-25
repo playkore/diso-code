@@ -1,4 +1,4 @@
-import { cargoUsedTonnes, getLegalStatus } from '../domain/commander';
+import { getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
 import { MAX_FUEL, getFuelUnits } from '../domain/fuel';
 import { getInstalledEquipmentList } from '../domain/outfitting';
 import { LASER_CATALOG } from '../domain/shipCatalog';
@@ -9,7 +9,7 @@ import { formatLightYears } from '../utils/distance';
 export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
   const buyFuel = useGameStore((state) => state.buyFuel);
-  const cargoUsed = cargoUsedTonnes(commander.cargo);
+  const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(commander.fuel));
   const installedEquipment = getInstalledEquipmentList(commander);
   const laserEntries = Object.entries(commander.laserMounts).map(([mount, laserId]) => ({
@@ -44,6 +44,20 @@ export function InventoryScreen() {
           {commander.missilesInstalled} / {commander.missileCapacity}
         </dd>
       </dl>
+      <section className="subpanel">
+        <p className="dialog-kicker">Mission Cargo</p>
+        {commander.missionCargo.length ? (
+          <ul className="chip-list">
+            {commander.missionCargo.map((item) => (
+              <li key={`${item.missionId}:${item.key}`}>
+                {item.name} x{item.amount}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">No mission-specific cargo aboard.</p>
+        )}
+      </section>
       <section className="subpanel">
         <p className="dialog-kicker">Laser Mounts</p>
         <ul className="chip-list">

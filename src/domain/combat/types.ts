@@ -1,5 +1,5 @@
 import type { InstalledEquipmentState, LaserMountState, LegalStatus } from '../commander';
-import type { MissionExternalEvent, MissionVariant } from '../missions';
+import type { MissionEvent, MissionTemplateId, MissionTravelContext } from '../missions';
 import type { LaserMountPosition } from '../shipCatalog';
 
 /**
@@ -177,7 +177,11 @@ export interface CombatEnemy {
    * live gameplay share the exact same despawn thresholds.
    */
   lifetime: number;
-  missionTag?: 'constrictor' | 'thargoid-plans';
+  missionTag?: {
+    missionId: string;
+    templateId: MissionTemplateId;
+    role: 'target' | 'escort' | 'ambusher' | 'blockade' | 'scan-hostile';
+  };
 }
 
 /**
@@ -315,13 +319,12 @@ export interface TravelCombatState {
   nextId: number;
   currentGovernment: number;
   currentTechLevel: number;
-  missionTP: number;
-  missionVariant: MissionVariant;
+  missionContext: MissionTravelContext;
   witchspace: boolean;
-  thargoidContactTriggered: boolean;
-  constrictorSpawned: boolean;
+  pendingMissionMessages: string[];
+  missionSpawnBudget: number;
   messages: CombatMessage[];
-  missionEvents: MissionExternalEvent[];
+  missionEvents: MissionEvent[];
   salvageCargo: Record<string, number>;
   salvageFuel: number;
   lastPlayerArc: LaserMountPosition;
@@ -334,8 +337,7 @@ export interface TravelCombatInit {
   legalValue: number;
   government: number;
   techLevel: number;
-  missionTP: number;
-  missionVariant: MissionVariant;
+  missionContext: MissionTravelContext;
   energyBanks: number;
   energyPerBank: number;
   laserMounts: LaserMountState;

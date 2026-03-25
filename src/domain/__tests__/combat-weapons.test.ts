@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt, consumeEscapePod, createDeterministicRandomSource, getPlayerCombatSnapshot, stepTravelCombat } from '../travelCombat';
-import { TP_MISSION_FLAGS } from '../missions';
 import { createDefaultCommander } from '../commander';
 import { createCombatState, createTestEnemy } from './combatTestUtils';
 import { moveProjectiles } from '../combat/weapons/projectiles';
@@ -16,7 +15,7 @@ describe('travel combat weapons', () => {
 
   it('spawns thargons instead of missiles for thargoids', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
-    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed });
+    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0]);
     state.enemies.push(createTestEnemy({
       id: 5,
       blueprintId: 'thargoid',
@@ -38,7 +37,7 @@ describe('travel combat weapons', () => {
       fireCooldown: 999,
       missileCooldown: 0,
       isFiringLaser: false,
-      missionTag: 'thargoid-plans'
+      missionTag: { missionId: 'hunt', templateId: 'named_pirate_hunt', role: 'ambusher' }
     }));
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.kind === 'thargon')).toBe(true);
@@ -151,7 +150,7 @@ describe('travel combat weapons', () => {
       fireCooldown: 999,
       missileCooldown: 999,
       isFiringLaser: false,
-      missionTag: 'constrictor'
+      missionTag: { missionId: 'hunt', templateId: 'named_pirate_hunt', role: 'target' }
     }));
     state.enemies.push(createTestEnemy({
       id: 5,
@@ -194,7 +193,7 @@ describe('travel combat weapons', () => {
     expect(state.encounter.bombEffectTimer).toBeGreaterThan(0);
     expect(state.particles.length).toBeGreaterThan(20);
     expect(state.enemies.some((enemy) => enemy.blueprintId === 'sidewinder')).toBe(false);
-    expect(state.enemies.some((enemy) => enemy.missionTag === 'constrictor')).toBe(false);
+    expect(state.enemies.some((enemy) => enemy.missionTag?.role === 'target')).toBe(false);
     expect(state.enemies.some((enemy) => enemy.blueprintId === 'mamba')).toBe(false);
     expect(state.enemies.some((enemy) => enemy.blueprintId === 'adder')).toBe(true);
   });

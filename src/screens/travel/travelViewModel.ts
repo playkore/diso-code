@@ -76,13 +76,16 @@ export function getHudState(
   };
 }
 
-export function createCombatInit(commander: CommanderState, originSystem: { government: number; techLevel: number }) {
+export function createCombatInit(
+  commander: CommanderState,
+  originSystem: { government: number; techLevel: number },
+  missionContext: import('../../domain/missions').MissionTravelContext
+) {
   return {
     legalValue: Math.max(commander.legalValue, 0),
     government: originSystem.government,
     techLevel: originSystem.techLevel,
-    missionTP: commander.missionTP,
-    missionVariant: commander.missionVariant,
+    missionContext,
     energyBanks: commander.energyBanks,
     energyPerBank: commander.energyPerBank,
     laserMounts: commander.laserMounts,

@@ -1,4 +1,4 @@
-import type { MissionVariant } from './missions';
+import type { MissionCargoItem, MissionHistoryEntry, MissionInstance } from './missions';
 import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, type ShipType } from './shipCatalog';
 
 /**
@@ -37,8 +37,9 @@ export interface CommanderState {
   tally: number;
   rating: string;
   currentSystem: string;
-  missionTP: number;
-  missionVariant: MissionVariant;
+  activeMissions: MissionInstance[];
+  completedMissions: MissionHistoryEntry[];
+  missionCargo: MissionCargoItem[];
 }
 
 function createInstalledEquipmentState(installed: EquipmentId[] = []): InstalledEquipmentState {
@@ -83,13 +84,27 @@ export function createDefaultCommander(): CommanderState {
     tally: 0,
     rating: 'Harmless',
     currentSystem: 'Lave',
-    missionTP: 0,
-    missionVariant: 'classic'
+    activeMissions: [],
+    completedMissions: [],
+    missionCargo: []
   };
 }
 
 export function cargoUsedTonnes(cargo: Record<string, number>): number {
   return Object.values(cargo).reduce((sum, amount) => sum + Math.max(0, Math.trunc(amount)), 0);
+}
+
+/**
+ * Mission cargo can reserve hold space independently of normal market goods.
+ * The tonnage is explicit per item so documents can consume 0 t while a rescue
+ * payload or decoy crates use real hold capacity.
+ */
+export function missionCargoUsedTonnes(missionCargo: MissionCargoItem[]): number {
+  return missionCargo.reduce((sum, item) => sum + Math.max(0, Math.trunc(item.amount)) * Math.max(0, item.tonnagePerUnit), 0);
+}
+
+export function totalCargoUsedTonnes(cargo: Record<string, number>, missionCargo: MissionCargoItem[]): number {
+  return cargoUsedTonnes(cargo) + missionCargoUsedTonnes(missionCargo);
 }
 
 export function clampLegalValue(value: number): number {
@@ -116,12 +131,19 @@ export function getCargoBadness(cargo: Record<string, number>): number {
   return (slaves + narcotics) * 2 + firearms;
 }
 
+export function getMissionCargoLegalBadness(missionCargo: MissionCargoItem[]): number {
+  return missionCargo.reduce(
+    (sum, item) => sum + Math.max(0, Math.trunc(item.amount)) * Math.max(0, Math.trunc(item.legalBadnessPerUnit)),
+    0
+  );
+}
+
 export function getMinimumLegalValue(cargo: Record<string, number>): number {
   return clampLegalValue(getCargoBadness(cargo));
 }
 
-export function applyLegalFloor(legalValue: number, cargo: Record<string, number>): number {
-  return Math.max(clampLegalValue(legalValue), getMinimumLegalValue(cargo));
+export function applyLegalFloor(legalValue: number, cargo: Record<string, number>, missionCargo: MissionCargoItem[] = []): number {
+  return Math.max(clampLegalValue(legalValue), clampLegalValue(getCargoBadness(cargo) + getMissionCargoLegalBadness(missionCargo)));
 }
 
 function legacyLegalValue(status?: string): number {
@@ -162,14 +184,15 @@ function mapLegacyEquipment(legacyEquipment: string[]): EquipmentId[] {
 }
 
 export function normalizeCommanderState(
-  commander: CommanderState | (Partial<CommanderState> & { legalStatus?: string; equipment?: string[] })
+  commander: CommanderState | (Partial<CommanderState> & { legalStatus?: string; equipment?: string[]; missionTP?: number; missionVariant?: string })
 ): CommanderState {
   // Legacy saves may only carry a status label, but modern flows treat the
   // numeric legal value as the source of truth because cargo can raise it.
   const legacyStatus = 'legalStatus' in commander ? commander.legalStatus : undefined;
   const legalValue = applyLegalFloor(
     typeof commander.legalValue === 'number' ? commander.legalValue : legacyLegalValue(legacyStatus),
-    commander.cargo ?? {}
+    commander.cargo ?? {},
+    commander.missionCargo ?? []
   );
   const legacyEquipment = 'equipment' in commander && Array.isArray(commander.equipment) ? commander.equipment : [];
   const installedEquipment = commander.installedEquipment ?? createInstalledEquipmentState(mapLegacyEquipment(legacyEquipment));
@@ -203,7 +226,8 @@ export function normalizeCommanderState(
     tally: commander.tally ?? 0,
     rating: commander.rating ?? 'Harmless',
     currentSystem: commander.currentSystem ?? 'Lave',
-    missionTP: commander.missionTP ?? 0,
-    missionVariant: commander.missionVariant ?? 'classic'
+    activeMissions: commander.activeMissions ?? [],
+    completedMissions: commander.completedMissions ?? [],
+    missionCargo: commander.missionCargo ?? []
   };
 }

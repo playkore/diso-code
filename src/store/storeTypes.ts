@@ -1,5 +1,5 @@
 import type { StateCreator } from 'zustand';
-import type { MissionExternalEvent } from '../domain/missions';
+import type { MissionEvent } from '../domain/missions';
 import type { EquipmentId, LaserId, LaserMountPosition } from '../domain/shipCatalog';
 import type { GameSnapshot } from '../domain/gamePersistence';
 import type { AppTab, CommanderState, MarketState, MissionsState, TravelState, UiState, UniverseState } from './types';
@@ -35,12 +35,16 @@ export type SaveSlotId = 1 | 2 | 3;
 export interface TravelCompletionReport {
   outcome?: 'arrived' | 'rescued';
   dockSystemName?: string;
+  rerouteDestination?: string;
   spendJumpFuel?: boolean;
   legalValue?: number;
   tallyDelta?: number;
-  missionEvents?: MissionExternalEvent[];
+  missionEvents?: MissionEvent[];
   cargo?: Record<string, number>;
+  missionCargoDelta?: CommanderState['missionCargo'];
   fuelDelta?: number;
+  rewardDelta?: number;
+  choicePrompts?: string[];
   installedEquipment?: CommanderState['installedEquipment'];
   missilesInstalled?: number;
 }
@@ -88,7 +92,10 @@ export interface GameStore {
   buyEquipment: (equipmentId: EquipmentId) => void;
   buyLaser: (mount: LaserMountPosition, laserId: LaserId) => void;
   buyMissile: () => void;
-  triggerMissionExternalEvent: (event: MissionExternalEvent) => void;
+  acceptMission: (offerId: string) => void;
+  declineMission: (offerId: string) => void;
+  resolveMissionChoice: (missionId: string, choiceId: string) => void;
+  dismissMissionMessage: (messageId: string) => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
   startNewGame: () => void;

@@ -1,13 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { createDeterministicRandomSource, getAvailablePackHunters, getBlueprintAvailability, getCombatBlueprint, selectBlueprintFile, stepTravelCombat } from '../travelCombat';
-import { TP_MISSION_FLAGS } from '../missions';
+import type { MissionTravelContext } from '../missions';
 import { createCombatState } from './combatTestUtils';
+
+const EMPTY_MISSION_CONTEXT: MissionTravelContext = {
+  effectiveDestinationSystem: 'Lave',
+  primaryObjectiveText: 'Travel to Lave.',
+  activeEffects: [],
+  pirateSpawnMultiplier: 1,
+  policeHostile: false,
+  policeSuppressed: false,
+  blockadeAtDestination: false,
+  missionTargetSystems: [],
+  missionMessages: []
+};
 
 describe('travel combat encounters', () => {
   it('selects blueprint files from system danger and mission state', () => {
-    expect(selectBlueprintFile({ government: 0, techLevel: 7, missionTP: 0, witchspace: false, randomByte: 0 })).toBe('E');
-    expect(selectBlueprintFile({ government: 7, techLevel: 12, missionTP: 0, witchspace: false, randomByte: 6 })).toBe('L');
-    expect(selectBlueprintFile({ government: 4, techLevel: 8, missionTP: TP_MISSION_FLAGS.thargoidPlansBriefed, witchspace: false, randomByte: 1 })).toBe('D');
+    expect(selectBlueprintFile({ government: 0, techLevel: 7, missionContext: EMPTY_MISSION_CONTEXT, witchspace: false, randomByte: 0 })).toBe('E');
+    expect(selectBlueprintFile({ government: 7, techLevel: 12, missionContext: EMPTY_MISSION_CONTEXT, witchspace: false, randomByte: 6 })).toBe('L');
+    expect(
+      selectBlueprintFile({
+        government: 4,
+        techLevel: 8,
+        missionContext: { ...EMPTY_MISSION_CONTEXT, missionTargetSystems: ['Diso'] },
+        witchspace: false,
+        randomByte: 1
+      })
+    ).toBe('O');
   });
 
   it('keeps pack-hunter availability tied to the active blueprint file', () => {

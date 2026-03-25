@@ -1,6 +1,19 @@
 import { createDefaultCommander } from '../commander';
 import type { CombatEnemy } from '../combat/types';
 import { createDeterministicRandomSource, createTravelCombatState } from '../travelCombat';
+import type { MissionTravelContext } from '../missions';
+
+const EMPTY_MISSION_CONTEXT: MissionTravelContext = {
+  effectiveDestinationSystem: 'Lave',
+  primaryObjectiveText: 'Travel to Lave.',
+  activeEffects: [],
+  pirateSpawnMultiplier: 1,
+  policeHostile: false,
+  policeSuppressed: false,
+  blockadeAtDestination: false,
+  missionTargetSystems: [],
+  missionMessages: []
+};
 
 export function createCombatState(
   bytes: number[],
@@ -12,8 +25,7 @@ export function createCombatState(
       legalValue: 0,
       government: 0,
       techLevel: 7,
-      missionTP: 0,
-      missionVariant: 'classic',
+      missionContext: EMPTY_MISSION_CONTEXT,
       energyBanks: commander.energyBanks,
       energyPerBank: commander.energyPerBank,
       laserMounts: commander.laserMounts,

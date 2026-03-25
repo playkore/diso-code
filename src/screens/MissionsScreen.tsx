@@ -1,29 +1,100 @@
 import { useGameStore } from '../store/useGameStore';
 
+/**
+ * The missions screen now serves as the contract board and mission inbox.
+ * Offers, active objectives, and pending branch choices are all driven by the
+ * same mission-state model the rest of the game uses.
+ */
 export function MissionsScreen() {
-  const missionLog = useGameStore((state) => state.missions.missionLog);
-  const triggerMissionExternalEvent = useGameStore((state) => state.triggerMissionExternalEvent);
+  const availableContracts = useGameStore((state) => state.missions.availableContracts);
+  const activeMissionMessages = useGameStore((state) => state.missions.activeMissionMessages);
+  const activeMissions = useGameStore((state) => state.commander.activeMissions);
+  const completedMissions = useGameStore((state) => state.commander.completedMissions);
+  const acceptMission = useGameStore((state) => state.acceptMission);
+  const declineMission = useGameStore((state) => state.declineMission);
+  const resolveMissionChoice = useGameStore((state) => state.resolveMissionChoice);
+  const dismissMissionMessage = useGameStore((state) => state.dismissMissionMessage);
 
   return (
     <section className="screen">
       <h2>Missions</h2>
-      <div className="button-group">
-        <button type="button" onClick={() => triggerMissionExternalEvent({ type: 'combat:constrictor-destroyed' })}>
-          Simulate Constrictor Kill
-        </button>
-        <button type="button" onClick={() => triggerMissionExternalEvent({ type: 'combat:thargoid-plans-delivered' })}>
-          Simulate Plans Delivery
-        </button>
-      </div>
-      <ul className="card-list">
-        {missionLog.map((message) => (
-          <li key={message.id} className="mission-card">
-            <strong>{message.title}</strong>
-            <span className="status">{message.kind}</span>
-            <span>{message.body}</span>
-          </li>
-        ))}
-      </ul>
+
+      <section className="subpanel">
+        <p className="dialog-kicker">Available Contracts</p>
+        <ul className="card-list">
+          {availableContracts.map((offer) => (
+            <li key={offer.id} className="mission-card">
+              <strong>{offer.title}</strong>
+              <span>{offer.objectiveText}</span>
+              <span>{offer.briefing}</span>
+              <div className="button-group">
+                <button type="button" onClick={() => acceptMission(offer.id)}>
+                  Accept
+                </button>
+                <button type="button" onClick={() => declineMission(offer.id)}>
+                  Decline
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="subpanel">
+        <p className="dialog-kicker">Active Missions</p>
+        <ul className="card-list">
+          {activeMissions.map((mission) => (
+            <li key={mission.id} className="mission-card">
+              <strong>{mission.title}</strong>
+              <span>{mission.objectiveText}</span>
+              <span>
+                Destination: {mission.currentDestinationSystem} | Stage: {mission.stageId}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="subpanel">
+        <p className="dialog-kicker">Mission Inbox</p>
+        <ul className="card-list">
+          {activeMissionMessages.map((message) => (
+            <li key={message.id} className="mission-card">
+              <strong>{message.title}</strong>
+              <span className="status">{message.kind}</span>
+              <span>{message.body}</span>
+              {message.choices?.length ? (
+                <div className="button-group">
+                  {message.choices.map((choice) => (
+                    <button key={choice.id} type="button" onClick={() => resolveMissionChoice(message.missionId, choice.id)}>
+                      {choice.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="button-group">
+                  <button type="button" onClick={() => dismissMissionMessage(message.id)}>
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="subpanel">
+        <p className="dialog-kicker">Completed</p>
+        <ul className="card-list">
+          {completedMissions.map((entry) => (
+            <li key={`${entry.missionId}:${entry.outcome}`} className="mission-card">
+              <strong>{entry.title}</strong>
+              <span className="status">{entry.outcome}</span>
+              <span>{entry.summary}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </section>
   );
 }

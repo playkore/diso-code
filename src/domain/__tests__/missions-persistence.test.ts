@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { applyLegalFloor, createDefaultCommander, getCargoBadness, getLegalStatus, normalizeCommanderState } from '../commander';
+import {
+  applyLegalFloor,
+  createDefaultCommander,
+  getCargoBadness,
+  getLegalStatus,
+  getMissionCargoLegalBadness,
+  missionCargoUsedTonnes,
+  normalizeCommanderState
+} from '../commander';
 import { decodeCommanderBinary256, encodeCommanderBinary256, loadCommanderJson, serializeCommanderJson } from '../commanderPersistence';
 import { getJumpFuelCost, getJumpFuelUnits, getRefuelCost } from '../fuel';
 import { loadGameJson, serializeGameJson } from '../gamePersistence';
-import { applyMissionExternalEvent, getMissionMessagesForDocking, hasMissionFlag, TP_MISSION_FLAGS } from '../missions';
+import { acceptMissionOffer, applyMissionEvent, generateMissionOffers, getMissionInbox, settleCompletedMissions } from '../missions';
 import { createDockedMarketSession } from '../market';
 import { PLAYER_SHIP } from '../shipCatalog';
 
@@ -15,31 +23,35 @@ describe('missions and commander persistence', () => {
     expect(getLegalStatus(50)).toBe('fugitive');
   });
 
-  it('applies contraband floor when normalizing commander state', () => {
-    const normalized = normalizeCommanderState({
-      ...createDefaultCommander(),
-      legalValue: 0,
-      cargo: { firearms: 8 }
-    });
-    expect(normalized.legalValue).toBe(8);
-    expect(applyLegalFloor(3, { slaves: 4 })).toBe(8);
+  it('accounts for mission cargo tonnage and legal badness', () => {
+    const missionCargo = [
+      { missionId: 'm1', key: 'dispatches', name: 'Dispatches', amount: 1, tonnagePerUnit: 0, legalBadnessPerUnit: 2, sellable: false, dumpable: false }
+    ];
+    expect(missionCargoUsedTonnes(missionCargo)).toBe(0);
+    expect(getMissionCargoLegalBadness(missionCargo)).toBe(2);
+    expect(applyLegalFloor(0, {}, missionCargo)).toBe(2);
   });
 
-  it('advances TP flags from external events', () => {
-    const progressed = applyMissionExternalEvent({ tp: 0, variant: 'classic' }, { type: 'combat:constrictor-destroyed' });
-    expect(hasMissionFlag(progressed.tp, 'constrictorBriefed')).toBe(true);
-    expect(hasMissionFlag(progressed.tp, 'constrictorCompleted')).toBe(true);
+  it('accepts offers and generates inbox messages from mission state', () => {
+    const offers = generateMissionOffers({ currentSystem: 'Lave', nearbySystems: ['Diso', 'Leesti', 'Zaonce'], stardate: 3124 });
+    const accepted = acceptMissionOffer(offers[0]);
+    const progressed = applyMissionEvent([accepted.mission], { type: 'travel:jump-completed', destinationSystem: accepted.mission.destinationSystem });
+    const messages = getMissionInbox(progressed, { currentSystem: 'Lave' });
+    expect(messages.some((message) => message.kind === 'reveal' || message.kind === 'briefing')).toBe(true);
   });
 
-  it('generates mission debriefing messages', () => {
-    const messages = getMissionMessagesForDocking({ tp: TP_MISSION_FLAGS.thargoidPlansCompleted, variant: 'classic' });
-    expect(messages.some((message) => message.id === 'thargoid-plans-debriefing')).toBe(true);
+  it('settles completed missions into cash and history', () => {
+    const offer = generateMissionOffers({ currentSystem: 'Lave', nearbySystems: ['Diso', 'Leesti', 'Zaonce'], stardate: 3124 })[0];
+    const accepted = acceptMissionOffer(offer);
+    const completed = applyMissionEvent([accepted.mission], { type: 'mission:cargo-delivered', missionId: accepted.mission.id, systemName: accepted.mission.destinationSystem });
+    const settlement = settleCompletedMissions(completed, []);
+    expect(settlement.cashDelta).toBe(offer.reward);
+    expect(settlement.completedMissions[0]?.outcome).toBe('completed');
   });
 
   it('round-trips commander through JSON and binary saves', () => {
     const commander = createDefaultCommander();
     commander.cash = 2222;
-    commander.missionTP = 7;
     commander.installedEquipment.ecm = true;
     commander.laserMounts.rear = 'beam_laser';
     const json = serializeCommanderJson(commander);
@@ -48,7 +60,7 @@ describe('missions and commander persistence', () => {
     const fromBinary = decodeCommanderBinary256(binary);
     expect(fromJson.cash).toBe(2222);
     expect(fromJson.installedEquipment.ecm).toBe(true);
-    expect(fromBinary.missionTP).toBe(7);
+    expect(fromBinary.activeMissions).toEqual([]);
     expect(fromBinary.laserMounts.rear).toBe('beam_laser');
   });
 

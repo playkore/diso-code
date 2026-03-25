@@ -18,7 +18,6 @@ import {
   stepTravelCombat,
   type FlightPhase
 } from '../../domain/travelCombat';
-import { hasMissionFlag } from '../../domain/missions';
 import type { TravelState } from '../../store/types';
 import { renderCanvas } from './renderCanvas';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
@@ -77,8 +76,6 @@ interface TravelRefs {
 interface CombatCommanderSnapshot {
   cargo: CommanderState['cargo'];
   legalValue: CommanderState['legalValue'];
-  missionTP: CommanderState['missionTP'];
-  missionVariant: CommanderState['missionVariant'];
   energyBanks: CommanderState['energyBanks'];
   energyPerBank: CommanderState['energyPerBank'];
   laserMounts: CommanderState['laserMounts'];
@@ -387,8 +384,7 @@ export function useTravelSession(
         legalValue: applyLegalFloor(commander.legalValue, commander.cargo),
         government: originSystem.government,
         techLevel: originSystem.techLevel,
-        missionTP: commander.missionTP,
-        missionVariant: commander.missionVariant,
+        missionContext: session.missionContext,
         energyBanks: commander.energyBanks,
         energyPerBank: commander.energyPerBank,
         laserMounts: commander.laserMounts,
@@ -494,9 +490,6 @@ export function useTravelSession(
     // same snapshot shape whether docking happens manually or via auto-dock.
     const completeDocking = (dockSystemName: string, spendJumpFuel: boolean, missionEvents = [...combatState.missionEvents]) => {
       const snapshot = getPlayerCombatSnapshot(combatState);
-      if (jumpCompleted && hasMissionFlag(combatState.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(combatState.missionTP, 'thargoidPlansCompleted')) {
-        missionEvents.push({ type: 'combat:thargoid-plans-delivered' });
-      }
       completeTravel({
         dockSystemName,
         spendJumpFuel,
@@ -562,8 +555,7 @@ export function useTravelSession(
           legalValue: applyLegalFloor(commander.legalValue, commander.cargo),
           government: originSystem.government,
           techLevel: originSystem.techLevel,
-          missionTP: commander.missionTP,
-          missionVariant: commander.missionVariant,
+          missionContext: session.missionContext,
           energyBanks: commander.energyBanks,
           energyPerBank: commander.energyPerBank,
           laserMounts: commander.laserMounts,

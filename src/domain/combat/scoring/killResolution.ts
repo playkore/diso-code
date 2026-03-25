@@ -47,8 +47,8 @@ export function recordKill(state: TravelCombatState, enemy: CombatEnemy) {
   if (enemy.roles.innocent) {
     state.legalValue = Math.max(state.legalValue, 32);
   }
-  if (enemy.missionTag === 'constrictor') {
-    state.missionEvents.push({ type: 'combat:constrictor-destroyed' });
+  if (enemy.missionTag?.role === 'target') {
+    state.missionEvents.push({ type: 'mission:target-destroyed', missionId: enemy.missionTag.missionId });
   }
   state.player.tallyKills += 1;
   state.player.combatReward += getKillReward(enemy);

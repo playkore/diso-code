@@ -1,11 +1,11 @@
 import type { CombatProjectile, CombatShipRoles, TravelCombatState } from '../../../domain/travelCombat';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_THARGOID } from './constants';
 
-export function getEnemyColor(roles: CombatShipRoles, missionTag?: string) {
-  if (missionTag === 'constrictor') {
+export function getEnemyColor(roles: CombatShipRoles, missionTag?: TravelCombatState['enemies'][number]['missionTag']) {
+  if (missionTag?.role === 'target') {
     return CGA_YELLOW;
   }
-  if (missionTag === 'thargoid-plans') {
+  if (missionTag?.role === 'blockade' || missionTag?.role === 'ambusher' || missionTag?.role === 'scan-hostile') {
     return CGA_RED;
   }
   if (roles.cop) {

@@ -1,5 +1,5 @@
 import { applyLegalFloor, normalizeCommanderState } from '../../domain/commander';
-import { applyMissionExternalEvent } from '../../domain/missions';
+import { applyMissionEvent, evaluateDockingMissionState, getMissionCargoForActiveMissions, getMissionInbox, getMissionTravelContext, settleCompletedMissions } from '../../domain/missions';
 import { getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../../domain/fuel';
 import { getSystemDistance } from '../../domain/galaxyCatalog';
 import { formatCredits } from '../../utils/money';
@@ -93,19 +93,26 @@ export const createTravelSlice: GameSlice<
       return false;
     }
 
-    const commander = {
-      ...state.commander,
-      legalValue: applyLegalFloor(state.commander.legalValue, state.commander.cargo)
-    };
-    set({
-      commander,
-      travelSession: {
+      const missionContext = getMissionTravelContext(state.commander.activeMissions, {
         originSystem: state.universe.currentSystem,
-        destinationSystem: systemName,
-        fuelCost: jumpFuelCost,
-        fuelUnits: jumpFuelUnits
-      }
-    });
+        destinationSystem: systemName
+      });
+      const commander = {
+        ...state.commander,
+        legalValue: applyLegalFloor(state.commander.legalValue, state.commander.cargo, state.commander.missionCargo)
+      };
+      set({
+        commander,
+        travelSession: {
+          originSystem: state.universe.currentSystem,
+          destinationSystem: systemName,
+          effectiveDestinationSystem: missionContext.effectiveDestinationSystem,
+          fuelCost: jumpFuelCost,
+          fuelUnits: jumpFuelUnits,
+          primaryObjectiveText: missionContext.primaryObjectiveText,
+          missionContext
+        }
+      });
     return true;
   },
   /**
@@ -137,6 +144,7 @@ export const createTravelSlice: GameSlice<
         mergedCargo[commodityKey] = (mergedCargo[commodityKey] ?? 0) + Math.max(0, Math.trunc(amount));
       }
       const insurancePenalty = report?.outcome === 'rescued' ? Math.min(state.commander.cash, Math.max(250, Math.trunc(state.commander.cash * 0.1))) : 0;
+      let missionCargo = report?.missionCargoDelta ?? state.commander.missionCargo;
 
       // First, merge all direct commander deltas from the travel report.
       let commander = normalizeCommanderState({
@@ -147,23 +155,17 @@ export const createTravelSlice: GameSlice<
         legalValue: report?.legalValue ?? state.commander.legalValue,
         tally: state.commander.tally + (report?.tallyDelta ?? 0),
         cargo: mergedCargo,
+        missionCargo,
         fuel: state.commander.fuel + (report?.fuelDelta ?? 0),
         installedEquipment: report?.installedEquipment ?? state.commander.installedEquipment,
         missilesInstalled: report?.missilesInstalled ?? state.commander.missilesInstalled
       });
-      // Then fold in mission-side effects emitted during travel combat.
+      let activeMissions = state.commander.activeMissions;
       if (report?.missionEvents?.length) {
-        const progress = report.missionEvents.reduce((current, event) => applyMissionExternalEvent(current, event), {
-          tp: commander.missionTP,
-          variant: commander.missionVariant
-        });
-        commander = normalizeCommanderState({
-          ...commander,
-          missionTP: progress.tp
-        });
+        activeMissions = report.missionEvents.reduce((missions, event) => applyMissionEvent(missions, event), activeMissions);
       }
 
-      const dockSystemName = report?.dockSystemName ?? state.travelSession.destinationSystem;
+      const dockSystemName = report?.dockSystemName ?? state.travelSession.effectiveDestinationSystem;
       const spendJumpFuel = report?.spendJumpFuel ?? dockSystemName === state.travelSession.destinationSystem;
       // Finally choose the appropriate docked transition:
       // - rescue recovery
@@ -192,7 +194,27 @@ export const createTravelSlice: GameSlice<
           ui: withUiMessage(state.ui, createUiMessage('error', 'Travel failed', 'The hyperspace solution collapsed before arrival.'))
         };
       }
-      return { ...nextState, travelSession: null };
+      const dockingMissionEvents = evaluateDockingMissionState(activeMissions, { currentSystem: dockSystemName });
+      if (dockingMissionEvents.length) {
+        activeMissions = dockingMissionEvents.reduce((missions, event) => applyMissionEvent(missions, event), activeMissions);
+      }
+      const settlement = settleCompletedMissions(activeMissions, state.commander.completedMissions);
+      missionCargo = getMissionCargoForActiveMissions(settlement.activeMissions);
+      return {
+        ...nextState,
+        commander: normalizeCommanderState({
+          ...nextState.commander,
+          cash: nextState.commander.cash + (report?.rewardDelta ?? 0) + settlement.cashDelta,
+          activeMissions: settlement.activeMissions,
+          completedMissions: settlement.completedMissions,
+          missionCargo
+        }),
+        missions: {
+          ...nextState.missions,
+          activeMissionMessages: getMissionInbox(settlement.activeMissions, { currentSystem: dockSystemName })
+        },
+        travelSession: null
+      };
     }),
 
   /**

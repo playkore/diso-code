@@ -1,6 +1,6 @@
 import type { CommanderState as DomainCommanderState } from '../domain/commander';
 import type { DockedMarketSession, MarketCommodity } from '../domain/market';
-import type { MissionMessage } from '../domain/missions';
+import type { MissionMessage, MissionOffer, MissionTravelContext } from '../domain/missions';
 
 export interface UniverseState {
   currentSystem: string;
@@ -26,14 +26,18 @@ export interface UiMessage {
 }
 
 export interface MissionsState {
-  missionLog: MissionMessage[];
+  availableContracts: MissionOffer[];
+  activeMissionMessages: MissionMessage[];
 }
 
 export interface TravelState {
   originSystem: string;
   destinationSystem: string;
+  effectiveDestinationSystem: string;
   fuelCost: number;
   fuelUnits: number;
+  primaryObjectiveText: string;
+  missionContext: MissionTravelContext;
 }
 
 export interface UiState {

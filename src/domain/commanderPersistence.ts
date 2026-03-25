@@ -1,5 +1,4 @@
 import { normalizeCommanderState, type CommanderState } from './commander';
-import type { MissionVariant } from './missions';
 import type { LaserId } from './shipCatalog';
 
 /**
@@ -48,8 +47,9 @@ type CompactCommanderPayload = [
   number,
   string,
   string,
-  number,
-  MissionVariant
+  CommanderState['activeMissions'],
+  CommanderState['completedMissions'],
+  CommanderState['missionCargo']
 ];
 
 /**
@@ -106,8 +106,9 @@ function toCompactPayload(commander: CommanderState): CompactCommanderPayload {
     commander.tally,
     commander.rating,
     commander.currentSystem,
-    commander.missionTP,
-    commander.missionVariant
+    commander.activeMissions,
+    commander.completedMissions,
+    commander.missionCargo
   ];
 }
 
@@ -136,8 +137,9 @@ function fromCompactPayload(payload: CompactCommanderPayload): CommanderState {
     tally: payload[15],
     rating: payload[16],
     currentSystem: payload[17],
-    missionTP: payload[18],
-    missionVariant: payload[19]
+    activeMissions: payload[18] ?? [],
+    completedMissions: payload[19] ?? [],
+    missionCargo: payload[20] ?? []
   });
 }
 
@@ -181,7 +183,7 @@ export function encodeCommanderBinary256(commander: CommanderState): Uint8Array 
   view.setUint32(0, COMMANDER_SCHEMA_VERSION, true);
   view.setUint32(4, normalized.cash, true);
   view.setFloat32(8, normalized.fuel, true);
-  view.setUint8(12, normalized.missionTP & 0xff);
+  view.setUint8(12, normalized.activeMissions.length & 0xff);
   view.setUint16(13, normalized.tally & 0xffff, true);
 
   // The visible commander name gets its own ASCII slot so old tooling can read

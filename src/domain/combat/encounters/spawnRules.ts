@@ -1,5 +1,4 @@
 import { getCargoBadness } from '../../legal';
-import { hasMissionFlag } from '../../missions';
 import { getCombatBlueprint } from '../blueprints';
 import { getAvailablePackHunters, getBlueprintAvailability, getLoneBountySequence, getPackSequence } from './blueprintFiles';
 import { pushMessage } from '../state';
@@ -64,15 +63,14 @@ function canSpawnEnemy(state: TravelCombatState, role: 'pirate' | 'cop' | 'trade
 export function selectBlueprintFile(params: {
   government: number;
   techLevel: number;
-  missionTP: number;
+  missionContext: TravelCombatState['missionContext'];
   witchspace: boolean;
   randomByte: number;
 }): BlueprintFileId {
-  if (params.witchspace || (hasMissionFlag(params.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(params.missionTP, 'thargoidPlansCompleted'))) {
+  if (params.witchspace) {
     return (params.randomByte & 1) === 0 ? 'C' : 'D';
   }
-
-  if (!hasMissionFlag(params.missionTP, 'constrictorCompleted') && hasMissionFlag(params.missionTP, 'constrictorBriefed')) {
+  if (params.missionContext.missionTargetSystems.length > 0 || params.missionContext.blockadeAtDestination) {
     return 'O';
   }
 
@@ -143,26 +141,39 @@ function spawnBenignTrader(state: TravelCombatState, random: RandomSource) {
   });
 }
 
-/**
- * Mission-only Constrictor encounter.
- */
-function spawnConstrictor(state: TravelCombatState, random: RandomSource) {
-  spawnEnemyFromBlueprint(state, 'constrictor', random, { missionTag: 'constrictor', aggression: 56, baseAggression: 56 });
-  state.constrictorSpawned = true;
-  pushMessage(state, 'NAVY ALERT: CONSTRICTOR CONTACT');
+function spawnMissionTarget(state: TravelCombatState, random: RandomSource) {
+  const effect = state.missionContext.activeEffects.find((entry) => entry.missionTargetSystem);
+  if (!effect?.missionTargetBlueprintId || !effect.missionTargetRole) {
+    return;
+  }
+  spawnEnemyFromBlueprint(state, effect.missionTargetBlueprintId as never, random, {
+    missionTag: {
+      missionId: 'mission-target',
+      templateId: 'named_pirate_hunt',
+      role: effect.missionTargetRole
+    },
+    aggression: 56,
+    baseAggression: 56
+  });
+  state.missionSpawnBudget += 1;
+  pushMessage(state, `TARGET CONTACT: ${getCombatBlueprint(effect.missionTargetBlueprintId as never).label.toUpperCase()}`);
 }
 
-/**
- * Mission-only thargoid contact. The first spawn also emits a mission event so
- * the campaign can react later when the player returns.
- */
-function spawnThargoidIntercept(state: TravelCombatState, random: RandomSource) {
-  spawnEnemyFromBlueprint(state, 'thargoid', random, { missionTag: 'thargoid-plans', aggression: 58, baseAggression: 58 });
-  pushMessage(state, 'THARGOID INTERCEPTOR');
-  if (!state.thargoidContactTriggered) {
-    state.thargoidContactTriggered = true;
-    state.missionEvents.push({ type: 'travel:thargoid-contact-system' });
+function spawnBlockadeWave(state: TravelCombatState, random: RandomSource) {
+  const spawnCount = Math.min(3, Math.max(1, getFreeEnemySlots(state)));
+  for (let i = 0; i < spawnCount; i += 1) {
+    spawnEnemyFromBlueprint(state, 'cobra-mk3-pirate', random, {
+      missionTag: {
+        missionId: 'mission-blockade',
+        templateId: 'station_blockade',
+        role: 'blockade'
+      },
+      aggression: 54,
+      baseAggression: 54
+    });
   }
+  state.missionSpawnBudget += spawnCount;
+  pushMessage(state, 'BLOCKADE CONTACTS DETECTED');
 }
 
 /**
@@ -175,7 +186,13 @@ function deepSpaceCopShouldSpawn(state: TravelCombatState, random: RandomSource,
   if (state.encounter.safeZone) {
     return false;
   }
+  if (state.missionContext.policeSuppressed) {
+    return false;
+  }
   let badness = getCargoBadness(cargo) * 2;
+  if (state.missionContext.policeHostile) {
+    badness = Math.max(badness, 40);
+  }
   if (state.encounter.copsNearby > 0) {
     badness |= state.legalValue;
   }
@@ -211,14 +228,12 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
   }
   state.encounter.ev = 0;
 
-  const thargoidMissionActive = hasMissionFlag(state.missionTP, 'thargoidPlansBriefed') && !hasMissionFlag(state.missionTP, 'thargoidPlansCompleted');
-  const constrictorActive = hasMissionFlag(state.missionTP, 'constrictorBriefed') && !hasMissionFlag(state.missionTP, 'constrictorCompleted');
-  if (constrictorActive && !state.constrictorSpawned) {
-    spawnConstrictor(state, random);
+  if (state.missionContext.missionTargetSystems.length > 0 && state.missionSpawnBudget === 0) {
+    spawnMissionTarget(state, random);
     return;
   }
-  if (thargoidMissionActive && random.nextByte() >= 200) {
-    spawnThargoidIntercept(state, random);
+  if (state.missionContext.blockadeAtDestination && state.missionSpawnBudget === 0) {
+    spawnBlockadeWave(state, random);
     return;
   }
   if (state.currentGovernment !== 0) {
@@ -228,7 +243,7 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
     }
   }
 
-  const pirateInterest = getCargoPirateInterest(cargo);
+  const pirateInterest = Math.min(255, Math.round(getCargoPirateInterest(cargo) * state.missionContext.pirateSpawnMultiplier));
   if (pirateInterest > 0 && canSpawnEnemy(state, 'pirate') && random.nextByte() < pirateInterest) {
     if (random.nextByte() >= 96) {
       spawnPackPirates(state, random);
@@ -263,8 +278,9 @@ export function setCombatSystemContext(
   state.encounter.activeBlueprintFile = selectBlueprintFile({
     government: params.government,
     techLevel: params.techLevel,
-    missionTP: state.missionTP,
+    missionContext: state.missionContext,
     witchspace: params.witchspace,
     randomByte: random.nextByte()
   });
+  state.missionSpawnBudget = 0;
 }

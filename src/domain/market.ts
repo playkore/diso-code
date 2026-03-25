@@ -29,6 +29,26 @@ export interface DockedMarketSession {
   localQuantities: Record<string, number>;
 }
 
+/**
+ * Mission cargo is intentionally invisible to the ordinary commodity market.
+ * Trading helpers consult these guards before allowing cargo to leave the
+ * mission layer.
+ */
+export function canSellCommodity(commodityKey: string) {
+  return COMMODITIES.some((commodity) => commodity.key === commodityKey);
+}
+
+export function canSellMissionCargo(destinationSystem: string, cargo: { sellable: boolean; destinationSystem?: string }) {
+  if (!cargo.sellable) {
+    return false;
+  }
+  return !cargo.destinationSystem || cargo.destinationSystem === destinationSystem;
+}
+
+export function canDumpMissionCargo(cargo: { dumpable: boolean }) {
+  return cargo.dumpable;
+}
+
 export const COMMODITIES: Commodity[] = [
   { key: 'food', name: 'Food', basePrice: 0x13, gradient: -0x02, baseQuantity: 0x06, mask: 0x01, unit: 't' },
   { key: 'textiles', name: 'Textiles', basePrice: 0x14, gradient: -0x01, baseQuantity: 0x0a, mask: 0x03, unit: 't' },

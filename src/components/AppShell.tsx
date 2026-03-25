@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../appRoutes';
-import { cargoUsedTonnes } from '../domain/commander';
+import { totalCargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
 import { formatCredits } from '../utils/money';
@@ -109,9 +109,9 @@ export function AppShell() {
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
-  const missionLog = useGameStore((state) => state.missions.missionLog);
-  const latestMessage = missionLog[0];
-  const cargoUsed = cargoUsedTonnes(commander.cargo);
+  const missionMessages = useGameStore((state) => state.missions.activeMissionMessages);
+  const latestMessage = missionMessages[0];
+  const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
   const isTravelRoute = location.pathname === '/travel';
 
   if (isTravelRoute) {
