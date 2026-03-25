@@ -5,6 +5,12 @@ the gameplay rules each mission applies. The mission system is built around
 explicit mission instances rather than a legacy bitfield, so each contract can
 own its own cargo, route modifiers, inbox messages, and completion logic.
 
+## Credit Format
+
+- Mission rewards use the same internal credit format as the rest of the game.
+- Values are stored in tenths of a credit.
+- Example: an internal reward value of `1400` is displayed as `140.0 Cr`.
+
 ## Mission System Overview
 
 - Missions are generated as dockside contract offers.
@@ -25,7 +31,7 @@ intended to draw pirate attention onto your route.
 
 **Current gameplay rules**
 
-- Reward: `1400 Cr`
+- Reward: `140.0 Cr`
 - Cargo: `4` units of `Medical Crates`
 - Cargo space: `4 t`
 - Cargo sale rule: not sellable through the normal market
@@ -49,7 +55,7 @@ inspection and may force a reroute.
 
 **Current gameplay rules**
 
-- Reward: `2200 Cr`
+- Reward: `220.0 Cr`
 - Cargo: `1` unit of `Sealed Dispatches`
 - Cargo space: `0 t`
 - Legal pressure: carrying the packet increases legal risk
@@ -74,7 +80,7 @@ approach corridor.
 
 **Current gameplay rules**
 
-- Reward: `2600 Cr`
+- Reward: `260.0 Cr`
 - Cargo: no mission-owned cargo is created automatically
 - Trade hook: the mission watches for delivery of a required commodity at the
   destination station
@@ -96,7 +102,7 @@ clues and must search before engaging the target.
 
 **Current gameplay rules**
 
-- Reward: `3000 Cr`
+- Reward: `300.0 Cr`
 - Cargo: none
 - Search phase: the mission tracks a small set of candidate systems
 - Travel effect: visiting the right systems advances the mission from search to
@@ -119,7 +125,7 @@ offer mid-route.
 
 **Current gameplay rules**
 
-- Reward: `1800 Cr`
+- Reward: `180.0 Cr`
 - Cargo: `3` units of `Bonded Goods`
 - Cargo space: `3 t`
 - Legal pressure: mild legal risk while carried
@@ -146,7 +152,7 @@ them back alive.
 
 **Current gameplay rules**
 
-- Reward: `2800 Cr`
+- Reward: `280.0 Cr`
 - Outbound leg: no starting mission cargo
 - Pickup trigger: docking at the target system converts the mission into a
   return leg

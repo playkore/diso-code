@@ -10,7 +10,12 @@
  * instance owns its stage, mission-only cargo, routing modifiers, inbox
  * messages, and any pending player choices. Store slices and combat/travel code
  * talk to this module through pure functions so mission logic stays testable.
+ *
+ * Reward values use the same tenths-of-a-credit convention as the rest of the
+ * game economy. For example, `1400` should be displayed as `140.0 Cr`.
  */
+
+import { formatCredits } from '../utils/money';
 
 export type MissionTemplateId =
   | 'decoy_cargo'
@@ -635,7 +640,7 @@ export function settleCompletedMissions(activeMissions: MissionInstance[], compl
         templateId: mission.templateId,
         title: mission.title,
         outcome: 'completed',
-        summary: `${mission.title} completed for ${mission.reward} credits.`
+        summary: `${mission.title} completed for ${formatCredits(mission.reward)}.`
       });
       continue;
     }
@@ -685,4 +690,3 @@ export function getMissionCargoForActiveMissions(activeMissions: MissionInstance
     }))
   );
 }
-

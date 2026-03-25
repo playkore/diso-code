@@ -1,4 +1,5 @@
 import { useGameStore } from '../store/useGameStore';
+import { formatCredits } from '../utils/money';
 
 /**
  * The missions screen now serves as the contract board and mission inbox.
@@ -25,6 +26,7 @@ export function MissionsScreen() {
           {availableContracts.map((offer) => (
             <li key={offer.id} className="mission-card">
               <strong>{offer.title}</strong>
+              <span>Reward: {formatCredits(offer.reward)}</span>
               <span>{offer.objectiveText}</span>
               <span>{offer.briefing}</span>
               <div className="button-group">
@@ -46,6 +48,7 @@ export function MissionsScreen() {
           {activeMissions.map((mission) => (
             <li key={mission.id} className="mission-card">
               <strong>{mission.title}</strong>
+              <span>Reward: {formatCredits(mission.reward)}</span>
               <span>{mission.objectiveText}</span>
               <span>
                 Destination: {mission.currentDestinationSystem} | Stage: {mission.stageId}
