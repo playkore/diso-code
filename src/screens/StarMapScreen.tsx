@@ -80,6 +80,11 @@ export function StarMapScreen() {
   const selectedDistance = selectedSystem ? getJumpFuelCost(getSystemDistance(universe.currentSystem, selectedSystem)) : null;
   const fuelAfterJump = selectedDistance === null ? null : Math.max(0, currentFuel - selectedDistance);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
+  const currentSystemData = getSystemByName(universe.currentSystem)?.data ?? null;
+  const currentSystemFacts = currentSystemData ? getSystemFacts(currentSystemData) : null;
+  const detailsSystemName = selectedSystem ?? universe.currentSystem;
+  const detailsSystemFacts = selectedSystemFacts ?? currentSystemFacts;
+  const showingCurrentSystem = selectedSystem === null;
 
   return (
     <section className="screen">
@@ -114,9 +119,9 @@ export function StarMapScreen() {
                 transform={`translate(${star.x} ${star.y})`}
                 className={`star-map__point ${star.isCurrent ? 'is-current' : ''} ${selectedSystem === star.name ? 'is-selected' : ''} ${star.inRange ? 'is-in-range' : 'is-out-of-range'}`}
                 onClick={() => {
-                  if (!star.isCurrent) {
-                    setSelectedSystem(star.name);
-                  }
+                  // Selecting the current system returns the map to its neutral
+                  // "no destination" state, which doubles as the undock mode.
+                  setSelectedSystem(star.isCurrent ? null : star.name);
                 }}
               >
                 {!star.isCurrent ? <circle className="star-map__target" r="9" /> : null}
@@ -142,6 +147,11 @@ export function StarMapScreen() {
                 cx={star.x}
                 cy={star.y}
                 r={star.isCurrent ? 2.8 : 1.3}
+                onClick={() => {
+                  if (star.isCurrent) {
+                    setSelectedSystem(null);
+                  }
+                }}
               />
             ))}
           </svg>
@@ -158,46 +168,54 @@ export function StarMapScreen() {
           Fill Fuel to Full
         </button>
       </div>
-      {mapMode === 'local' && selectedSystem && selectedPoint ? (
+      {mapMode === 'local' ? (
         <div className="star-map__actions">
-          {/* Selection is explicit: the player chooses a destination first, reviews
-              its procedural metadata, and then commits to travel from the same panel. */}
           <p>
-            Selected destination: <strong>{selectedSystem}</strong>
+            {showingCurrentSystem ? (
+              <>
+                Current system: <strong>{detailsSystemName}</strong>
+              </>
+            ) : (
+              <>
+                Selected destination: <strong>{detailsSystemName}</strong>
+              </>
+            )}
           </p>
-          <p>
-            Distance: <strong>{selectedDistance !== null ? formatLightYears(selectedDistance) : 'Unknown'}</strong>
-            {' · '}
-            Fuel after jump: <strong>{fuelAfterJump !== null ? formatLightYears(fuelAfterJump) : 'Unknown'}</strong>
-          </p>
-          {selectedSystemFacts ? (
+          {!showingCurrentSystem ? (
+            <p>
+              Distance: <strong>{selectedDistance !== null ? formatLightYears(selectedDistance) : 'Unknown'}</strong>
+              {' · '}
+              Fuel after jump: <strong>{fuelAfterJump !== null ? formatLightYears(fuelAfterJump) : 'Unknown'}</strong>
+            </p>
+          ) : null}
+          {detailsSystemFacts ? (
             <dl className="detail-grid star-map__details">
               <dt>Economy</dt>
-              <dd>{selectedSystemFacts.economy}</dd>
+              <dd>{detailsSystemFacts.economy}</dd>
               <dt>Government</dt>
-              <dd>{selectedSystemFacts.government}</dd>
+              <dd>{detailsSystemFacts.government}</dd>
               <dt>Tech Level</dt>
-              <dd>{selectedSystemFacts.techLevel}</dd>
+              <dd>{detailsSystemFacts.techLevel}</dd>
               <dt>Population</dt>
-              <dd>{selectedSystemFacts.population}</dd>
+              <dd>{detailsSystemFacts.population}</dd>
               <dt>Productivity</dt>
-              <dd>{selectedSystemFacts.productivity}</dd>
+              <dd>{detailsSystemFacts.productivity}</dd>
               <dt>Average Radius</dt>
-              <dd>{selectedSystemFacts.averageRadius}</dd>
+              <dd>{detailsSystemFacts.averageRadius}</dd>
               <dt>Species</dt>
-              <dd>{selectedSystemFacts.species}</dd>
+              <dd>{detailsSystemFacts.species}</dd>
             </dl>
           ) : null}
           <button
             type="button"
-            disabled={!selectedPoint.inRange}
+            disabled={!showingCurrentSystem && !selectedPoint?.inRange}
             onClick={() => {
-              if (beginTravel(selectedSystem)) {
+              if (beginTravel(detailsSystemName)) {
                 navigate('/travel');
               }
             }}
           >
-            Travel to {selectedSystem}
+            {showingCurrentSystem ? 'Undock' : `Travel to ${detailsSystemName}`}
           </button>
         </div>
       ) : null}

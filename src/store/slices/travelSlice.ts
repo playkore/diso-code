@@ -66,11 +66,12 @@ export const createTravelSlice: GameSlice<
    */
   beginTravel: (systemName) => {
     const state = get();
+    const isUndocking = systemName === state.universe.currentSystem;
     const distance = getSystemDistance(state.universe.currentSystem, systemName);
-    const jumpFuelCost = getJumpFuelCost(distance);
-    const jumpFuelUnits = getJumpFuelUnits(distance);
+    const jumpFuelCost = isUndocking ? 0 : getJumpFuelCost(distance);
+    const jumpFuelUnits = isUndocking ? 0 : getJumpFuelUnits(distance);
     const availableFuelUnits = getFuelUnits(state.commander.fuel);
-    if (!Number.isFinite(distance) || jumpFuelUnits <= 0) {
+    if ((!isUndocking && !Number.isFinite(distance)) || (!isUndocking && jumpFuelUnits <= 0)) {
       return false;
     }
     if (jumpFuelUnits > availableFuelUnits) {
@@ -109,7 +110,9 @@ export const createTravelSlice: GameSlice<
           effectiveDestinationSystem: missionContext.effectiveDestinationSystem,
           fuelCost: jumpFuelCost,
           fuelUnits: jumpFuelUnits,
-          primaryObjectiveText: missionContext.primaryObjectiveText,
+          // Undocking reuses the same travel session contract as hyperspace,
+          // but it should present as a local launch rather than a destination jump.
+          primaryObjectiveText: isUndocking ? `Undock from ${state.universe.currentSystem}.` : missionContext.primaryObjectiveText,
           missionContext
         }
       });
