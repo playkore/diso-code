@@ -73,7 +73,7 @@ describe('travel combat encounters', () => {
     expect(state.enemies.length).toBeLessThanOrEqual(12);
   });
 
-  it('despawns stale ambient pirates once they drift out of encounter range', () => {
+  it('despawns ambient pirates once they drift far from the player', () => {
     const state = createCombatState([0, 0, 0, 0]);
     const blueprint = getCombatBlueprint('sidewinder');
     state.enemies.push({
@@ -107,5 +107,42 @@ describe('travel combat encounters', () => {
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
     expect(state.enemies).toHaveLength(0);
+  });
+
+  it('keeps nearby ambient pirates alive even after a long time in the encounter', () => {
+    const state = createCombatState([0, 0, 0, 0]);
+    const blueprint = getCombatBlueprint('sidewinder');
+    state.enemies.push({
+      id: 1,
+      kind: 'ship',
+      blueprintId: blueprint.id,
+      label: blueprint.label,
+      behavior: blueprint.behavior,
+      x: 150,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      energy: blueprint.maxEnergy,
+      maxEnergy: blueprint.maxEnergy,
+      laserPower: blueprint.laserPower,
+      missiles: blueprint.missiles,
+      targetableArea: blueprint.targetableArea,
+      laserRange: blueprint.laserRange,
+      topSpeed: blueprint.topSpeed,
+      acceleration: blueprint.acceleration,
+      turnRate: blueprint.turnRate,
+      roles: { ...blueprint.roles },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 0,
+      missileCooldown: 0,
+      isFiringLaser: false,
+      lifetime: 60 * 60
+    });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
+    expect(state.enemies).toHaveLength(1);
+    expect(state.enemies[0].id).toBe(1);
   });
 });

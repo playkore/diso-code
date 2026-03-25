@@ -14,12 +14,11 @@ import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCo
 
 const MAX_ACTIVE_ENEMIES = 12;
 const ENEMY_DESPAWN_DISTANCE = RADAR_SHIP_RANGE * 3;
-const ENEMY_DESPAWN_LIFETIME = 60 * 45;
 
 /**
- * Ambient contacts are short-lived by design. Once a non-mission ship has
- * drifted well beyond scanner relevance or has lingered for too long, we drop
- * it so new encounters can rotate in instead of accumulating forever.
+ * Ambient contacts may leave the encounter once they drift far enough away,
+ * but they are no longer removed just because a hidden lifetime counter ran
+ * out. That prevents on-screen ships from vanishing mid-fight.
  */
 function shouldDespawnEnemy(state: TravelCombatState, enemy: TravelCombatState['enemies'][number]) {
   if (enemy.missionTag) {
@@ -30,7 +29,7 @@ function shouldDespawnEnemy(state: TravelCombatState, enemy: TravelCombatState['
   }
 
   const distanceFromPlayer = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
-  return distanceFromPlayer > ENEMY_DESPAWN_DISTANCE || enemy.lifetime >= ENEMY_DESPAWN_LIFETIME;
+  return distanceFromPlayer > ENEMY_DESPAWN_DISTANCE;
 }
 
 /**
