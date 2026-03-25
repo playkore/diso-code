@@ -54,13 +54,18 @@ describe('missions and commander persistence', () => {
     commander.cash = 2222;
     commander.installedEquipment.ecm = true;
     commander.laserMounts.rear = 'beam_laser';
+    const accepted = acceptMissionOffer(generateMissionOffers({ currentSystem: 'Lave', nearbySystems: ['Diso', 'Leesti', 'Zaonce'], stardate: 3124 })[0]);
+    commander.activeMissions = [accepted.mission];
+    commander.missionCargo = accepted.missionCargo;
     const json = serializeCommanderJson(commander);
     const fromJson = loadCommanderJson(json);
     const binary = encodeCommanderBinary256(commander);
     const fromBinary = decodeCommanderBinary256(binary);
     expect(fromJson.cash).toBe(2222);
     expect(fromJson.installedEquipment.ecm).toBe(true);
+    expect(fromJson.activeMissions).toHaveLength(1);
     expect(fromBinary.activeMissions).toEqual([]);
+    expect(fromBinary.missionCargo).toEqual([]);
     expect(fromBinary.laserMounts.rear).toBe('beam_laser');
   });
 

@@ -46,10 +46,7 @@ type CompactCommanderPayload = [
   number,
   number,
   string,
-  string,
-  CommanderState['activeMissions'],
-  CommanderState['completedMissions'],
-  CommanderState['missionCargo']
+  string
 ];
 
 /**
@@ -105,10 +102,7 @@ function toCompactPayload(commander: CommanderState): CompactCommanderPayload {
     encodeInstalledEquipmentBits(commander),
     commander.tally,
     commander.rating,
-    commander.currentSystem,
-    commander.activeMissions,
-    commander.completedMissions,
-    commander.missionCargo
+    commander.currentSystem
   ];
 }
 
@@ -136,10 +130,7 @@ function fromCompactPayload(payload: CompactCommanderPayload): CommanderState {
     installedEquipment: decodeInstalledEquipmentBits(payload[14]),
     tally: payload[15],
     rating: payload[16],
-    currentSystem: payload[17],
-    activeMissions: payload[18] ?? [],
-    completedMissions: payload[19] ?? [],
-    missionCargo: payload[20] ?? []
+    currentSystem: payload[17]
   });
 }
 
@@ -183,7 +174,9 @@ export function encodeCommanderBinary256(commander: CommanderState): Uint8Array 
   view.setUint32(0, COMMANDER_SCHEMA_VERSION, true);
   view.setUint32(4, normalized.cash, true);
   view.setFloat32(8, normalized.fuel, true);
-  view.setUint8(12, normalized.activeMissions.length & 0xff);
+  // The binary format intentionally stays mission-agnostic so it can keep the
+  // original fixed-size footprint even as the richer JSON snapshot evolves.
+  view.setUint8(12, 0);
   view.setUint16(13, normalized.tally & 0xffff, true);
 
   // The visible commander name gets its own ASCII slot so old tooling can read
