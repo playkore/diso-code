@@ -128,13 +128,13 @@ export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerT
   return 'ready';
 }
 
-function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId, enemy: CombatEnemy) {
+function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId, enemy?: CombatEnemy) {
   const profile = getLaserProjectileProfile(laserId);
   const spawnAngle = getMountAngle(state.player.angle, mount);
   const originX = state.player.x + Math.cos(spawnAngle) * 12;
   const originY = state.player.y + Math.sin(spawnAngle) * 12;
-  const aimDx = enemy.x - originX;
-  const aimDy = enemy.y - originY;
+  const aimDx = enemy ? enemy.x - originX : Math.cos(spawnAngle);
+  const aimDy = enemy ? enemy.y - originY : Math.sin(spawnAngle);
   const aimDistance = Math.hypot(aimDx, aimDy);
   const directionX = aimDistance > 0.001 ? aimDx / aimDistance : Math.cos(spawnAngle);
   const directionY = aimDistance > 0.001 ? aimDy / aimDistance : Math.sin(spawnAngle);
@@ -150,21 +150,38 @@ function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, l
     damage: profile.damage,
     life: profile.life,
     sourceMount: mount,
-    targetEnemyId: enemy.id
+    targetEnemyId: enemy?.id
   });
   state.player.fireCooldown = profile.cooldown;
   state.lastPlayerArc = mount;
 }
 
 /**
- * Fire control now behaves like a target-lock system rather than a broadside.
- * Pressing fire acquires the closest reachable enemy, then only the sector-owning
- * mount spends energy and heat to keep that lock engaged.
+ * Fire control prefers the held target lock, but if no ship is currently
+ * locked it falls back to a straight shot from the front mount only.
  */
 export function firePlayerLasers(state: TravelCombatState) {
   const targetLock = state.playerTargetLock;
   if (!targetLock) {
-    return false;
+    const laserId = state.playerLoadout.laserMounts.front;
+    if (!laserId) {
+      return false;
+    }
+
+    const nextHeat = state.player.laserHeat.front + getLaserHeatPerShot(laserId);
+    if (state.player.laserHeat.front >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+      state.player.laserHeat.front = state.player.maxLaserHeat;
+      pushMessage(state, 'LASER OVERHEAT', 900);
+      return false;
+    }
+    if (!spendPlayerEnergy(state, getLaserEnergyCost(laserId))) {
+      pushMessage(state, 'ENERGY LOW', 900);
+      return false;
+    }
+
+    state.player.laserHeat.front = clampLaserHeat(state.player.laserHeat.front + getLaserHeatPerShot(laserId), state.player.maxLaserHeat);
+    spawnPlayerLaser(state, 'front', laserId);
+    return true;
   }
 
   const enemy = findEnemyById(state, targetLock.enemyId);

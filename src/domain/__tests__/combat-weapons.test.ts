@@ -124,6 +124,22 @@ describe('travel combat weapons', () => {
     expect(getPlayerTargetIndicatorState(state)).toBe('overheated');
   });
 
+  it('fires only the front laser straight when no target lock is present', () => {
+    const commander = createDefaultCommander();
+    commander.laserMounts.front = 'pulse_laser';
+    commander.laserMounts.left = 'beam_laser';
+    commander.laserMounts.rear = 'mining_laser';
+    const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+
+    expect(state.playerTargetLock).toBeNull();
+    expect(state.projectiles).toHaveLength(1);
+    expect(state.projectiles[0].sourceMount).toBe('front');
+    expect(state.projectiles[0].targetEnemyId).toBeUndefined();
+    expect(state.projectiles[0].damage).toBe(15);
+  });
+
   it('gives player lasers roughly triple the previous reach while preserving per-laser range differences', () => {
     const pulse = getLaserProjectileProfile('pulse_laser');
     const beam = getLaserProjectileProfile('beam_laser');
