@@ -5,7 +5,7 @@ import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
-import { firePlayerLasers } from './weapons/playerWeapons';
+import { firePlayerLasers, syncPlayerTargetLock } from './weapons/playerWeapons';
 import { clampLaserHeat, rechargePlayerDefense, stepParticles } from './state';
 import type { LaserMountPosition } from '../shipCatalog';
 import { updateLegalStatus } from './scoring/legalStatus';
@@ -123,6 +123,7 @@ export function stepTravelCombat(
     state.player.x += state.player.vx * dt;
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
+    syncPlayerTargetLock(state);
     if (input.fire && state.player.fireCooldown <= 0) {
       firePlayerLasers(state);
     }
@@ -164,6 +165,7 @@ export function stepTravelCombat(
 
   state.encounter.copsNearby = state.enemies.filter((enemy) => enemy.roles.cop).length;
   moveProjectiles(state, dt, random);
+  syncPlayerTargetLock(state);
   stepParticles(state, dt);
   updateLegalStatus(state);
 

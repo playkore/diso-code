@@ -44,17 +44,64 @@ describe('travel combat weapons', () => {
     expect(state.projectiles.some((projectile) => projectile.kind === 'missile')).toBe(false);
   });
 
-  it('fires every installed laser mount at the same time', () => {
+  it('locks the closest reachable enemy and fires only the sector-owning laser', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'pulse_laser';
     commander.laserMounts.left = 'beam_laser';
     commander.laserMounts.rear = 'mining_laser';
     const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
+    state.enemies.push(createTestEnemy({ id: 11, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 12, x: -140, y: 0, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 13, x: 0, y: 220, energy: 400, maxEnergy: 400 }));
+
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, rng);
-    expect(state.projectiles).toHaveLength(3);
-    expect(state.projectiles.map((projectile) => projectile.damage)).toEqual([15, 16, 10]);
-    expect(state.lastPlayerArc).toBe('rear');
+    expect(state.projectiles).toHaveLength(1);
+    expect(state.projectiles[0]).toEqual(
+      expect.objectContaining({
+        damage: 16,
+        sourceMount: 'left',
+        targetEnemyId: 12
+      })
+    );
+    expect(state.playerTargetLock).toEqual({ enemyId: 12, mount: 'left' });
+    expect(state.lastPlayerArc).toBe('left');
+  });
+
+  it('hands a lock to another installed sector when the target crosses a quadrant boundary', () => {
+    const state = createCombatState([0, 0, 0, 0]);
+    state.playerLoadout.laserMounts.front = 'pulse_laser';
+    state.playerLoadout.laserMounts.right = 'beam_laser';
+    state.enemies.push(createTestEnemy({ id: 21, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.playerTargetLock).toEqual({ enemyId: 21, mount: 'front' });
+    expect(state.projectiles[0]).toEqual(expect.objectContaining({ sourceMount: 'front', targetEnemyId: 21 }));
+
+    state.player.fireCooldown = 0;
+    state.enemies[0].x = 160;
+    state.enemies[0].y = -10;
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.playerTargetLock).toEqual({ enemyId: 21, mount: 'right' });
+    expect(state.projectiles[1]).toEqual(expect.objectContaining({ sourceMount: 'right', targetEnemyId: 21, damage: 16 }));
+  });
+
+  it('drops an unreachable lock and reacquires the next closest enemy automatically', () => {
+    const state = createCombatState([0, 0, 0, 0]);
+    state.playerLoadout.laserMounts.front = 'pulse_laser';
+    state.playerLoadout.laserMounts.rear = 'beam_laser';
+    state.enemies.push(createTestEnemy({ id: 31, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 32, x: 0, y: 220, energy: 400, maxEnergy: 400 }));
+
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.playerTargetLock).toEqual({ enemyId: 31, mount: 'front' });
+
+    state.enemies[0].x = -180;
+    state.enemies[0].y = 0;
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+
+    expect(state.playerTargetLock).toEqual({ enemyId: 32, mount: 'rear' });
   });
 
   it('gives player lasers roughly triple the previous reach while preserving per-laser range differences', () => {
@@ -338,6 +385,7 @@ describe('travel combat weapons', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'beam_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
+    state.enemies.push(createTestEnemy({ id: 41, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.projectiles).toHaveLength(1);
     expect(state.player.energy).toBe(state.player.maxEnergy - 0.8);
@@ -354,6 +402,7 @@ describe('travel combat weapons', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'pulse_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
+    state.enemies.push(createTestEnemy({ id: 51, x: 0, y: -700, energy: 5000, maxEnergy: 5000 }));
     const startingEnergy = state.player.energy;
 
     for (let frame = 0; frame < 24; frame += 1) {
@@ -364,37 +413,47 @@ describe('travel combat weapons', () => {
     expect(state.player.laserHeat.front).toBeGreaterThan(0);
   });
 
-  it('tracks heat per mount and cools each mount independently over time', () => {
+  it('tracks heat per mount and preserves heat on inactive sectors', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'beam_laser';
     commander.laserMounts.rear = 'military_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
+    state.enemies.push(createTestEnemy({ id: 61, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.player.laserHeat.front).toBe(6);
-    expect(state.player.laserHeat.rear).toBe(4);
+    expect(state.player.laserHeat.rear).toBe(0);
     expect(state.player.laserHeat.left).toBe(0);
+
+    state.player.fireCooldown = 0;
+    state.enemies[0].x = 0;
+    state.enemies[0].y = 180;
+    stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(state.player.laserHeat.front).toBeCloseTo(5.8);
+    expect(state.player.laserHeat.rear).toBe(4);
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 60, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.player.laserHeat.front).toBe(0);
     expect(state.player.laserHeat.rear).toBe(0);
   });
 
-  it('blocks only overheated mounts while cooler mounts continue firing', () => {
+  it('uses another available sector when a different mount is overheated', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'military_laser';
     commander.laserMounts.rear = 'beam_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
     state.player.laserHeat.front = 97;
     state.player.laserHeat.rear = 0;
+    state.enemies.push(createTestEnemy({ id: 71, x: 0, y: 180, energy: 400, maxEnergy: 400 }));
 
     stepTravelCombat(state, { thrust: 0, turn: 0, fire: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
 
     expect(state.projectiles).toHaveLength(1);
     expect(state.projectiles[0].damage).toBe(16);
-    expect(state.player.laserHeat.front).toBe(state.player.maxLaserHeat);
+    expect(state.projectiles[0].sourceMount).toBe('rear');
+    expect(state.player.laserHeat.front).toBe(97);
     expect(state.player.laserHeat.rear).toBe(6);
-    expect(state.messages.some((message) => message.text === 'LASER OVERHEAT')).toBe(true);
+    expect(state.messages.some((message) => message.text === 'LASER OVERHEAT')).toBe(false);
   });
 
   it('recharges shields on the classic cadence and only above half energy', () => {

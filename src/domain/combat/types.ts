@@ -199,6 +199,21 @@ export interface CombatProjectile {
   damage: number;
   life: number;
   sourceEnemyId?: number;
+  /**
+   * Player lasers now store the mount that fired and the target they were
+   * aimed at so the simulation and tests can reason about sector handoffs.
+   */
+  sourceMount?: LaserMountPosition;
+  targetEnemyId?: number;
+}
+
+/**
+ * Player fire control keeps one persistent target lock that can migrate across
+ * 90-degree laser sectors as ships move around the Cobra.
+ */
+export interface PlayerTargetLock {
+  enemyId: number;
+  mount: LaserMountPosition;
 }
 
 /**
@@ -309,6 +324,7 @@ export interface CombatPlayerLoadout {
 export interface TravelCombatState {
   player: CombatPlayer;
   playerLoadout: CombatPlayerLoadout;
+  playerTargetLock: PlayerTargetLock | null;
   enemies: CombatEnemy[];
   projectiles: CombatProjectile[];
   particles: CombatParticle[];

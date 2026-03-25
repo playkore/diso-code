@@ -76,6 +76,36 @@ function drawEnemyHealthBar(ctx: CanvasRenderingContext2D, enemy: CombatEnemy, s
 }
 
 /**
+ * The lock indicator uses four short corner chevrons so the target remains
+ * readable without obscuring the wireframe or health bar underneath it.
+ */
+function drawTargetIndicator(ctx: CanvasRenderingContext2D, screenX: number, screenY: number) {
+  const arm = 8;
+  const gap = 10;
+
+  ctx.save();
+  ctx.strokeStyle = CGA_YELLOW;
+  ctx.shadowBlur = 6;
+  ctx.shadowColor = CGA_YELLOW;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(screenX - gap - arm, screenY - gap);
+  ctx.lineTo(screenX - gap, screenY - gap);
+  ctx.lineTo(screenX - gap, screenY - gap - arm);
+  ctx.moveTo(screenX + gap + arm, screenY - gap);
+  ctx.lineTo(screenX + gap, screenY - gap);
+  ctx.lineTo(screenX + gap, screenY - gap - arm);
+  ctx.moveTo(screenX - gap - arm, screenY + gap);
+  ctx.lineTo(screenX - gap, screenY + gap);
+  ctx.lineTo(screenX - gap, screenY + gap + arm);
+  ctx.moveTo(screenX + gap + arm, screenY + gap);
+  ctx.lineTo(screenX + gap, screenY + gap);
+  ctx.lineTo(screenX + gap, screenY + gap + arm);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
  * Enemy laser fire is currently simulation-only. This helper turns the AI's
  * `isFiringLaser` flag into a short visible beam aimed at the player so shots
  * are readable even when no projectile object is spawned for laser damage.
@@ -109,6 +139,9 @@ export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatStat
     const screenY = enemy.y - camY;
     drawWireframe(ctx, getEnemyShape(enemy), screenX, screenY, enemy.angle, getEnemyColor(enemy.roles, enemy.missionTag));
     drawEnemyHealthBar(ctx, enemy, screenX, screenY);
+    if (state.playerTargetLock?.enemyId === enemy.id) {
+      drawTargetIndicator(ctx, screenX, screenY);
+    }
   }
 }
 

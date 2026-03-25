@@ -77,6 +77,7 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
       },
       missilesInstalled: 0
     },
+    playerTargetLock: null,
     enemies: [createEnemy(enemyOverrides)],
     projectiles: [],
     particles: [],

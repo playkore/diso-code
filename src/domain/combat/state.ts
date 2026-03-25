@@ -220,6 +220,9 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       installedEquipment: { ...init.installedEquipment },
       missilesInstalled: init.missilesInstalled
     },
+    // Target lock is established lazily when the player fires and then kept in
+    // sync by the combat step so the HUD reticle and active firing arc agree.
+    playerTargetLock: null,
     enemies: [],
     projectiles: [],
     particles: [],
