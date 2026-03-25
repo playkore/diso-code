@@ -133,13 +133,13 @@ export function getEnemyLaserTrace(enemy: CombatEnemy, state: TravelCombatState)
   };
 }
 
-export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatState, camX: number, camY: number) {
+export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatState, camX: number, camY: number, showTargetLock = false) {
   for (const enemy of state.enemies) {
     const screenX = enemy.x - camX;
     const screenY = enemy.y - camY;
     drawWireframe(ctx, getEnemyShape(enemy), screenX, screenY, enemy.angle, getEnemyColor(enemy.roles, enemy.missionTag));
     drawEnemyHealthBar(ctx, enemy, screenX, screenY);
-    if (state.playerTargetLock?.enemyId === enemy.id) {
+    if (showTargetLock && state.playerTargetLock?.enemyId === enemy.id) {
       drawTargetIndicator(ctx, screenX, screenY);
     }
   }

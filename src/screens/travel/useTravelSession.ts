@@ -617,7 +617,7 @@ export function useTravelSession(
         if (playerDestructionTimerMs <= 0 && respawnReady && (liveInput.fire || keys[' '])) {
           resetPrototype();
         }
-        renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem);
+        renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem, false);
         pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
         if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
           publishPerfSnapshot(timestamp);
@@ -877,7 +877,16 @@ export function useTravelSession(
       }
 
       updateHud();
-      renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem);
+      renderCanvas(
+        ctx,
+        combatState,
+        stars,
+        flightState,
+        cw,
+        ch,
+        jumpCompleted ? session.destinationSystem : session.originSystem,
+        liveInput.fire
+      );
       pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
       if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
         publishPerfSnapshot(timestamp);

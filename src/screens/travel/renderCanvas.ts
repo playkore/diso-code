@@ -29,7 +29,8 @@ export function renderCanvas(
   flightState: FlightPhase,
   cw: number,
   ch: number,
-  systemLabel: string
+  systemLabel: string,
+  showTargetLock = false
 ) {
   // A short bomb-effect timer drives both screen shake and a red flash. The
   // decay curve is intentionally front-loaded so the blast hits hard, then
@@ -57,7 +58,7 @@ export function renderCanvas(
 
   drawStars(ctx, stars, flightState, cw, ch, combatState.player);
   drawStation(ctx, combatState, camX, camY);
-  drawShips(ctx, combatState, camX, camY);
+  drawShips(ctx, combatState, camX, camY, showTargetLock);
   drawProjectilesAndParticles(ctx, combatState, camX, camY);
   if (flightState !== 'GAMEOVER') {
     drawPlayer(ctx, cw, ch, combatState.player.angle);
