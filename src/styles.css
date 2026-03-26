@@ -623,6 +623,9 @@ button:disabled {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  /* Keep HUD overlays below mobile system UI (status/notch area) while
+     preserving the full-flight canvas size for gameplay. */
+  --travel-safe-top: max(env(safe-area-inset-top), 0px);
   background: #000;
   color: #55ff55;
   font-family: 'Courier New', Courier, monospace;
@@ -638,7 +641,7 @@ button:disabled {
 
 .travel-screen__hud {
   position: absolute;
-  top: 0.8rem;
+  top: calc(0.8rem + var(--travel-safe-top));
   left: 0.8rem;
   right: 1rem;
   color: #55ff55;
@@ -710,7 +713,7 @@ button:disabled {
 
 .travel-screen__telemetry {
   position: absolute;
-  top: 7.35rem;
+  top: calc(7.35rem + var(--travel-safe-top));
   left: 0.8rem;
   display: flex;
   flex-direction: column;
@@ -813,7 +816,7 @@ button:disabled {
 
 .travel-screen__perf {
   position: absolute;
-  top: 0.9rem;
+  top: calc(0.9rem + var(--travel-safe-top));
   right: 0.9rem;
   display: grid;
   gap: 0.18rem;
