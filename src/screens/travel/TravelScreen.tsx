@@ -144,42 +144,53 @@ export function TravelScreen() {
                 style={{ left: travel.joystickView.knobLeft, top: travel.joystickView.knobTop }}
               />
             </div>
-            <button type="button" className="travel-screen__button travel-screen__button--jump" {...travel.jumpButtonHandlers}>
-              JUMP
-            </button>
-            <button
-              type="button"
-              className={`travel-screen__button travel-screen__button--hyperspace${travel.hyperspaceHidden ? ' travel-screen__button--hidden' : ''}`}
-              {...travel.hyperspaceButtonHandlers}
-            >
-              HYPER
-            </button>
-            <button type="button" className="travel-screen__button travel-screen__button--fire" {...travel.fireButtonHandlers}>
-              FIRE
-            </button>
-            {travel.ecm.visible ? (
-              <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--ecm" {...travel.ecmButtonHandlers}>
-                ECM
-              </button>
-            ) : null}
-            {travel.bomb.visible ? (
-              <button type="button" className="travel-screen__button travel-screen__button--aux travel-screen__button--bomb" {...travel.bombButtonHandlers}>
-                BOMB
-              </button>
-            ) : null}
-            {travel.autoDock.visible ? (
-              <button
-                type="button"
-                aria-disabled={!travel.autoDock.enabled}
-                aria-pressed={travel.autoDock.active}
-                className={`travel-screen__button travel-screen__button--aux travel-screen__button--dock${
-                  travel.autoDock.enabled ? '' : ' travel-screen__button--dock-disabled'
-                }${travel.autoDock.active ? ' travel-screen__button--dock-active' : ''}`}
-                {...(travel.autoDock.enabled ? travel.dockButtonHandlers : {})}
-              >
-                DOCK
-              </button>
-            ) : null}
+            {/* The combat buttons travel as a single anchored cluster so mobile
+                spacing is controlled by stack gaps instead of hand-tuned
+                per-button coordinates that can overlap on short viewports. */}
+            <div className="travel-screen__controls-cluster">
+              {(travel.ecm.visible || travel.bomb.visible || travel.autoDock.visible) ? (
+                <div className="travel-screen__controls-aux">
+                  {travel.ecm.visible ? (
+                    <button type="button" className="travel-screen__button travel-screen__button--aux" {...travel.ecmButtonHandlers}>
+                      ECM
+                    </button>
+                  ) : null}
+                  {travel.bomb.visible ? (
+                    <button type="button" className="travel-screen__button travel-screen__button--aux" {...travel.bombButtonHandlers}>
+                      BOMB
+                    </button>
+                  ) : null}
+                  {travel.autoDock.visible ? (
+                    <button
+                      type="button"
+                      aria-disabled={!travel.autoDock.enabled}
+                      aria-pressed={travel.autoDock.active}
+                      className={`travel-screen__button travel-screen__button--aux travel-screen__button--dock${
+                        travel.autoDock.enabled ? '' : ' travel-screen__button--dock-disabled'
+                      }${travel.autoDock.active ? ' travel-screen__button--dock-active' : ''}`}
+                      {...(travel.autoDock.enabled ? travel.dockButtonHandlers : {})}
+                    >
+                      DOCK
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              <div className="travel-screen__controls-primary">
+                <button
+                  type="button"
+                  className={`travel-screen__button travel-screen__button--hyperspace${travel.hyperspaceHidden ? ' travel-screen__button--hidden' : ''}`}
+                  {...travel.hyperspaceButtonHandlers}
+                >
+                  HYPER
+                </button>
+                <button type="button" className="travel-screen__button travel-screen__button--jump" {...travel.jumpButtonHandlers}>
+                  JUMP
+                </button>
+                <button type="button" className="travel-screen__button travel-screen__button--fire" {...travel.fireButtonHandlers}>
+                  FIRE
+                </button>
+              </div>
+            </div>
           </div>
 
           <div className="travel-screen__help">

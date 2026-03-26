@@ -6,6 +6,10 @@
   --cga-green: #55ff55;
   --cga-red: #ff5555;
   --cga-yellow: #ffff55;
+  /* Keep the shell clear of Android system UI even when the browser does not
+     expose large safe-area insets. */
+  --app-safe-area-top: max(env(safe-area-inset-top, 0px), 1rem);
+  --app-safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 1.5rem);
 }
 
 * {
@@ -28,13 +32,17 @@ body {
   margin: 0 auto;
   display: grid;
   grid-template-rows: auto 1fr auto;
-  padding: 0.75rem;
+  /* Preserve the existing side gutter while reserving extra vertical space
+     for mobile browser bars and device cutouts. */
+  padding: var(--app-safe-area-top) 0.75rem var(--app-safe-area-bottom);
   gap: 0.75rem;
 }
 
 .app-shell--travel {
   max-width: none;
-  padding: 0;
+  /* Travel keeps its edge-to-edge layout, but still honors the outer safe
+     area so HUD controls do not sit under Android system chrome. */
+  padding: var(--app-safe-area-top) 0 var(--app-safe-area-bottom);
   gap: 0;
 }
 
@@ -838,13 +846,40 @@ button:disabled {
   pointer-events: none;
 }
 
-.travel-screen__button {
+.travel-screen__controls-cluster {
   position: absolute;
+  right: 1.4rem;
+  bottom: 3rem;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.9rem;
+  pointer-events: none;
+}
+
+.travel-screen__controls-primary,
+.travel-screen__controls-aux {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.7rem;
+  pointer-events: none;
+}
+
+/* Primary flight controls stay in a fixed order so the player can build
+   muscle memory while the whole block shifts as one anchored unit. */
+.travel-screen__controls-primary {
+  gap: 0.8rem;
+}
+
+.travel-screen__button {
   border: 2px solid #ffff55;
   border-radius: 50%;
   color: #ffff55;
   text-align: center;
   font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: auto;
   background: #000;
   box-shadow: none;
@@ -862,25 +897,18 @@ button:disabled {
 }
 
 .travel-screen__button--fire {
-  right: 1.6rem;
-  bottom: 1.6rem;
   width: 4.9rem;
   height: 4.9rem;
   line-height: 1;
 }
 
 .travel-screen__button--jump {
-  right: 2.2rem;
-  bottom: 7.2rem;
   width: 3.6rem;
   height: 3.6rem;
   font-size: 0.82rem;
 }
 
 .travel-screen__button--hyperspace {
-  right: 1.4rem;
-  /* Keep hyperspace clearly separated from jump so touch targets do not crowd each other. */
-  bottom: 11.5rem;
   width: 5rem;
   height: 3rem;
   font-size: 0.74rem;
@@ -892,22 +920,9 @@ button:disabled {
 }
 
 .travel-screen__button--aux {
-  right: 7.2rem;
   width: 3.45rem;
   height: 3.45rem;
   font-size: 0.72rem;
-}
-
-.travel-screen__button--ecm {
-  bottom: 1.7rem;
-}
-
-.travel-screen__button--bomb {
-  bottom: 5.8rem;
-}
-
-.travel-screen__button--dock {
-  bottom: 9.9rem;
 }
 
 .travel-screen__button--dock-disabled {
