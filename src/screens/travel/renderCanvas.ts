@@ -31,12 +31,13 @@ export function renderCanvas(
   cw: number,
   ch: number,
   systemLabel: string,
-  showTargetLock = false
+  showTargetLock = false,
+  radarInsetTop = 20,
+  radarInsetRight = 20
 ) {
-  const radarInset = Math.max(16, Math.round(Math.min(cw, ch) * 0.03));
   const radarSize = Math.min(156, Math.max(120, Math.round(Math.min(cw, ch) * 0.24)));
-  const radarX = cw - radarInset - radarSize;
-  const radarY = radarInset;
+  const radarX = cw - radarInsetRight - radarSize;
+  const radarY = radarInsetTop;
 
   // A short bomb-effect timer drives both screen shake and a red flash. The
   // decay curve is intentionally front-loaded so the blast hits hard, then
@@ -69,9 +70,8 @@ export function renderCanvas(
   if (flightState !== 'GAMEOVER') {
     drawPlayer(ctx, cw, ch, combatState.player.angle);
   }
-  // The radar is anchored with the same viewport-relative inset on every
-  // screen size so it stays comfortably inside the visible playfield instead
-  // of creeping into the status-bar cutout on short mobile displays.
+  // The radar uses explicit canvas insets so its placement can be tuned
+  // independently from the DOM HUD layout.
   drawRadarPanel(ctx, combatState, systemLabel, radarX, radarY, radarSize, radarSize);
   if (bombEffectRatio > 0) {
     ctx.fillStyle = CGA_RED;

@@ -102,6 +102,8 @@ const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
+const RADAR_INSET_TOP = 20;
+const RADAR_INSET_RIGHT = 20;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
   fps: 0,
   frameAvgMs: 0,
@@ -397,6 +399,8 @@ export function useTravelSession(
 
     let cw = 0;
     let ch = 0;
+    const radarInsetTop = RADAR_INSET_TOP;
+    const radarInsetRight = RADAR_INSET_RIGHT;
     const resize = () => {
       cw = canvas.width = viewport.clientWidth;
       ch = canvas.height = viewport.clientHeight;
@@ -618,7 +622,18 @@ export function useTravelSession(
         if (playerDestructionTimerMs <= 0 && respawnReady && liveInput.toggleLasers) {
           resetPrototype();
         }
-        renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem, false);
+        renderCanvas(
+          ctx,
+          combatState,
+          stars,
+          flightState,
+          cw,
+          ch,
+          jumpCompleted ? session.destinationSystem : session.originSystem,
+          false,
+          radarInsetTop,
+          radarInsetRight
+        );
         pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
         if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
           publishPerfSnapshot(timestamp);
@@ -881,7 +896,9 @@ export function useTravelSession(
         cw,
         ch,
         jumpCompleted ? session.destinationSystem : session.originSystem,
-        Boolean(combatState.playerTargetLock)
+        Boolean(combatState.playerTargetLock),
+        radarInsetTop,
+        radarInsetRight
       );
       pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
       if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {

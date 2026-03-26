@@ -492,9 +492,14 @@ button:disabled {
     display: none;
   }
 
+  .travel-screen__viewport {
+    --travel-screen-top-inset: 0.85rem;
+    --travel-screen-side-inset: 0.85rem;
+  }
+
   .travel-screen__hud {
-    top: 0.85rem;
-    left: 0.85rem;
+    top: var(--travel-screen-top-inset);
+    left: var(--travel-screen-side-inset);
   }
 
   .travel-screen__hud-panel {
@@ -612,6 +617,8 @@ button:disabled {
 }
 
 .travel-screen__viewport {
+  --travel-screen-top-inset: 1.25rem;
+  --travel-screen-side-inset: 1.25rem;
   position: relative;
   width: 100%;
   height: 100%;
@@ -631,8 +638,8 @@ button:disabled {
 
 .travel-screen__hud {
   position: absolute;
-  top: 1.25rem;
-  left: 1.25rem;
+  top: var(--travel-screen-top-inset);
+  left: var(--travel-screen-side-inset);
   color: #55ff55;
   text-shadow: none;
   pointer-events: none;
