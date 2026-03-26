@@ -1,6 +1,7 @@
 import { clampAngle, clampLaserHeat, getLaserEnergyCost, getLaserHeatPerShot, getLaserProjectileProfile, projectileId, pushMessage, spendPlayerEnergy } from '../state';
 import type { CombatEnemy, PlayerTargetLock, TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../shipCatalog';
+import { RADAR_SHIP_RANGE } from '../navigation';
 
 const PLAYER_LASER_SECTOR_HALF_ANGLE = Math.PI / 4;
 
@@ -54,47 +55,75 @@ function findEnemyById(state: TravelCombatState, enemyId: number) {
   return state.enemies.find((enemy) => enemy.id === enemyId) ?? null;
 }
 
-function acquireNearestEnemyLock(state: TravelCombatState): PlayerTargetLock | null {
-  let bestLock: PlayerTargetLock | null = null;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  for (const enemy of state.enemies) {
-    const targetSector = getTargetSectorLaser(state, enemy);
-    if (targetSector.distance >= bestDistance) {
-      continue;
-    }
-    bestDistance = targetSector.distance;
-    bestLock = { enemyId: enemy.id, mount: targetSector.mount };
-  }
-  return bestLock;
+function isHostileMissionRole(enemy: CombatEnemy) {
+  return (
+    enemy.missionTag?.role === 'target' ||
+    enemy.missionTag?.role === 'ambusher' ||
+    enemy.missionTag?.role === 'blockade' ||
+    enemy.missionTag?.role === 'scan-hostile'
+  );
 }
 
 /**
- * The fire button owns target-lock lifetime:
- * - press/hold: keep one locked ship, or reacquire if the old one vanished
- * - release: drop the lock immediately so the indicator disappears
- *
- * The stored mount is refreshed every frame because the target may drift into
- * a different 90-degree sector while the same ship remains locked.
+ * Hostility gating lives here so UI hit-testing and auto-fire both share the
+ * exact same targeting rules.
  */
-export function syncPlayerTargetLock(state: TravelCombatState, fireHeld: boolean): PlayerTargetLock | null {
-  if (!fireHeld) {
+export function canEnemyBePlayerTarget(enemy: CombatEnemy) {
+  return enemy.roles.hostile || isHostileMissionRole(enemy);
+}
+
+/**
+ * Explicit target changes come from the travel UI. The stored mount is filled
+ * from the current sector-owner so the HUD indicator can render immediately.
+ */
+export function setPlayerTargetLock(state: TravelCombatState, enemyId: number | null): PlayerTargetLock | null {
+  if (enemyId === null) {
     state.playerTargetLock = null;
     return null;
   }
 
-  const currentLock = state.playerTargetLock;
-  if (currentLock) {
-    const currentEnemy = findEnemyById(state, currentLock.enemyId);
-    if (currentEnemy) {
-      const targetSector = getTargetSectorLaser(state, currentEnemy);
-      state.playerTargetLock = { enemyId: currentEnemy.id, mount: targetSector.mount };
-      return state.playerTargetLock;
-    }
+  const enemy = findEnemyById(state, enemyId);
+  if (!enemy || !canEnemyBePlayerTarget(enemy)) {
+    state.playerTargetLock = null;
+    return null;
   }
 
-  const bestLock = acquireNearestEnemyLock(state);
-  state.playerTargetLock = bestLock;
-  return bestLock;
+  const targetSector = getTargetSectorLaser(state, enemy);
+  if (targetSector.distance > RADAR_SHIP_RANGE) {
+    state.playerTargetLock = null;
+    return null;
+  }
+
+  state.playerTargetLock = { enemyId: enemy.id, mount: targetSector.mount };
+  return state.playerTargetLock;
+}
+
+/**
+ * Lock refresh is independent from button state:
+ * - keep the selected hostile while it exists and stays in radar range
+ * - drop immediately when the target dies, despawns, or leaves engagement range
+ * - never auto-acquire a replacement target
+ */
+export function refreshPlayerTargetLock(state: TravelCombatState): PlayerTargetLock | null {
+  const currentLock = state.playerTargetLock;
+  if (!currentLock) {
+    return null;
+  }
+
+  const currentEnemy = findEnemyById(state, currentLock.enemyId);
+  if (!currentEnemy || !canEnemyBePlayerTarget(currentEnemy)) {
+    state.playerTargetLock = null;
+    return null;
+  }
+
+  const targetSector = getTargetSectorLaser(state, currentEnemy);
+  if (targetSector.distance > RADAR_SHIP_RANGE) {
+    state.playerTargetLock = null;
+    return null;
+  }
+
+  state.playerTargetLock = { enemyId: currentEnemy.id, mount: targetSector.mount };
+  return state.playerTargetLock;
 }
 
 export type PlayerTargetIndicatorState = 'missing-laser' | 'ready' | 'overheated';

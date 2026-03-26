@@ -18,6 +18,8 @@ import {
   stepTravelCombat,
   type FlightPhase
 } from '../../domain/travelCombat';
+import { canEnemyBePlayerTarget, setPlayerTargetLock } from '../../domain/combat/weapons/playerWeapons';
+import type { CombatEnemy } from '../../domain/combat/types';
 import type { TravelState } from '../../store/types';
 import { renderCanvas } from './renderCanvas';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
@@ -101,6 +103,10 @@ const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
+// Ship wireframes are intentionally compact, so target selection uses a larger
+// screen-space radius than the visible hull to make touch and mouse taps
+// forgiving enough during combat motion.
+const TARGET_TAP_RADIUS_PX = 56;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
   fps: 0,
   frameAvgMs: 0,
@@ -163,6 +169,44 @@ function createPerfAccumulator(now: number): PerfAccumulator {
   };
 }
 
+/**
+ * Travel-screen hit testing stays in the session layer because it depends on
+ * the live camera transform rather than on simulation-space combat rules.
+ */
+function getTargetedEnemyFromTap(
+  enemies: CombatEnemy[],
+  player: { x: number; y: number },
+  viewport: { width: number; height: number },
+  tap: { clientX: number; clientY: number },
+  viewportRect: DOMRect
+) {
+  const camX = player.x - viewport.width / 2;
+  const camY = player.y - viewport.height / 2;
+  let bestEnemy: CombatEnemy | null = null;
+  let bestTapDistance = Number.POSITIVE_INFINITY;
+  let bestWorldDistance = Number.POSITIVE_INFINITY;
+
+  for (const enemy of enemies) {
+    const screenX = enemy.x - camX;
+    const screenY = enemy.y - camY;
+    const dx = tap.clientX - (viewportRect.left + screenX);
+    const dy = tap.clientY - (viewportRect.top + screenY);
+    const tapDistance = Math.hypot(dx, dy);
+    if (tapDistance > TARGET_TAP_RADIUS_PX || !canEnemyBePlayerTarget(enemy)) {
+      continue;
+    }
+
+    const worldDistance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+    if (tapDistance < bestTapDistance || (tapDistance === bestTapDistance && worldDistance < bestWorldDistance)) {
+      bestEnemy = enemy;
+      bestTapDistance = tapDistance;
+      bestWorldDistance = worldDistance;
+    }
+  }
+
+  return bestEnemy;
+}
+
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
@@ -199,6 +243,7 @@ export function useTravelSession(
     joyActiveRef,
     jumpPointerIdRef,
     firePointerIdRef,
+    viewportTapRef,
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
@@ -596,6 +641,18 @@ export function useTravelSession(
       pushPerfSample(perfAccumulator.frameDeltas, deltaMs);
       const liveInput = inputRef.current;
       const keys = keysRef.current;
+      const pendingTap = viewportTapRef.current;
+      if (pendingTap) {
+        viewportTapRef.current = null;
+        const targetEnemy = getTargetedEnemyFromTap(
+          combatState.enemies,
+          combatState.player,
+          { width: cw, height: ch },
+          pendingTap,
+          viewport.getBoundingClientRect()
+        );
+        setPlayerTargetLock(combatState, targetEnemy ? targetEnemy.id : null);
+      }
 
       if (flightState === 'GAMEOVER') {
         stepParticles(combatState, dt);
@@ -885,7 +942,7 @@ export function useTravelSession(
         cw,
         ch,
         jumpCompleted ? session.destinationSystem : session.originSystem,
-        liveInput.fire
+        Boolean(combatState.playerTargetLock)
       );
       pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
       if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
