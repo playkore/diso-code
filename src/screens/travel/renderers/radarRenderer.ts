@@ -9,16 +9,15 @@ import { getEnemyColor } from './shipsRenderer';
  * larger scale than ships so the player can still track the station while
  * enemies cluster near the origin during close-range combat.
  */
-export function drawRadar(
+export function drawRadarPanel(
   ctx: CanvasRenderingContext2D,
   state: TravelCombatState,
-  cw: number,
-  sessionLabel: string
+  sessionLabel: string,
+  radarX = 0,
+  radarY = 0,
+  radarWidth = 156,
+  radarHeight = 156
 ) {
-  const radarWidth = 156;
-  const radarHeight = 156;
-  const radarX = cw - radarWidth - 18;
-  const radarY = 82;
   const radarCenterX = radarX + radarWidth / 2;
   const radarCenterY = radarY + radarHeight / 2;
   const radarRadius = 48;

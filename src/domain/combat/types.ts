@@ -378,11 +378,6 @@ export interface TravelCombatInit {
 export interface CombatInput {
   thrust: number;
   turn: number;
-  /**
-   * Legacy manual-fire input kept temporarily so older tests and helpers can
-   * still construct `CombatInput` objects while the UI moves to a laser toggle.
-   */
-  fire?: boolean;
   toggleLasers?: boolean;
   jump?: boolean;
   hyperspace?: boolean;

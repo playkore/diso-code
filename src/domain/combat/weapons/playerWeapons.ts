@@ -1,7 +1,7 @@
 import { clampAngle, clampLaserHeat, getLaserEnergyCost, getLaserHeatPerShot, getLaserProjectileProfile, projectileId, pushMessage, spendPlayerEnergy } from '../state';
 import type { CombatEnemy, PlayerTargetLock, TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../shipCatalog';
-import { RADAR_SHIP_RANGE } from '../navigation';
+import { PLAYER_TARGET_LOCK_RANGE } from '../navigation';
 
 const PLAYER_LASER_SECTOR_HALF_ANGLE = Math.PI / 4;
 
@@ -74,15 +74,23 @@ export function canEnemyBePlayerTarget(enemy: CombatEnemy) {
 
 /**
  * Auto-targeting only considers hostiles that are currently inside an arc with
- * an installed laser. That keeps the target indicator aligned with what the
- * armed fire-control system can actually shoot right now.
+ * an installed laser and inside the tighter engagement radius. That keeps the
+ * target indicator aligned with what the armed fire-control system should
+ * actively track, not just anything visible in the wider camera/radar view.
  */
 function getArmedTargetSector(state: TravelCombatState, enemy: CombatEnemy): { mount: LaserMountPosition; laserId: LaserId; distance: number } | null {
   const targetSector = getTargetSectorLaser(state, enemy);
-  if (!targetSector.laserId || targetSector.distance > RADAR_SHIP_RANGE) {
+  if (!targetSector.laserId || targetSector.distance > PLAYER_TARGET_LOCK_RANGE) {
     return null;
   }
   return { mount: targetSector.mount, laserId: targetSector.laserId, distance: targetSector.distance };
+}
+
+interface ResolvedPlayerTarget {
+  enemy: CombatEnemy;
+  mount: LaserMountPosition;
+  laserId: LaserId | null;
+  distance: number;
 }
 
 /**
@@ -104,6 +112,31 @@ export function setPlayerTargetLock(state: TravelCombatState, enemyId: number | 
   const targetSector = getTargetSectorLaser(state, enemy);
   state.playerTargetLock = { enemyId: enemy.id, mount: targetSector.mount };
   return state.playerTargetLock;
+}
+
+/**
+ * Resolves the current renderer-visible target snapshot back into live combat
+ * data so firing, HUD state, and stale-lock cleanup all read one consistent
+ * view of the world.
+ */
+function resolveCurrentPlayerTarget(state: TravelCombatState): ResolvedPlayerTarget | null {
+  const targetLock = state.playerTargetLock;
+  if (!targetLock) {
+    return null;
+  }
+
+  const enemy = findEnemyById(state, targetLock.enemyId);
+  if (!enemy) {
+    return null;
+  }
+
+  const targetSector = getTargetSectorLaser(state, enemy);
+  return {
+    enemy,
+    mount: targetSector.mount,
+    laserId: targetSector.laserId,
+    distance: targetSector.distance
+  };
 }
 
 /**
@@ -137,28 +170,18 @@ export type PlayerTargetIndicatorState = 'missing-laser' | 'ready' | 'overheated
  * as firing so the reticle color always matches weapon availability.
  */
 export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerTargetIndicatorState | null {
-  const targetLock = state.playerTargetLock;
-  if (!targetLock) {
+  const resolvedTarget = resolveCurrentPlayerTarget(state);
+  if (!resolvedTarget || resolvedTarget.distance > PLAYER_TARGET_LOCK_RANGE) {
     return null;
   }
 
-  const enemy = findEnemyById(state, targetLock.enemyId);
-  if (!enemy) {
-    return null;
-  }
-
-  const targetSector = getTargetSectorLaser(state, enemy);
-  if (targetSector.distance > RADAR_SHIP_RANGE) {
-    return null;
-  }
-
-  const laserId = targetSector.laserId;
+  const laserId = resolvedTarget.laserId;
   if (!laserId) {
     return 'missing-laser';
   }
 
-  const nextHeat = state.player.laserHeat[targetSector.mount] + getLaserHeatPerShot(laserId);
-  if (state.player.laserHeat[targetSector.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+  const nextHeat = state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId);
+  if (state.player.laserHeat[resolvedTarget.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
     return 'overheated';
   }
 
@@ -198,27 +221,25 @@ function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, l
  * hostile ship sits inside an armed arc, the weapon controller simply idles.
  */
 export function firePlayerLasers(state: TravelCombatState) {
-  const targetLock = state.playerTargetLock;
-  if (!targetLock) {
+  const resolvedTarget = resolveCurrentPlayerTarget(state);
+  if (!resolvedTarget) {
     return true;
   }
 
-  const enemy = findEnemyById(state, targetLock.enemyId);
-  if (!enemy) {
+  if (resolvedTarget.distance > PLAYER_TARGET_LOCK_RANGE) {
     state.playerTargetLock = null;
     return false;
   }
 
-  const targetSector = getTargetSectorLaser(state, enemy);
-  state.playerTargetLock = { enemyId: enemy.id, mount: targetSector.mount };
-  const laserId = targetSector.laserId;
-  if (!laserId || targetSector.distance > RADAR_SHIP_RANGE) {
+  state.playerTargetLock = { enemyId: resolvedTarget.enemy.id, mount: resolvedTarget.mount };
+  const laserId = resolvedTarget.laserId;
+  if (!laserId) {
     return false;
   }
 
-  const nextHeat = state.player.laserHeat[targetSector.mount] + getLaserHeatPerShot(laserId);
-  if (state.player.laserHeat[targetSector.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
-    state.player.laserHeat[targetSector.mount] = state.player.maxLaserHeat;
+  const nextHeat = state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId);
+  if (state.player.laserHeat[resolvedTarget.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+    state.player.laserHeat[resolvedTarget.mount] = state.player.maxLaserHeat;
     pushMessage(state, 'LASER OVERHEAT', 900);
     return false;
   }
@@ -228,10 +249,10 @@ export function firePlayerLasers(state: TravelCombatState) {
     return false;
   }
 
-  state.player.laserHeat[targetSector.mount] = clampLaserHeat(
-    state.player.laserHeat[targetSector.mount] + getLaserHeatPerShot(laserId),
+  state.player.laserHeat[resolvedTarget.mount] = clampLaserHeat(
+    state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId),
     state.player.maxLaserHeat
   );
-  spawnPlayerLaser(state, targetSector.mount, laserId, enemy);
+  spawnPlayerLaser(state, resolvedTarget.mount, laserId, resolvedTarget.enemy);
   return true;
 }

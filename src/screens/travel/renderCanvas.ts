@@ -1,8 +1,8 @@
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 import { drawProjectilesAndParticles, drawShips } from './renderers/projectilesRenderer';
-import { drawRadar } from './renderers/radarRenderer';
 import { drawShips as _unused } from './renderers/projectilesRenderer';
 import { CGA_RED, CGA_YELLOW } from './renderers/constants';
+import { drawRadarPanel } from './renderers/radarRenderer';
 import { drawPlayer } from './renderers/shipsRenderer';
 import { drawStars, type StarPoint } from './renderers/starsRenderer';
 import { drawStation } from './renderers/stationRenderer';
@@ -20,7 +20,8 @@ import { drawStation } from './renderers/stationRenderer';
  * 4. enemy ships
  * 5. projectiles and particles
  * 6. player ship
- * 7. radar overlay
+ * 7. radar
+ * 8. overlay UI (rendered outside this canvas)
  */
 export function renderCanvas(
   ctx: CanvasRenderingContext2D,
@@ -32,6 +33,11 @@ export function renderCanvas(
   systemLabel: string,
   showTargetLock = false
 ) {
+  const radarInset = Math.max(16, Math.round(Math.min(cw, ch) * 0.03));
+  const radarSize = Math.min(156, Math.max(120, Math.round(Math.min(cw, ch) * 0.24)));
+  const radarX = cw - radarInset - radarSize;
+  const radarY = radarInset;
+
   // A short bomb-effect timer drives both screen shake and a red flash. The
   // decay curve is intentionally front-loaded so the blast hits hard, then
   // gets out of the way before it obscures piloting for too long.
@@ -63,8 +69,10 @@ export function renderCanvas(
   if (flightState !== 'GAMEOVER') {
     drawPlayer(ctx, cw, ch, combatState.player.angle);
   }
-  drawRadar(ctx, combatState, cw, systemLabel);
-
+  // The radar is anchored with the same viewport-relative inset on every
+  // screen size so it stays comfortably inside the visible playfield instead
+  // of creeping into the status-bar cutout on short mobile displays.
+  drawRadarPanel(ctx, combatState, systemLabel, radarX, radarY, radarSize, radarSize);
   if (bombEffectRatio > 0) {
     ctx.fillStyle = CGA_RED;
     ctx.globalAlpha = 0.12 + bombEffectRatio * 0.26;

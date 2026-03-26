@@ -38,7 +38,7 @@ describe('travel combat civilian AI', () => {
       isFiringLaser: false
     }));
     for (let index = 0; index < 1000 && state.enemies.length > 0; index += 1) {
-      stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 4, 'JUMPING', {}, rng);
+      stepTravelCombat(state, { thrust: 0, turn: 0 }, 4, 'JUMPING', {}, rng);
     }
     expect(state.enemies).toHaveLength(0);
   });

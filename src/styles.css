@@ -493,37 +493,22 @@ button:disabled {
   }
 
   .travel-screen__hud {
-    top: 0.55rem;
-    left: 0.55rem;
-    right: 0.55rem;
+    top: 0.85rem;
+    left: 0.85rem;
   }
 
   .travel-screen__hud-panel {
+    width: min(16rem, calc(100vw - 7rem));
     min-width: 0;
   }
 
-  .travel-screen__hud-row {
-    gap: 0.22rem 0.55rem;
-  }
-
   .travel-screen__hud-stat {
+    grid-template-columns: 3.8rem minmax(0, 1fr);
     font-size: 0.76rem;
   }
 
   .travel-screen__hud-stat--route {
-    min-width: 0;
-  }
-
-  .travel-screen__hud-stat--right-anchor,
-  .travel-screen__hud-stat--heat {
-    margin-left: 0;
-  }
-
-  .travel-screen__telemetry {
-    top: 7.55rem;
-    left: 0.55rem;
-    right: auto;
-    bottom: auto;
+    grid-template-columns: 3.8rem minmax(0, 1fr);
   }
 }
 
@@ -646,60 +631,40 @@ button:disabled {
 
 .travel-screen__hud {
   position: absolute;
-  top: 0.8rem;
-  left: 0.8rem;
-  right: 1rem;
+  top: 1.25rem;
+  left: 1.25rem;
   color: #55ff55;
   text-shadow: none;
   pointer-events: none;
 }
 
-.travel-screen__hud-panel,
-.travel-screen__telemetry {
-  display: grid;
-  gap: 0.28rem;
-}
-
 .travel-screen__hud-panel {
-  width: 100%;
+  display: grid;
+  gap: 0.34rem;
+  width: min(20rem, calc(100vw - 11rem));
   min-width: 0;
 }
 
-.travel-screen__hud-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.24rem 0.85rem;
-}
-
-.travel-screen__hud-row--systems {
-  gap: 0.2rem 0.75rem;
-}
-
 .travel-screen__hud-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  align-items: start;
+  gap: 0.3rem 0.65rem;
   min-width: 0;
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .travel-screen__hud-stat--route {
-  min-width: 16rem;
-}
-
-.travel-screen__hud-stat--right-anchor {
-  margin-left: auto;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
 }
 
 .travel-screen__hud-stat--bar {
-  gap: 0.42rem;
+  align-items: center;
 }
 
 .travel-screen__hud-stat--heat {
-  align-items: flex-start;
-  margin-left: auto;
+  align-items: start;
 }
 
 .travel-screen__hud-key {
@@ -714,26 +679,6 @@ button:disabled {
   min-width: 0;
   color: var(--cga-green);
   text-shadow: 0 0 6px rgba(85, 255, 85, 0.22);
-}
-
-.travel-screen__telemetry {
-  position: absolute;
-  top: 7.35rem;
-  left: 0.8rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.28rem;
-  min-width: 0;
-  pointer-events: none;
-}
-
-.travel-screen__telemetry-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.28rem;
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
 .travel-screen__hud-banks {
@@ -777,8 +722,8 @@ button:disabled {
 
 .travel-screen__hud-heat-grid {
   display: grid;
-  grid-template-columns: repeat(2, auto);
-  gap: 0.18rem 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, auto));
+  gap: 0.18rem 0.38rem;
 }
 
 .travel-screen__hud-heat-cell {

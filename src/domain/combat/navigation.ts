@@ -2,6 +2,12 @@ import type { TravelCombatState } from './types';
 
 export const MASS_LOCK_DISTANCE = 600;
 export const RADAR_SHIP_RANGE = 600;
+/**
+ * Auto-target lock intentionally uses a tighter radius than the full radar
+ * sweep so the fire-control system only tracks ships inside the player's local
+ * engagement bubble instead of contacts that merely happen to be on screen.
+ */
+export const PLAYER_TARGET_LOCK_RANGE = 320;
 export const LOCAL_JUMP_SPEED_MULTIPLIER = 10;
 
 export function getDistanceToStation(state: TravelCombatState) {

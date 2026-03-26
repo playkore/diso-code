@@ -39,23 +39,23 @@ describe('travel combat encounters', () => {
     const rng = createDeterministicRandomSource([0, 255, 255, 255, 255, 255]);
     const state = createCombatState([0, 255, 255, 255, 255, 255]);
     state.encounter.ev = 1;
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.roles.hostile || enemy.roles.pirate || enemy.missionTag)).toBe(false);
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', {}, rng);
     expect(state.enemies.length).toBeGreaterThan(0);
   });
 
   it('spawns cops more readily when cargo badness is present', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0, 0, 0], { government: 7, techLevel: 12 });
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', { narcotics: 10 }, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', { narcotics: 10 }, rng);
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(true);
   });
 
   it('spawns pirate pressure from valuable legal cargo without cops', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { government: 0, techLevel: 12 });
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', { luxuries: 12, computers: 8 }, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', { luxuries: 12, computers: 8 }, rng);
     expect(state.enemies.some((enemy) => enemy.roles.pirate || enemy.roles.hostile)).toBe(true);
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(false);
   });
@@ -66,7 +66,7 @@ describe('travel combat encounters', () => {
     const state = createCombatState(bytes, { government: 0, techLevel: 12 });
 
     for (let i = 0; i < 12; i += 1) {
-      stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 256, 'PLAYING', {}, rng);
+      stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', {}, rng);
     }
 
     expect(state.enemies.filter((enemy) => enemy.roles.pirate || enemy.roles.hostile).length).toBeLessThanOrEqual(4);
@@ -105,7 +105,7 @@ describe('travel combat encounters', () => {
       lifetime: 0
     });
 
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
     expect(state.enemies).toHaveLength(0);
   });
 
@@ -141,7 +141,7 @@ describe('travel combat encounters', () => {
       lifetime: 60 * 60
     });
 
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
     expect(state.enemies).toHaveLength(1);
     expect(state.enemies[0].id).toBe(1);
   });

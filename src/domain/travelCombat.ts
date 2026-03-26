@@ -20,7 +20,16 @@ export type {
   TravelCombatState
 } from './combat/types';
 export { BLUEPRINTS, getCombatBlueprint } from './combat/blueprints';
-export { canAutoDock, getVisibleRadarContacts, isMassNearby, isPlayerInStationSafeZone, LOCAL_JUMP_SPEED_MULTIPLIER, MASS_LOCK_DISTANCE, RADAR_SHIP_RANGE } from './combat/navigation';
+export {
+  canAutoDock,
+  getVisibleRadarContacts,
+  isMassNearby,
+  isPlayerInStationSafeZone,
+  LOCAL_JUMP_SPEED_MULTIPLIER,
+  MASS_LOCK_DISTANCE,
+  PLAYER_TARGET_LOCK_RANGE,
+  RADAR_SHIP_RANGE
+} from './combat/navigation';
 export { stepTravelCombat } from './combat/step';
 export {
   createDeterministicRandomSource,

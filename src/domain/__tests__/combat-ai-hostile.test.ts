@@ -36,7 +36,7 @@ describe('travel combat hostile AI', () => {
       fireCooldown: 0,
       isFiringLaser: false
     }));
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'ARRIVED', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'ARRIVED', {}, rng);
     expect(state.enemies[0].roles.hostile).toBe(true);
     expect(state.enemies[1].aggression).toBe(0);
   });
@@ -60,7 +60,7 @@ describe('travel combat hostile AI', () => {
       fireCooldown: 0,
       isFiringLaser: false
     }));
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, rng);
     // Pirates should now stay outside two full safe-zone radii instead of only
     // bouncing off the single-ring station perimeter.
     expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(737.5);
@@ -95,7 +95,7 @@ describe('travel combat hostile AI', () => {
       missileCooldown: 999,
       isFiringLaser: false
     }));
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, rng);
     expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(377.5);
     expect(state.enemies[0].isFiringLaser).toBe(false);
   });
@@ -112,7 +112,7 @@ describe('travel combat hostile AI', () => {
       isFiringLaser: false
     }));
 
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 10, 'PLAYING', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 10, 'PLAYING', {}, rng);
 
     expect(state.enemies[0].energy).toBe(37);
   });
@@ -131,7 +131,7 @@ describe('travel combat hostile AI', () => {
     }));
 
     for (let index = 0; index < 40; index += 1) {
-      stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+      stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, rng);
     }
 
     expect(state.enemies[0].hostileAttackPhase).toBe('breakaway');
@@ -152,7 +152,7 @@ describe('travel combat hostile AI', () => {
       isFiringLaser: false
     }));
 
-    stepTravelCombat(state, { thrust: 0, turn: 0, fire: false }, 1, 'PLAYING', {}, rng);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, rng);
 
     expect(Math.hypot(state.enemies[0].vx, state.enemies[0].vy)).toBeGreaterThan(0.03);
     expect(state.enemies[0].x).toBeLessThan(100);
