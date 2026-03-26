@@ -137,7 +137,7 @@ export function getEnemyLaserTrace(enemy: CombatEnemy, state: TravelCombatState)
 export function drawShips(ctx: CanvasRenderingContext2D, state: TravelCombatState, camX: number, camY: number, showTargetLock = false) {
   const targetIndicatorState = showTargetLock ? getPlayerTargetIndicatorState(state) : null;
   const targetIndicatorColor =
-    targetIndicatorState === 'missing-laser' ? CGA_RED : targetIndicatorState === 'overheated' ? CGA_YELLOW : targetIndicatorState === 'ready' ? CGA_GREEN : null;
+    targetIndicatorState === 'overheated' ? CGA_RED : targetIndicatorState === 'warning' ? CGA_YELLOW : targetIndicatorState === 'ready' ? CGA_GREEN : null;
 
   for (const enemy of state.enemies) {
     const screenX = enemy.x - camX;

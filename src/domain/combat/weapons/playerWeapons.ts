@@ -163,11 +163,12 @@ export function refreshPlayerTargetLock(state: TravelCombatState): PlayerTargetL
   return bestLock;
 }
 
-export type PlayerTargetIndicatorState = 'missing-laser' | 'ready' | 'overheated';
+export type PlayerTargetIndicatorState = 'ready' | 'warning' | 'overheated';
 
 /**
  * Renderer-facing lock status is derived from the same sector ownership logic
- * as firing so the reticle color always matches weapon availability.
+ * as firing so the reticle color always matches the HUD heat meter for the
+ * currently armed mount.
  */
 export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerTargetIndicatorState | null {
   const resolvedTarget = resolveCurrentPlayerTarget(state);
@@ -177,12 +178,16 @@ export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerT
 
   const laserId = resolvedTarget.laserId;
   if (!laserId) {
-    return 'missing-laser';
+    return null;
   }
 
-  const nextHeat = state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId);
-  if (state.player.laserHeat[resolvedTarget.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
+  const heatRatio =
+    state.player.maxLaserHeat > 0 ? state.player.laserHeat[resolvedTarget.mount] / state.player.maxLaserHeat : 0;
+  if (heatRatio >= 0.8) {
     return 'overheated';
+  }
+  if (heatRatio >= 0.45) {
+    return 'warning';
   }
 
   return 'ready';

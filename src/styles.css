@@ -640,6 +640,8 @@ button:disabled {
   position: absolute;
   top: var(--travel-screen-top-inset);
   left: var(--travel-screen-side-inset);
+  --travel-energy-bank-width: 1rem;
+  --travel-energy-bank-gap: 0.12rem;
   color: #55ff55;
   text-shadow: none;
   pointer-events: none;
@@ -691,12 +693,18 @@ button:disabled {
 .travel-screen__hud-banks {
   display: inline-grid;
   grid-auto-flow: column;
-  gap: 0.12rem;
+  grid-auto-columns: max-content;
+  justify-content: start;
+  justify-self: start;
+  width: max-content;
+  /* Energy banks should read as one continuous instrument, so keep the
+     segments longer and separated by only a narrow Elite-style gutter. */
+  gap: var(--travel-energy-bank-gap);
 }
 
 .travel-screen__hud-bank {
   position: relative;
-  width: 0.6rem;
+  width: var(--travel-energy-bank-width);
   height: 0.45rem;
   border: 1px solid var(--cga-yellow);
   background: var(--cga-black);
@@ -713,7 +721,8 @@ button:disabled {
 .travel-screen__hud-meter {
   position: relative;
   display: inline-block;
-  width: 3.4rem;
+  /* Match the full span of the four energy banks so both gauges align. */
+  width: calc(var(--travel-energy-bank-width) * 4 + var(--travel-energy-bank-gap) * 3);
   height: 0.45rem;
   border: 1px solid var(--cga-yellow);
   background: var(--cga-black);
@@ -725,6 +734,16 @@ button:disabled {
   display: block;
   height: 100%;
   background: var(--cga-green);
+}
+
+.travel-screen__hud-meter--heat {
+  /* Heat cells include an arc label, so trim the bar width to keep each
+     label-plus-meter pair aligned with the shield gauge width. */
+  width: calc(
+    var(--travel-energy-bank-width) * 4 +
+    var(--travel-energy-bank-gap) * 3 -
+    0.8rem
+  );
 }
 
 .travel-screen__hud-heat-grid {

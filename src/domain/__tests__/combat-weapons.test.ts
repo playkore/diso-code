@@ -122,6 +122,10 @@ describe('travel combat weapons', () => {
 
     state.enemies[0].x = 0;
     state.enemies[0].y = -180;
+    state.player.laserHeat.front = 60;
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
+    expect(getPlayerTargetIndicatorState(state)).toBe('warning');
+
     state.player.laserHeat.front = 97;
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(getPlayerTargetIndicatorState(state)).toBe('overheated');

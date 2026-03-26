@@ -55,7 +55,7 @@ export function TravelScreen() {
   const laserHeat = travel.hud.laserHeat.map((entry) => (
     <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
       <span className="travel-screen__hud-heat-label">{mountLabels[entry.mount as LaserMountPosition]}</span>
-      <span className="travel-screen__hud-meter">
+      <span className="travel-screen__hud-meter travel-screen__hud-meter--heat">
         <span className="travel-screen__hud-meter-fill" style={{ width: `${entry.ratio * 100}%`, backgroundColor: entry.color }} />
       </span>
     </span>
