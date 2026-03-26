@@ -896,10 +896,25 @@ button:disabled {
   color: #000;
 }
 
-.travel-screen__button--fire {
+.travel-screen__button--laser {
   width: 4.9rem;
   height: 4.9rem;
   line-height: 1;
+}
+
+.travel-screen__button--laser-on {
+  border-color: #55ff55;
+  color: #55ff55;
+}
+
+.travel-screen__button--laser-on:active {
+  background: #55ff55;
+  color: #000;
+}
+
+.travel-screen__button--laser-off {
+  border-color: #ff5555;
+  color: #ff5555;
 }
 
 .travel-screen__button--jump {

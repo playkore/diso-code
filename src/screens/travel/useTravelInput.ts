@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEven
 export interface TravelInputState {
   turn: number;
   thrust: number;
-  fire: boolean;
+  toggleLasers: boolean;
   jump: boolean;
   hyperspace: boolean;
   activateEcm: boolean;
@@ -20,11 +20,6 @@ export interface TravelInputState {
   vectorX: number;
   vectorY: number;
   vectorStrength: number;
-}
-
-export interface TravelViewportTap {
-  clientX: number;
-  clientY: number;
 }
 
 export interface TravelJoystickView {
@@ -52,8 +47,6 @@ export interface TravelTapHandlers {
 const JOYSTICK_RADIUS = 60;
 const JOYSTICK_MAX_DIST = 40;
 const JOYSTICK_ACTIVATION_DIST = 14;
-const VIEWPORT_TAP_MAX_DIST = 12;
-const VIEWPORT_TAP_MAX_DURATION_MS = 250;
 
 const DEFAULT_JOYSTICK_VIEW: TravelJoystickView = {
   active: false,
@@ -65,7 +58,7 @@ const DEFAULT_JOYSTICK_VIEW: TravelJoystickView = {
 };
 
 export function createTravelInput(): TravelInputState {
-  return { turn: 0, thrust: 0, fire: false, jump: false, hyperspace: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
+  return { turn: 0, thrust: 0, toggleLasers: false, jump: false, hyperspace: false, activateEcm: false, triggerEnergyBomb: false, autoDock: false, vectorX: 0, vectorY: 0, vectorStrength: 0 };
 }
 
 export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
@@ -92,8 +85,6 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   const joyCenterRef = useRef({ x: 0, y: 0 });
   const joyStartRef = useRef({ x: 0, y: 0, timestamp: 0 });
   const jumpPointerIdRef = useRef<number | null>(null);
-  const firePointerIdRef = useRef<number | null>(null);
-  const viewportTapRef = useRef<TravelViewportTap | null>(null);
   const [joystickView, setJoystickView] = useState<TravelJoystickView>(DEFAULT_JOYSTICK_VIEW);
 
   const setJoystickState = (next: TravelJoystickView) => {
@@ -157,9 +148,8 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
       return;
     }
 
-    // Viewport interactions now start as an undecided gesture:
-    // - short press/release becomes a target-selection tap
-    // - a larger drag promotes into the virtual joystick
+    // Viewport interactions start as an undecided gesture so short presses do
+    // not spawn the joystick. Only a larger drag promotes into active steering.
     joyActiveRef.current = false;
     joyPendingRef.current = true;
     joyPointerIdRef.current = event.pointerId;
@@ -208,13 +198,6 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
     if (joyPointerIdRef.current !== event.pointerId) {
       return;
     }
-    const tapDx = event.clientX - joyStartRef.current.x;
-    const tapDy = event.clientY - joyStartRef.current.y;
-    const tapDistance = Math.hypot(tapDx, tapDy);
-    const tapDuration = performance.now() - joyStartRef.current.timestamp;
-    if (!joyActiveRef.current && tapDistance <= VIEWPORT_TAP_MAX_DIST && tapDuration <= VIEWPORT_TAP_MAX_DURATION_MS) {
-      viewportTapRef.current = { clientX: event.clientX, clientY: event.clientY };
-    }
     if (viewport?.hasPointerCapture(event.pointerId)) {
       viewport.releasePointerCapture(event.pointerId);
     }
@@ -226,6 +209,11 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
     // latched inputs interact with touch controls each frame.
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key in keysRef.current) {
+        if (event.key === ' ' && !keysRef.current[event.key]) {
+          // The laser controller toggles on the leading edge so a held Space
+          // key cannot oscillate the switch through browser key-repeat events.
+          inputRef.current.toggleLasers = true;
+        }
         keysRef.current[event.key] = true;
         if (event.key === ' ' || event.key === 'ArrowUp') {
           event.preventDefault();
@@ -247,7 +235,7 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
     };
   }, []);
 
-  const createPressHandlers = (key: 'fire' | 'jump', activePointerIdRef: MutableRefObject<number | null>): TravelPressHandlers => {
+  const createPressHandlers = (key: 'jump', activePointerIdRef: MutableRefObject<number | null>): TravelPressHandlers => {
     // Hold actions stay active until the same pointer releases or capture is lost.
     const release = (event?: ReactPointerEvent<HTMLButtonElement>) => {
       if (event && activePointerIdRef.current !== null && event.pointerId !== activePointerIdRef.current) {
@@ -279,7 +267,7 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
     };
   };
 
-  const createTapHandlers = (key: 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock'): TravelTapHandlers => ({
+  const createTapHandlers = (key: 'toggleLasers' | 'hyperspace' | 'activateEcm' | 'triggerEnergyBomb' | 'autoDock'): TravelTapHandlers => ({
     // Tap actions are single-frame latches. The session loop clears them after
     // consuming the request.
     onPointerDown: (event) => {
@@ -301,7 +289,7 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
     []
   );
   const jumpButtonHandlers = useMemo(() => createPressHandlers('jump', jumpPointerIdRef), []);
-  const fireButtonHandlers = useMemo(() => createPressHandlers('fire', firePointerIdRef), []);
+  const toggleLasersButtonHandlers = useMemo(() => createTapHandlers('toggleLasers'), []);
   const hyperspaceButtonHandlers = useMemo(() => createTapHandlers('hyperspace'), []);
   const ecmButtonHandlers = useMemo(() => createTapHandlers('activateEcm'), []);
   const bombButtonHandlers = useMemo(() => createTapHandlers('triggerEnergyBomb'), []);
@@ -324,12 +312,10 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
       keysRef,
       joyActiveRef,
       jumpPointerIdRef,
-      firePointerIdRef,
-      viewportTapRef,
       joystickView,
       viewportHandlers,
       jumpButtonHandlers,
-      fireButtonHandlers,
+      toggleLasersButtonHandlers,
       hyperspaceButtonHandlers,
       ecmButtonHandlers,
       bombButtonHandlers,
@@ -340,14 +326,12 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
       bombButtonHandlers,
       dockButtonHandlers,
       ecmButtonHandlers,
-      firePointerIdRef,
-      fireButtonHandlers,
       hyperspaceButtonHandlers,
       jumpPointerIdRef,
       joystickView,
       jumpButtonHandlers,
       resetInput,
-      viewportTapRef,
+      toggleLasersButtonHandlers,
       viewportHandlers
     ]
   );

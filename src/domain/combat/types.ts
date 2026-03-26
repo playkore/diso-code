@@ -208,8 +208,8 @@ export interface CombatProjectile {
 }
 
 /**
- * Player fire control keeps one persistent target lock that can migrate across
- * 90-degree laser sectors as ships move around the Cobra.
+ * Player fire control exposes the currently auto-selected hostile ship so the
+ * HUD and renderer can show which contact the laser controller is tracking.
  */
 export interface PlayerTargetLock {
   enemyId: number;
@@ -324,6 +324,14 @@ export interface CombatPlayerLoadout {
 export interface TravelCombatState {
   player: CombatPlayer;
   playerLoadout: CombatPlayerLoadout;
+  /**
+   * Master laser switch toggled from the travel UI.
+   *
+   * When armed, the combat step auto-selects the nearest hostile ship inside
+   * any currently installed laser sector and keeps firing until no eligible
+   * target remains or the pilot switches the controller off.
+   */
+  playerLasersActive: boolean;
   playerTargetLock: PlayerTargetLock | null;
   enemies: CombatEnemy[];
   projectiles: CombatProjectile[];
@@ -370,7 +378,12 @@ export interface TravelCombatInit {
 export interface CombatInput {
   thrust: number;
   turn: number;
-  fire: boolean;
+  /**
+   * Legacy manual-fire input kept temporarily so older tests and helpers can
+   * still construct `CombatInput` objects while the UI moves to a laser toggle.
+   */
+  fire?: boolean;
+  toggleLasers?: boolean;
   jump?: boolean;
   hyperspace?: boolean;
   activateEcm?: boolean;

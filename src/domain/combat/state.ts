@@ -220,8 +220,11 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       installedEquipment: { ...init.installedEquipment },
       missilesInstalled: init.missilesInstalled
     },
-    // Target lock is established lazily when the player fires and then kept in
-    // sync by the combat step so the HUD reticle and active firing arc agree.
+    // Lasers start armed so launch behavior stays aggressive by default; the
+    // travel UI can toggle this switch off without touching equipment layout.
+    playerLasersActive: true,
+    // The combat step refreshes this from the nearest eligible hostile inside
+    // an installed laser sector so the HUD reticle always matches auto-fire.
     playerTargetLock: null,
     enemies: [],
     projectiles: [],

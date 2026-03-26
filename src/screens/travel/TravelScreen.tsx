@@ -186,15 +186,22 @@ export function TravelScreen() {
                 <button type="button" className="travel-screen__button travel-screen__button--jump" {...travel.jumpButtonHandlers}>
                   JUMP
                 </button>
-                <button type="button" className="travel-screen__button travel-screen__button--fire" {...travel.fireButtonHandlers}>
-                  FIRE
+                <button
+                  type="button"
+                  aria-pressed={travel.hud.lasersActive}
+                  className={`travel-screen__button travel-screen__button--laser${
+                    travel.hud.lasersActive ? ' travel-screen__button--laser-on' : ' travel-screen__button--laser-off'
+                  }`}
+                  {...travel.toggleLasersButtonHandlers}
+                >
+                  LASER
                 </button>
               </div>
             </div>
           </div>
 
           <div className="travel-screen__help">
-            Space Fire / J Jump / H Hyper / CNT {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
+            Space Laser On/Off / J Jump / H Hyper / CNT {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
           </div>
         </div>
       </section>

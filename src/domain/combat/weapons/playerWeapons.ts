@@ -73,8 +73,21 @@ export function canEnemyBePlayerTarget(enemy: CombatEnemy) {
 }
 
 /**
- * Explicit target changes come from the travel UI. The stored mount is filled
- * from the current sector-owner so the HUD indicator can render immediately.
+ * Auto-targeting only considers hostiles that are currently inside an arc with
+ * an installed laser. That keeps the target indicator aligned with what the
+ * armed fire-control system can actually shoot right now.
+ */
+function getArmedTargetSector(state: TravelCombatState, enemy: CombatEnemy): { mount: LaserMountPosition; laserId: LaserId; distance: number } | null {
+  const targetSector = getTargetSectorLaser(state, enemy);
+  if (!targetSector.laserId || targetSector.distance > RADAR_SHIP_RANGE) {
+    return null;
+  }
+  return { mount: targetSector.mount, laserId: targetSector.laserId, distance: targetSector.distance };
+}
+
+/**
+ * Test helper for scenarios that need to seed or clear the renderer-visible
+ * target snapshot before the next auto-target refresh runs.
  */
 export function setPlayerTargetLock(state: TravelCombatState, enemyId: number | null): PlayerTargetLock | null {
   if (enemyId === null) {
@@ -89,41 +102,32 @@ export function setPlayerTargetLock(state: TravelCombatState, enemyId: number | 
   }
 
   const targetSector = getTargetSectorLaser(state, enemy);
-  if (targetSector.distance > RADAR_SHIP_RANGE) {
-    state.playerTargetLock = null;
-    return null;
-  }
-
   state.playerTargetLock = { enemyId: enemy.id, mount: targetSector.mount };
   return state.playerTargetLock;
 }
 
 /**
- * Lock refresh is independent from button state:
- * - keep the selected hostile while it exists and stays in radar range
- * - drop immediately when the target dies, despawns, or leaves engagement range
- * - never auto-acquire a replacement target
+ * Combat now auto-selects the nearest hostile among all arcs with installed
+ * lasers. The resulting lock is purely a rendering/firing snapshot and may
+ * switch from frame to frame as distances and sectors change.
  */
 export function refreshPlayerTargetLock(state: TravelCombatState): PlayerTargetLock | null {
-  const currentLock = state.playerTargetLock;
-  if (!currentLock) {
-    return null;
+  let bestLock: PlayerTargetLock | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const enemy of state.enemies) {
+    if (!canEnemyBePlayerTarget(enemy)) {
+      continue;
+    }
+    const targetSector = getArmedTargetSector(state, enemy);
+    if (!targetSector || targetSector.distance >= bestDistance) {
+      continue;
+    }
+    bestDistance = targetSector.distance;
+    bestLock = { enemyId: enemy.id, mount: targetSector.mount };
   }
 
-  const currentEnemy = findEnemyById(state, currentLock.enemyId);
-  if (!currentEnemy || !canEnemyBePlayerTarget(currentEnemy)) {
-    state.playerTargetLock = null;
-    return null;
-  }
-
-  const targetSector = getTargetSectorLaser(state, currentEnemy);
-  if (targetSector.distance > RADAR_SHIP_RANGE) {
-    state.playerTargetLock = null;
-    return null;
-  }
-
-  state.playerTargetLock = { enemyId: currentEnemy.id, mount: targetSector.mount };
-  return state.playerTargetLock;
+  state.playerTargetLock = bestLock;
+  return bestLock;
 }
 
 export type PlayerTargetIndicatorState = 'missing-laser' | 'ready' | 'overheated';
@@ -144,6 +148,10 @@ export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerT
   }
 
   const targetSector = getTargetSectorLaser(state, enemy);
+  if (targetSector.distance > RADAR_SHIP_RANGE) {
+    return null;
+  }
+
   const laserId = targetSector.laserId;
   if (!laserId) {
     return 'missing-laser';
@@ -186,30 +194,12 @@ function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, l
 }
 
 /**
- * Fire control prefers the held target lock, but if no ship is currently
- * locked it falls back to a straight shot from the front mount only.
+ * Auto-fire always prefers the currently published auto-target lock. If no
+ * hostile ship sits inside an armed arc, the weapon controller simply idles.
  */
 export function firePlayerLasers(state: TravelCombatState) {
   const targetLock = state.playerTargetLock;
   if (!targetLock) {
-    const laserId = state.playerLoadout.laserMounts.front;
-    if (!laserId) {
-      return false;
-    }
-
-    const nextHeat = state.player.laserHeat.front + getLaserHeatPerShot(laserId);
-    if (state.player.laserHeat.front >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
-      state.player.laserHeat.front = state.player.maxLaserHeat;
-      pushMessage(state, 'LASER OVERHEAT', 900);
-      return false;
-    }
-    if (!spendPlayerEnergy(state, getLaserEnergyCost(laserId))) {
-      pushMessage(state, 'ENERGY LOW', 900);
-      return false;
-    }
-
-    state.player.laserHeat.front = clampLaserHeat(state.player.laserHeat.front + getLaserHeatPerShot(laserId), state.player.maxLaserHeat);
-    spawnPlayerLaser(state, 'front', laserId);
     return true;
   }
 
@@ -222,7 +212,7 @@ export function firePlayerLasers(state: TravelCombatState) {
   const targetSector = getTargetSectorLaser(state, enemy);
   state.playerTargetLock = { enemyId: enemy.id, mount: targetSector.mount };
   const laserId = targetSector.laserId;
-  if (!laserId) {
+  if (!laserId || targetSector.distance > RADAR_SHIP_RANGE) {
     return false;
   }
 

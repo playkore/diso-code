@@ -38,7 +38,7 @@ function shouldDespawnEnemy(state: TravelCombatState, enemy: TravelCombatState['
  * The frame order is deliberate:
  * 1. recharge timers and player-only instant actions
  * 2. update station state and safe-zone flags
- * 3. apply player steering/thrust/fire for manual-flight phases
+ * 3. apply player steering/thrust and laser-controller updates for manual-flight phases
  * 4. roll ambient encounters and station police reactions
  * 5. step enemies, projectiles, particles, and legal-state fallout
  * 6. age transient UI messages and compute exit conditions
@@ -68,6 +68,15 @@ export function stepTravelCombat(
     );
   }
   rechargePlayerDefense(state, dt);
+
+  if (input.toggleLasers) {
+    // The travel UI owns the switch gesture, but the simulation owns the armed
+    // state so tests and live gameplay share the exact same behavior.
+    state.playerLasersActive = !state.playerLasersActive;
+    if (!state.playerLasersActive) {
+      state.playerTargetLock = null;
+    }
+  }
 
   if (input.activateEcm) {
     activatePlayerEcm(state);
@@ -122,10 +131,11 @@ export function stepTravelCombat(
     state.player.x += state.player.vx * dt;
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
-    const targetLock = refreshPlayerTargetLock(state);
-    if (targetLock && state.player.fireCooldown <= 0) {
-      firePlayerLasers(state);
-    } else if (input.fire && state.player.fireCooldown <= 0) {
+    const targetLock = state.playerLasersActive ? refreshPlayerTargetLock(state) : null;
+    if (!state.playerLasersActive) {
+      state.playerTargetLock = null;
+    }
+    if (state.playerLasersActive && targetLock && state.player.fireCooldown <= 0) {
       firePlayerLasers(state);
     }
   }
@@ -166,7 +176,11 @@ export function stepTravelCombat(
 
   state.encounter.copsNearby = state.enemies.filter((enemy) => enemy.roles.cop).length;
   moveProjectiles(state, dt, random);
-  refreshPlayerTargetLock(state);
+  if (state.playerLasersActive) {
+    refreshPlayerTargetLock(state);
+  } else {
+    state.playerTargetLock = null;
+  }
   stepParticles(state, dt);
   updateLegalStatus(state);
 

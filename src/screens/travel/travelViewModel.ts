@@ -27,6 +27,7 @@ export interface TravelHudState {
   threat: string;
   arc: string;
   bombVisible: boolean;
+  lasersActive: boolean;
 }
 
 function getHeatColor(heatRatio: number) {
@@ -72,7 +73,8 @@ export function getHudState(
     hostileCount,
     threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount}`,
     arc: `${state.lastPlayerArc.toUpperCase()} ${state.encounter.ecmTimer > 0 ? ' ECM' : ''}${bombVisible ? ' BOMB' : ''}`,
-    bombVisible
+    bombVisible,
+    lasersActive: state.playerLasersActive
   };
 }
 

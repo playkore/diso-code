@@ -37,6 +37,7 @@ describe('travel drive status', () => {
       { mount: 'right', installed: false, ratio: 0, color: '#55ff55' }
     ]);
     expect(hud.bombVisible).toBe(true);
+    expect(hud.lasersActive).toBe(true);
     expect(hud.arc).toContain('BOMB');
   });
 });

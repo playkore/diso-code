@@ -18,8 +18,6 @@ import {
   stepTravelCombat,
   type FlightPhase
 } from '../../domain/travelCombat';
-import { canEnemyBePlayerTarget, setPlayerTargetLock } from '../../domain/combat/weapons/playerWeapons';
-import type { CombatEnemy } from '../../domain/combat/types';
 import type { TravelState } from '../../store/types';
 import { renderCanvas } from './renderCanvas';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
@@ -59,6 +57,7 @@ const INITIAL_HUD = {
   legalColor: CGA_GREEN,
   threat: 'F- / 0',
   threatColor: CGA_GREEN,
+  lasersActive: true,
   arc: 'FRONT',
   arcColor: CGA_RED
 };
@@ -103,10 +102,6 @@ const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
-// Ship wireframes are intentionally compact, so target selection uses a larger
-// screen-space radius than the visible hull to make touch and mouse taps
-// forgiving enough during combat motion.
-const TARGET_TAP_RADIUS_PX = 56;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
   fps: 0,
   frameAvgMs: 0,
@@ -169,44 +164,6 @@ function createPerfAccumulator(now: number): PerfAccumulator {
   };
 }
 
-/**
- * Travel-screen hit testing stays in the session layer because it depends on
- * the live camera transform rather than on simulation-space combat rules.
- */
-function getTargetedEnemyFromTap(
-  enemies: CombatEnemy[],
-  player: { x: number; y: number },
-  viewport: { width: number; height: number },
-  tap: { clientX: number; clientY: number },
-  viewportRect: DOMRect
-) {
-  const camX = player.x - viewport.width / 2;
-  const camY = player.y - viewport.height / 2;
-  let bestEnemy: CombatEnemy | null = null;
-  let bestTapDistance = Number.POSITIVE_INFINITY;
-  let bestWorldDistance = Number.POSITIVE_INFINITY;
-
-  for (const enemy of enemies) {
-    const screenX = enemy.x - camX;
-    const screenY = enemy.y - camY;
-    const dx = tap.clientX - (viewportRect.left + screenX);
-    const dy = tap.clientY - (viewportRect.top + screenY);
-    const tapDistance = Math.hypot(dx, dy);
-    if (tapDistance > TARGET_TAP_RADIUS_PX || !canEnemyBePlayerTarget(enemy)) {
-      continue;
-    }
-
-    const worldDistance = Math.hypot(enemy.x - player.x, enemy.y - player.y);
-    if (tapDistance < bestTapDistance || (tapDistance === bestTapDistance && worldDistance < bestWorldDistance)) {
-      bestEnemy = enemy;
-      bestTapDistance = tapDistance;
-      bestWorldDistance = worldDistance;
-    }
-  }
-
-  return bestEnemy;
-}
-
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
@@ -242,12 +199,10 @@ export function useTravelSession(
     keysRef,
     joyActiveRef,
     jumpPointerIdRef,
-    firePointerIdRef,
-    viewportTapRef,
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
-    fireButtonHandlers,
+    toggleLasersButtonHandlers,
     hyperspaceButtonHandlers,
     ecmButtonHandlers,
     bombButtonHandlers,
@@ -280,7 +235,8 @@ export function useTravelSession(
       previous.threat === next.threat &&
       previous.threatColor === next.threatColor &&
       previous.arc === next.arc &&
-      previous.arcColor === next.arcColor
+      previous.arcColor === next.arcColor &&
+      previous.lasersActive === next.lasersActive
     ) {
       return;
     }
@@ -490,6 +446,7 @@ export function useTravelSession(
         shieldRatio: nextHud.shieldRatio,
         shieldColor: nextHud.shieldColor,
         laserHeat: nextHud.laserHeat,
+        lasersActive: nextHud.lasersActive,
         jump: nextHud.jump,
         jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
         hyperspace: nextHud.hyperspace,
@@ -641,19 +598,6 @@ export function useTravelSession(
       pushPerfSample(perfAccumulator.frameDeltas, deltaMs);
       const liveInput = inputRef.current;
       const keys = keysRef.current;
-      const pendingTap = viewportTapRef.current;
-      if (pendingTap) {
-        viewportTapRef.current = null;
-        const targetEnemy = getTargetedEnemyFromTap(
-          combatState.enemies,
-          combatState.player,
-          { width: cw, height: ch },
-          pendingTap,
-          viewport.getBoundingClientRect()
-        );
-        setPlayerTargetLock(combatState, targetEnemy ? targetEnemy.id : null);
-      }
-
       if (flightState === 'GAMEOVER') {
         stepParticles(combatState, dt);
         if (playerDestructionTimerMs > 0) {
@@ -663,15 +607,15 @@ export function useTravelSession(
             triggerPlayerDestructionAnimation();
           }
           if (playerDestructionTimerMs <= 0) {
-            showMessage('PRESS FIRE TO RESET', 99999);
+            showMessage('PRESS LASER TO RESET', 99999);
           }
         }
-        if (!liveInput.fire && !keys[' ']) {
-          // Respawn only arms after the player has fully released the fire
-          // control, which prevents the fatal shot input from being reused.
+        if (!keys[' ']) {
+          // Respawn only arms after the player has fully released the laser
+          // toggle control, which prevents the fatal input from being reused.
           respawnReady = true;
         }
-        if (playerDestructionTimerMs <= 0 && respawnReady && (liveInput.fire || keys[' '])) {
+        if (playerDestructionTimerMs <= 0 && respawnReady && liveInput.toggleLasers) {
           resetPrototype();
         }
         renderCanvas(ctx, combatState, stars, flightState, cw, ch, jumpCompleted ? session.destinationSystem : session.originSystem, false);
@@ -713,7 +657,6 @@ export function useTravelSession(
         showMessage('AUTO-DOCK CANCELLED', 900);
       }
 
-      liveInput.fire = keys[' '] || liveInput.fire;
       liveInput.jump = keys.j || keys.J || liveInput.jump;
       liveInput.hyperspace = keys.h || keys.H || liveInput.hyperspace;
       liveInput.activateEcm = keys.e || keys.E || liveInput.activateEcm;
@@ -778,7 +721,7 @@ export function useTravelSession(
           // still follows the normal flight model and station collision rules.
           thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.thrust ?? liveInput.thrust,
           turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn,
-          fire: flightState === 'HYPERSPACE' ? false : liveInput.fire,
+          toggleLasers: flightState === 'HYPERSPACE' ? false : liveInput.toggleLasers,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
           activateEcm: flightState === 'HYPERSPACE' ? false : liveInput.activateEcm,
@@ -910,16 +853,12 @@ export function useTravelSession(
       }
       setMessageState(overlayMessage || combatState.messages[0]?.text || '');
 
-      if (!keys[' ']) {
-        // Pointer-held buttons should stay latched until their capture ends;
-        // only keyboard-origin fire input clears immediately on key release.
-        liveInput.fire = firePointerIdRef.current !== null;
-      }
       if (!keys.j && !keys.J) {
-        // Jump hold needs the same treatment as fire so touch/mouse presses can
+        // Jump hold needs the same treatment as other held controls so touch presses can
         // sustain local jump for as long as the player keeps holding the button.
         liveInput.jump = jumpPointerIdRef.current !== null;
       }
+      liveInput.toggleLasers = false;
       if (!keys.h && !keys.H) {
         liveInput.hyperspace = false;
       }
@@ -962,7 +901,7 @@ export function useTravelSession(
       window.removeEventListener('resize', onResize);
       resetInput();
     };
-  }, [commander, completeTravel, firePointerIdRef, inputRef, joyActiveRef, jumpPointerIdRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
+  }, [commander, completeTravel, inputRef, joyActiveRef, jumpPointerIdRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
 
   return {
     hud,
@@ -976,7 +915,7 @@ export function useTravelSession(
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
-    fireButtonHandlers,
+    toggleLasersButtonHandlers,
     hyperspaceButtonHandlers,
     ecmButtonHandlers,
     bombButtonHandlers,
