@@ -69,4 +69,20 @@ describe('drawLineShape', () => {
     expect(ctx.stroke).toHaveBeenCalledTimes(2);
     expect(ctx.closePath).toHaveBeenCalledTimes(1);
   });
+
+  it('can preserve the screen-space line width while zooming', () => {
+    const ctx = createMockContext();
+    const shape: LineShape = [
+      {
+        points: [
+          [0, 0],
+          [8, 0]
+        ]
+      }
+    ];
+
+    drawLineShape(ctx, shape, 0, 0, 0, '#ffff55', 4, { preserveScreenLineWidth: true });
+
+    expect(ctx.lineWidth).toBeCloseTo(0.375);
+  });
 });

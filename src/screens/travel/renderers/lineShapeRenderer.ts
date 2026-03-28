@@ -1,5 +1,9 @@
 import type { LineShape } from '../background/types';
 
+interface DrawLineShapeOptions {
+  preserveScreenLineWidth?: boolean;
+}
+
 /**
  * Draws a multi-contour wireframe shape with the same visual treatment used by
  * the travel renderer's ship and station layers.
@@ -11,14 +15,18 @@ export function drawLineShape(
   y: number,
   angle: number,
   color: string,
-  scale = 1
+  scale = 1,
+  options: DrawLineShapeOptions = {}
 ) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
   ctx.scale(scale, scale);
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
+  // Debug previews can zoom far beyond in-flight scales, so they optionally
+  // compensate for canvas transforms to keep the perceived stroke width equal
+  // to the ship wireframe baseline instead of ballooning with zoom.
+  ctx.lineWidth = options.preserveScreenLineWidth ? 1.5 / Math.max(Math.abs(scale), 0.0001) : 1.5;
   ctx.shadowBlur = 6;
   ctx.shadowColor = color;
 

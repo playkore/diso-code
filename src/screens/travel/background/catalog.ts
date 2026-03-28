@@ -1,4 +1,5 @@
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from '../renderers/constants';
+import { extractedStationShape } from './extractedStationShape';
 import type { BackgroundObjectDefinition } from './types';
 
 /**
@@ -9,6 +10,18 @@ import type { BackgroundObjectDefinition } from './types';
  * generation logic starts assembling these shapes into system backdrops.
  */
 export const BACKGROUND_OBJECT_DEFINITIONS: BackgroundObjectDefinition[] = [
+  {
+    id: 'extracted-station',
+    label: 'Extracted Station',
+    kind: 'station',
+    color: CGA_YELLOW,
+    // The imported line set is already normalized into an approximately
+    // +/-50 coordinate box, so a moderate preview scale keeps it readable
+    // without clipping the debug canvas.
+    defaultScale: 1.9,
+    defaultAngle: 0,
+    shape: extractedStationShape
+  },
   {
     id: 'asteroid-jagged',
     label: 'Jagged Asteroid',

@@ -19,6 +19,7 @@ describe('BACKGROUND_OBJECT_DEFINITIONS', () => {
 
   it('returns definitions by id', () => {
     expect(getBackgroundObjectDefinition('wrecked-freighter')?.label).toBe('Wrecked Freighter');
+    expect(getBackgroundObjectDefinition('extracted-station')?.kind).toBe('station');
     expect(getBackgroundObjectDefinition('missing-object')).toBeUndefined();
   });
 });

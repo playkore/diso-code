@@ -6,6 +6,9 @@ import { CGA_GREEN, CGA_RED, CGA_YELLOW } from '../travel/renderers/constants';
 import { drawLineShape } from '../travel/renderers/lineShapeRenderer';
 
 const GRID_SPACING = 24;
+const ZOOM_STEP = 0.35;
+const MIN_ZOOM = 0.35;
+const MAX_ZOOM = 8;
 
 /**
  * Debug-only preview screen for authoring and validating line-based scenery.
@@ -17,10 +20,18 @@ const GRID_SPACING = 24;
 export function BackgroundDebugScreen() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [selectedId, setSelectedId] = useState(BACKGROUND_OBJECT_DEFINITIONS[0]?.id ?? '');
+  const [zoom, setZoom] = useState(1);
   const selected = useMemo<BackgroundObjectDefinition | undefined>(
     () => BACKGROUND_OBJECT_DEFINITIONS.find((definition) => definition.id === selectedId) ?? BACKGROUND_OBJECT_DEFINITIONS[0],
     [selectedId]
   );
+
+  useEffect(() => {
+    // Each object definition has its own intended default size, so switching
+    // selection resets the user zoom rather than carrying scale assumptions
+    // from one silhouette family into another.
+    setZoom(1);
+  }, [selectedId]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -73,14 +84,17 @@ export function BackgroundDebugScreen() {
     ctx.stroke();
     ctx.restore();
 
-    drawLineShape(ctx, selected.shape, width / 2, height / 2, selected.defaultAngle, selected.color, selected.defaultScale);
+    const previewScale = selected.defaultScale * zoom;
+    drawLineShape(ctx, selected.shape, width / 2, height / 2, selected.defaultAngle, selected.color, previewScale, {
+      preserveScreenLineWidth: true
+    });
 
     ctx.save();
     ctx.fillStyle = CGA_YELLOW;
     ctx.font = '14px Courier New, Courier, monospace';
-    ctx.fillText(`${selected.kind.toUpperCase()} / SCALE ${selected.defaultScale.toFixed(1)}`, 16, height - 18);
+    ctx.fillText(`${selected.kind.toUpperCase()} / SCALE ${(previewScale).toFixed(2)} / ZOOM ${zoom.toFixed(2)}x`, 16, height - 18);
     ctx.restore();
-  }, [selected]);
+  }, [selected, zoom]);
 
   return (
     <section className="screen debug-backgrounds">
@@ -123,11 +137,23 @@ export function BackgroundDebugScreen() {
               <div className="debug-backgrounds__stats">
                 <span>ID {selected.id}</span>
                 <span>Contours {selected.shape.length}</span>
+                <span>Zoom {zoom.toFixed(2)}x</span>
               </div>
             ) : null}
           </div>
+          <div className="debug-backgrounds__toolbar">
+            <button type="button" onClick={() => setZoom((current) => Math.max(MIN_ZOOM, Number((current - ZOOM_STEP).toFixed(2))))}>
+              Zoom -
+            </button>
+            <button type="button" onClick={() => setZoom(1)}>
+              Reset
+            </button>
+            <button type="button" onClick={() => setZoom((current) => Math.min(MAX_ZOOM, Number((current + ZOOM_STEP).toFixed(2))))}>
+              Zoom +
+            </button>
+          </div>
           <canvas ref={canvasRef} className="debug-backgrounds__canvas" />
-          <p className="muted">Green grid marks scale, red crosshair marks the preview anchor, and the object uses its catalog default angle and size.</p>
+          <p className="muted">Green grid marks scale, red crosshair marks the preview anchor, and the object is drawn by the same line renderer and line width used for ship wireframes.</p>
         </section>
       </div>
     </section>

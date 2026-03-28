@@ -1044,6 +1044,16 @@ button:disabled {
   margin: 0;
 }
 
+.debug-backgrounds__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.debug-backgrounds__toolbar button {
+  min-width: 5.5rem;
+}
+
 .debug-backgrounds__stats {
   display: flex;
   flex-wrap: wrap;

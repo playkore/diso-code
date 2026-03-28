@@ -32,7 +32,7 @@ export type LineShape = LineContour[];
 export interface BackgroundObjectDefinition {
   id: string;
   label: string;
-  kind: 'asteroid' | 'wreck' | 'ruinedStation' | 'debrisCluster';
+  kind: 'asteroid' | 'wreck' | 'ruinedStation' | 'debrisCluster' | 'station';
   color: string;
   defaultScale: number;
   defaultAngle: number;
