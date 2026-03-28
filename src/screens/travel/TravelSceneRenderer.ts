@@ -245,7 +245,7 @@ export class TravelSceneRenderer {
   private readonly worldGroup = new Group();
   private readonly overlayGroup = new Group();
   private readonly flashMesh = createQuad(1, 1, CGA_RED, 0);
-  private readonly shipPresenter = selectShipPresenter('flat-wireframe');
+  private readonly shipPresenter = selectShipPresenter();
   private width = 1;
   private height = 1;
 
@@ -387,7 +387,7 @@ export class TravelSceneRenderer {
     }
 
     for (const enemy of combatState.enemies) {
-      const ship = this.shipPresenter.geometryMode === 'line-shape'
+      const ship = this.shipPresenter.enemyGeometryMode === 'line-shape'
         ? createClosedShape(getEnemyShape(enemy), getEnemyColor(enemy.roles, enemy.missionTag))
         : new Group();
       const presentation = getShipPresentationAngles(
@@ -406,7 +406,9 @@ export class TravelSceneRenderer {
       }
     }
 
-    const player = createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
+    const player = this.shipPresenter.playerGeometryMode === 'mesh'
+      ? this.shipPresenter.createPlayerObject?.() ?? new Group()
+      : createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
     player.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
     player.rotation.z = -combatState.player.angle;
     this.worldGroup.add(player);

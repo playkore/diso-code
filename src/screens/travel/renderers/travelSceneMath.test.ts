@@ -46,10 +46,19 @@ describe('getWrappedStarScreenPosition', () => {
 });
 
 describe('selectShipPresenter', () => {
-  it('keeps the current renderer on the flat wireframe presenter until model-backed ships exist', () => {
-    expect(selectShipPresenter('wireframe-model')).toEqual({
+  it('defaults to the low-poly player presenter while keeping enemies as line shapes', () => {
+    expect(selectShipPresenter()).toMatchObject({
+      id: 'low-poly-player',
+      enemyGeometryMode: 'line-shape',
+      playerGeometryMode: 'mesh'
+    });
+  });
+
+  it('keeps the flat wireframe presenter as an explicit fallback', () => {
+    expect(selectShipPresenter('flat-wireframe')).toEqual({
       id: 'flat-wireframe',
-      geometryMode: 'line-shape'
+      enemyGeometryMode: 'line-shape',
+      playerGeometryMode: 'line-shape'
     });
   });
 });
