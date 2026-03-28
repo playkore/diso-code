@@ -17,7 +17,7 @@ export const STATION_BASE_HALF_EXTENT = 18;
 export const STATION_TUNNEL_HALF_WIDTH = 8;
 export const STATION_TUNNEL_START_X = 18;
 export const STATION_TUNNEL_END_X = 32;
-export const STATION_DOCK_POINT_X = 24;
+export const STATION_DOCK_POINT_X = 31;
 
 /**
  * Station geometry is shared between rendering and gameplay. The authored mesh
@@ -100,7 +100,11 @@ function scalePoint([x, y, z]: StationPoint3, scale: number): StationPoint3 {
 function transformStationPoint(station: CombatStation, point: StationPoint3): StationPoint3 {
   const scaled = scalePoint(point, getStationRenderScale(station));
   const banked = rotateX(scaled, station.angle);
-  return rotateZ(banked, -station.angle);
+  // Three.js applies `rotation.z = -station.angle` in a Y-up scene, while
+  // gameplay still reasons in the legacy Y-down plane. Mirroring the rendered
+  // result back into gameplay space flips the sign, so the equivalent 2D
+  // transform here is `+station.angle`.
+  return rotateZ(banked, station.angle);
 }
 
 function translatePoint(station: CombatStation, [x, y, z]: StationPoint3): StationPoint3 {

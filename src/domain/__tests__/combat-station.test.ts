@@ -105,7 +105,7 @@ describe('travel combat station rules', () => {
     };
     const docking = assessDockingApproach(station, player);
     expect(docking.isInDockingGap).toBe(true);
-    expect(docking.canDock).toBe(false);
+    expect(docking.canDock).toBe(true);
   });
 
   it('collides when crossing the ring away from the visible split', () => {

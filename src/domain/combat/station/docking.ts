@@ -1,10 +1,10 @@
 import { clampAngle } from '../state';
 import type { CombatPlayer, CombatStation, DockingAssessment } from '../types';
-import { getDistanceToStationSlice, getStationDockAngle, getStationDockDirection, getStationDockMouthPoint, getStationDockPoint, getStationSliceSegments, getStationTunnelHalfWidth } from './stationGeometry';
+import { getDistanceToStationSlice, getStationDockAngle, getStationDockDirection, getStationDockMouthPoint, getStationSliceSegments, getStationTunnelHalfWidth } from './stationGeometry';
 
 const STATION_COLLISION_MARGIN = 5;
-const STATION_DOCK_CAPTURE_RADIUS = 10;
 const STATION_DOCK_ENTRY_GRACE = 6;
+const STATION_DOCK_PROGRESS_MARGIN = 6;
 
 /**
  * Docking geometry helpers.
@@ -27,13 +27,11 @@ export function assessDockingApproach(
   const slotAngle = getStationSlotAngle(station.angle);
   const dockDirection = getStationDockDirection(station);
   const dockMouth = getStationDockMouthPoint(station);
-  const dockPoint = getStationDockPoint(station);
   const centerOffsetX = player.x - station.x;
   const centerOffsetY = player.y - station.y;
   const axialOffset = centerOffsetX * dockDirection.x + centerOffsetY * dockDirection.y;
   const lateralOffset = centerOffsetX * -dockDirection.y + centerOffsetY * dockDirection.x;
   const mouthAxial = (dockMouth.x - station.x) * dockDirection.x + (dockMouth.y - station.y) * dockDirection.y;
-  const dockAxial = (dockPoint.x - station.x) * dockDirection.x + (dockPoint.y - station.y) * dockDirection.y;
   const tunnelHalfWidth = getStationTunnelHalfWidth(station);
   const slotOffset = lateralOffset / Math.max(1, tunnelHalfWidth);
   const noseAlignment = clampAngle(player.angle - (slotAngle + Math.PI));
@@ -56,9 +54,11 @@ export function assessDockingApproach(
     Math.abs(lateralOffset) <= bodyHalfWidth;
   const isInsideSlot = Math.abs(lateralOffset) <= getStationTunnelHalfWidth(station);
   const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
-  const isInDockingGap = isInsideSlot && axialOffset >= dockAxial - STATION_DOCK_CAPTURE_RADIUS && axialOffset <= mouthAxial + STATION_DOCK_ENTRY_GRACE;
+  const isInDockingGap = isInsideSlot && axialOffset >= station.radius && axialOffset <= mouthAxial + STATION_DOCK_ENTRY_GRACE;
   const collidesWithHull = (insideBodySlice && !(isInsideSlot && axialOffset >= station.radius)) || (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot);
-  const canDock = isInsideSlot && isFacingHangar && Math.abs(axialOffset - dockAxial) <= STATION_DOCK_CAPTURE_RADIUS;
+  // Once the ship has genuinely entered the tunnel, docking should resolve
+  // anywhere along that corridor instead of requiring one hidden trigger point.
+  const canDock = isInsideSlot && isFacingHangar && axialOffset >= station.radius + STATION_DOCK_PROGRESS_MARGIN;
 
   return {
     slotAngle,
