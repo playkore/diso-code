@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getSystemByName, getSystemHeading } from '../../domain/galaxyCatalog';
 import { applyLegalFloor, type CommanderState } from '../../domain/commander';
+import { clampAngle } from '../../domain/combat/state';
 import {
   assessDockingApproach,
   consumeEscapePod,
@@ -131,6 +132,8 @@ interface PerfAccumulator {
   longTaskMaxMs: number;
 }
 
+const JOYSTICK_TARGET_TURN_ANGLE = 0.12;
+
 function pushPerfSample(samples: number[], value: number) {
   samples.push(value);
   if (samples.length > PERF_SAMPLE_CAP) {
@@ -165,6 +168,14 @@ function createPerfAccumulator(now: number): PerfAccumulator {
     longTaskCount: 0,
     longTaskMaxMs: 0
   };
+}
+
+function clampUnit(value: number) {
+  return Math.max(-1, Math.min(1, value));
+}
+
+function getJoystickTurnCommand(currentAngle: number, targetAngle: number) {
+  return clampUnit(clampAngle(targetAngle - currentAngle) / JOYSTICK_TARGET_TURN_ANGLE);
 }
 
 export function useTravelSession(
@@ -703,7 +714,6 @@ export function useTravelSession(
       let joystickHeading: number | null = null;
       if (joystickHeadingActive) {
         joystickHeading = Math.atan2(liveInput.vectorY, liveInput.vectorX);
-        combatState.player.angle = joystickHeading;
       }
 
       if (jumpActivationFrames > 0) {
@@ -742,7 +752,9 @@ export function useTravelSession(
         autoDockWaitLatched = false;
       }
 
-      const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn;
+      const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING'
+        ? 0
+        : autoDockCommand?.turn ?? (joystickHeading === null ? liveInput.turn : getJoystickTurnCommand(combatState.player.angle, joystickHeading));
       const previousPlayerAngle = combatState.player.angle;
       const result = stepTravelCombat(
         combatState,
@@ -767,7 +779,7 @@ export function useTravelSession(
       playerBankState = stepPlayerBankState(playerBankState, {
         currentAngle: combatState.player.angle,
         previousAngle: previousPlayerAngle,
-        joystickHeading,
+        joystickHeading: null,
         turnCommand: playerTurnCommand,
         dt
       });
