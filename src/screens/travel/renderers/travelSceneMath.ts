@@ -1,5 +1,4 @@
 import type { StarPoint } from './starsRenderer';
-
 /**
  * Fixed star depth bands for the WebGL renderer.
  *
@@ -75,13 +74,23 @@ export function getShipPresentationAngles(
 }
 
 /**
- * The player ship banks only as a presentation cue. It tracks the live turn
- * command instead of angular velocity so the lean begins immediately with the
- * pilot's input and snaps back to neutral as soon as steering stops.
+ * Banking follows the accumulated turn progress of the active steering action.
+ *
+ * - 0° turn progress: no bank
+ * - 90° turn progress: maximum bank
+ * - 180° turn progress: back to zero bank
+ * - 270° turn progress: maximum bank again
+ * - 360° turn progress: back to zero bank again
+ *
+ * The magnitude is periodic, while the sign still comes from steering
+ * direction so left/right turns lean onto opposite sides of the hull.
  */
-export function getPlayerBankAngle(turnInput: number) {
-  const clampedTurn = Math.max(-1, Math.min(1, turnInput));
-  return clampedTurn * MAX_PLAYER_BANK_RADIANS;
+export function getPlayerBankAngle(turnProgress: number, turnInput: number) {
+  const turnSign = Math.sign(turnInput);
+  if (turnSign === 0) {
+    return 0;
+  }
+  return turnSign * Math.abs(Math.sin(turnProgress)) * MAX_PLAYER_BANK_RADIANS;
 }
 
 /**

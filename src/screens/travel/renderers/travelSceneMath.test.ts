@@ -37,15 +37,24 @@ describe('getShipPresentationAngles', () => {
 });
 
 describe('getPlayerBankAngle', () => {
-  it('leans left for left turn input and right for right turn input', () => {
-    expect(getPlayerBankAngle(-1)).toBeCloseTo(-0.95, 5);
-    expect(getPlayerBankAngle(1)).toBeCloseTo(0.95, 5);
+  it('repeats the bank cycle every full turn for right turns', () => {
+    expect(getPlayerBankAngle(0, 1)).toBeCloseTo(0, 5);
+    expect(getPlayerBankAngle(Math.PI / 2, 1)).toBeCloseTo(0.95, 5);
+    expect(getPlayerBankAngle(Math.PI, 1)).toBeCloseTo(0, 5);
+    expect(getPlayerBankAngle((3 * Math.PI) / 2, 1)).toBeCloseTo(0.95, 5);
+    expect(getPlayerBankAngle(2 * Math.PI, 1)).toBeCloseTo(0, 5);
   });
 
-  it('clamps over-range turn input and returns to neutral at zero', () => {
-    expect(getPlayerBankAngle(-5)).toBeCloseTo(-0.95, 5);
-    expect(getPlayerBankAngle(0)).toBe(0);
-    expect(getPlayerBankAngle(5)).toBeCloseTo(0.95, 5);
+  it('mirrors the same periodic curve for left turns', () => {
+    expect(getPlayerBankAngle(0, -1)).toBeCloseTo(0, 5);
+    expect(getPlayerBankAngle(Math.PI / 2, -1)).toBeCloseTo(-0.95, 5);
+    expect(getPlayerBankAngle(Math.PI, -1)).toBeCloseTo(0, 5);
+    expect(getPlayerBankAngle((3 * Math.PI) / 2, -1)).toBeCloseTo(-0.95, 5);
+    expect(getPlayerBankAngle(2 * Math.PI, -1)).toBeCloseTo(0, 5);
+  });
+
+  it('returns to neutral when steering stops regardless of turn progress', () => {
+    expect(getPlayerBankAngle(Math.PI / 2, 0)).toBe(0);
   });
 });
 

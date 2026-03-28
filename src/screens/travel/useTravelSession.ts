@@ -25,6 +25,7 @@ import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
+import { clampAngle } from '../../domain/combat/state';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
 import { getPlayerBankAngle } from './renderers/travelSceneMath';
 
@@ -426,6 +427,8 @@ export function useTravelSession(
     let playerDestructionTimerMs = 0;
     let playerDestructionPulseTimerMs = 0;
     let respawnReady = false;
+    let playerBankTurnProgress = 0;
+    let playerBankTurnSign = 0;
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
@@ -590,6 +593,8 @@ export function useTravelSession(
       playerDestructionTimerMs = 0;
       playerDestructionPulseTimerMs = 0;
       respawnReady = false;
+      playerBankTurnProgress = 0;
+      playerBankTurnSign = 0;
       showMessage(
         hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
         2400
@@ -738,6 +743,17 @@ export function useTravelSession(
       }
 
       const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn;
+      const playerTurnSign = Math.sign(playerTurnCommand);
+      if (playerTurnSign === 0) {
+        playerBankTurnProgress = 0;
+        playerBankTurnSign = 0;
+      } else if (playerBankTurnSign !== playerTurnSign) {
+        // Starting a new steering action resets the periodic banking cycle so
+        // each turn begins from an upright hull at its current heading.
+        playerBankTurnProgress = 0;
+        playerBankTurnSign = playerTurnSign;
+      }
+      const previousPlayerAngle = combatState.player.angle;
       const result = stepTravelCombat(
         combatState,
         {
@@ -758,6 +774,17 @@ export function useTravelSession(
         commander.cargo,
         random
       );
+      let signedHeadingDelta = 0;
+      if (playerTurnSign !== 0) {
+        // Only count heading change that continues turning in the commanded
+        // direction. Virtual joystick steering can apply tiny corrective
+        // back-and-forth adjustments while holding a steady heading; those
+        // should not keep advancing the bank cycle.
+        signedHeadingDelta = clampAngle(combatState.player.angle - previousPlayerAngle) * playerTurnSign;
+        if (signedHeadingDelta > 0) {
+          playerBankTurnProgress += signedHeadingDelta;
+        }
+      }
 
       if (combatState.player.combatReward > creditedCombatReward) {
         const newlyEarnedCredits = combatState.player.combatReward - creditedCombatReward;
@@ -898,7 +925,23 @@ export function useTravelSession(
       }
 
       updateHud();
-      const playerBankAngle = getPlayerBankAngle(playerTurnCommand);
+      const playerBankAngle = getPlayerBankAngle(playerBankTurnProgress, playerBankTurnSign);
+      if (Math.abs(playerTurnCommand) > 0.01) {
+        // Temporary joystick/bank debug: shows whether held steering keeps
+        // advancing the bank cycle even when heading should be stable.
+        console.log('[travel-bank-debug]', {
+          turn: Number(playerTurnCommand.toFixed(3)),
+          turnSign: playerTurnSign,
+          angle: Number(combatState.player.angle.toFixed(3)),
+          delta: Number(signedHeadingDelta.toFixed(4)),
+          progress: Number(playerBankTurnProgress.toFixed(4)),
+          bank: Number(playerBankAngle.toFixed(4)),
+          joyActive: joyActiveRef.current,
+          vectorX: Number(liveInput.vectorX.toFixed(3)),
+          vectorY: Number(liveInput.vectorY.toFixed(3)),
+          vectorStrength: Number(liveInput.vectorStrength.toFixed(3))
+        });
+      }
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
