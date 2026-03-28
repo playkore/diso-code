@@ -25,10 +25,10 @@ import {
 } from 'three';
 import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type FlightPhase, type TravelCombatState } from '../../domain/travelCombat';
 import type { LineShape } from './background/types';
-import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_STATION, SHAPE_THARGOID } from './renderers/constants';
+import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_THARGOID } from './renderers/constants';
 import { getEnemyHealthBarState, getEnemyLaserTrace } from './renderers/projectilesRenderer';
 import { getEnemyColor, getProjectileColor } from './renderers/shipsRenderer';
-import { selectShipPresenter, type EnemyShipMeshId } from './renderers/shipPresenter';
+import { createStationObject, selectShipPresenter, type EnemyShipMeshId } from './renderers/shipPresenter';
 import { createStars, type StarPoint } from './renderers/starsRenderer';
 import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './renderers/travelSceneMath';
 
@@ -135,25 +135,6 @@ function createClosedShape(points: readonly (readonly [number, number])[], color
       {
         points: points.map(([x, y]) => [x, y] as [number, number]),
         closed: true
-      }
-    ],
-    color
-  );
-}
-
-function createStationShape(color: string) {
-  return createLineShapeObject(
-    [
-      {
-        points: SHAPE_STATION.slice(0, 5).map(([x, y]) => [x, y] as [number, number]),
-        closed: false
-      },
-      {
-        points: [
-          [SHAPE_STATION[5][0], SHAPE_STATION[5][1]],
-          [SHAPE_STATION[0][0], SHAPE_STATION[0][1]]
-        ],
-        closed: false
       }
     ],
     color
@@ -385,13 +366,17 @@ export class TravelSceneRenderer {
 
   private buildWorld(combatState: TravelCombatState, playerBankAngle: number, enemyBankAngles: ReadonlyMap<number, number>) {
     if (combatState.station) {
-      // The station hull intentionally leaves the docking slot open by drawing
-      // two independent open contours instead of closing the hexagon.
-      const station = createStationShape(CGA_YELLOW);
-      station.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z);
-      station.scale.setScalar(1.8);
-      station.rotation.z = -combatState.station.angle;
-      this.worldGroup.add(station);
+      const station = createStationObject();
+      const stationAnchor = new Group();
+      stationAnchor.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z);
+      stationAnchor.scale.setScalar(3.6);
+      // The outer anchor spins around the camera-facing axis, while the inner
+      // hull spins around its own local X axis after that Z rotation has already
+      // been applied. That gives the station a compound Elite-like tumble.
+      stationAnchor.rotation.z = -combatState.station.angle;
+      station.rotation.x = combatState.station.angle;
+      stationAnchor.add(station);
+      this.worldGroup.add(stationAnchor);
 
       const safeZone = createCircleLoop(combatState.station.safeZoneRadius, 96, combatState.encounter.safeZone ? CGA_GREEN : CGA_RED, true);
       safeZone.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z - 1);

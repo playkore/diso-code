@@ -207,6 +207,37 @@ const ENEMY_SHIP_MESHES: Record<EnemyShipMeshId, ShipMeshDefinition> = {
   thargoid: THARGOID_MESH
 };
 
+const STATION_MESH: ShipMeshDefinition = {
+  hullTriangles: [
+    [[18, 18, 18], [18, -18, 18], [18, -18, -18]],
+    [[18, 18, 18], [18, -18, -18], [18, 18, -18]],
+    [[-18, 18, 18], [-18, -18, -18], [-18, -18, 18]],
+    [[-18, 18, 18], [-18, 18, -18], [-18, -18, -18]],
+    [[18, 18, 18], [18, 18, -18], [-18, 18, -18]],
+    [[18, 18, 18], [-18, 18, -18], [-18, 18, 18]],
+    [[18, -18, 18], [-18, -18, 18], [-18, -18, -18]],
+    [[18, -18, 18], [-18, -18, -18], [18, -18, -18]],
+    [[18, 18, 18], [-18, 18, 18], [-18, -18, 18]],
+    [[18, 18, 18], [-18, -18, 18], [18, -18, 18]],
+    [[18, 18, -18], [18, -18, -18], [-18, -18, -18]],
+    [[18, 18, -18], [-18, -18, -18], [-18, 18, -18]]
+  ],
+  wireEdges: [
+    [[18, 18, 18], [18, -18, 18]],
+    [[18, -18, 18], [18, -18, -18]],
+    [[18, -18, -18], [18, 18, -18]],
+    [[18, 18, -18], [18, 18, 18]],
+    [[-18, 18, 18], [-18, -18, 18]],
+    [[-18, -18, 18], [-18, -18, -18]],
+    [[-18, -18, -18], [-18, 18, -18]],
+    [[-18, 18, -18], [-18, 18, 18]],
+    [[18, 18, 18], [-18, 18, 18]],
+    [[18, -18, 18], [-18, -18, 18]],
+    [[18, -18, -18], [-18, -18, -18]],
+    [[18, 18, -18], [-18, 18, -18]]
+  ]
+};
+
 /**
  * The player hull uses the renderer's native Three.js axes:
  * - `+X` points toward the nose
@@ -222,6 +253,14 @@ export function createLowPolyPlayerObject() {
 
 export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: string) {
   return createWireframeMeshObject(ENEMY_SHIP_MESHES[shipId], edgeColor);
+}
+
+/**
+ * The station currently uses a simple authored cube so its silhouette reads
+ * clearly while the renderer experiments with compound 3D rotation behavior.
+ */
+export function createStationObject() {
+  return createWireframeMeshObject(STATION_MESH, CGA_YELLOW);
 }
 
 export const FLAT_WIREFRAME_SHIP_PRESENTER: ShipPresenter = {

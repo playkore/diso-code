@@ -1,6 +1,6 @@
 import { Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { createLowPolyPlayerObject, selectShipPresenter } from './shipPresenter';
+import { createLowPolyPlayerObject, createStationObject, selectShipPresenter } from './shipPresenter';
 import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
 
 describe('createLowPolyPlayerObject', () => {
@@ -48,5 +48,20 @@ describe('selectShipPresenter geometry split', () => {
     expect((police.children[1] as LineSegments).geometry.getAttribute('position').count).not.toBe(
       (thargoid.children[1] as LineSegments).geometry.getAttribute('position').count
     );
+  });
+});
+
+describe('createStationObject', () => {
+  it('builds an authored cube station mesh', () => {
+    const station = createStationObject();
+    const hull = station.children[0] as Mesh;
+    const edges = station.children[1] as LineSegments;
+
+    expect(station).toBeInstanceOf(Group);
+    expect(hull).toBeInstanceOf(Mesh);
+    expect(edges).toBeInstanceOf(LineSegments);
+    expect(((hull.material as MeshBasicMaterial).color.getHexString())).toBe(CGA_BLACK.slice(1));
+    expect(((edges.material as LineBasicMaterial).color.getHexString())).toBe(CGA_YELLOW.slice(1));
+    expect(edges.geometry.getAttribute('position').count).toBe(24);
   });
 });
