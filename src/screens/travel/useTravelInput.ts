@@ -46,7 +46,6 @@ export interface TravelTapHandlers {
 
 const JOYSTICK_RADIUS = 60;
 const JOYSTICK_MAX_DIST = 40;
-const JOYSTICK_ACTIVATION_DIST = 14;
 
 const DEFAULT_JOYSTICK_VIEW: TravelJoystickView = {
   active: false,
@@ -81,9 +80,7 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   });
   const joyActiveRef = useRef(false);
   const joyPointerIdRef = useRef<number | null>(null);
-  const joyPendingRef = useRef(false);
   const joyCenterRef = useRef({ x: 0, y: 0 });
-  const joyStartRef = useRef({ x: 0, y: 0, timestamp: 0 });
   const jumpPointerIdRef = useRef<number | null>(null);
   const [joystickView, setJoystickView] = useState<TravelJoystickView>(DEFAULT_JOYSTICK_VIEW);
 
@@ -103,7 +100,6 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
   const resetJoystick = () => {
     joyActiveRef.current = false;
     joyPointerIdRef.current = null;
-    joyPendingRef.current = false;
     inputRef.current.turn = 0;
     inputRef.current.thrust = 0;
     inputRef.current.vectorX = 0;
@@ -148,43 +144,30 @@ export function useTravelInput(viewportRef: RefObject<HTMLDivElement | null>) {
       return;
     }
 
-    // Viewport interactions start as an undecided gesture so short presses do
-    // not spawn the joystick. Only a larger drag promotes into active steering.
+    // Touch steering reuses the press position as the joystick center so the
+    // control appears immediately under the player's finger on touch-down.
+    const viewportRect = viewport.getBoundingClientRect();
+    const left = `${event.clientX - viewportRect.left - JOYSTICK_RADIUS}px`;
+    const top = `${event.clientY - viewportRect.top - JOYSTICK_RADIUS}px`;
     joyActiveRef.current = false;
-    joyPendingRef.current = true;
     joyPointerIdRef.current = event.pointerId;
     viewport.setPointerCapture(event.pointerId);
     joyCenterRef.current = { x: event.clientX, y: event.clientY };
-    joyStartRef.current = { x: event.clientX, y: event.clientY, timestamp: performance.now() };
+    setJoystickState({
+      active: true,
+      left,
+      top,
+      bottom: 'auto',
+      knobLeft: '40px',
+      knobTop: '40px'
+    });
+    joyActiveRef.current = true;
   };
 
   const onViewportPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const viewport = viewportRef.current;
     if (!viewport || joyPointerIdRef.current !== event.pointerId) {
       return;
-    }
-
-    if (!joyActiveRef.current && joyPendingRef.current) {
-      const dragDx = event.clientX - joyStartRef.current.x;
-      const dragDy = event.clientY - joyStartRef.current.y;
-      if (Math.hypot(dragDx, dragDy) < JOYSTICK_ACTIVATION_DIST) {
-        return;
-      }
-
-      const viewportRect = viewport.getBoundingClientRect();
-      const left = `${joyStartRef.current.x - viewportRect.left - JOYSTICK_RADIUS}px`;
-      const top = `${joyStartRef.current.y - viewportRect.top - JOYSTICK_RADIUS}px`;
-      joyActiveRef.current = true;
-      joyPendingRef.current = false;
-      joyCenterRef.current = { x: joyStartRef.current.x, y: joyStartRef.current.y };
-      setJoystickState({
-        active: true,
-        left,
-        top,
-        bottom: 'auto',
-        knobLeft: '40px',
-        knobTop: '40px'
-      });
     }
 
     if (!joyActiveRef.current) {
