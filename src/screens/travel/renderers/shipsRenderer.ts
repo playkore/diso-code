@@ -1,5 +1,6 @@
 import type { CombatProjectile, CombatShipRoles, TravelCombatState } from '../../../domain/travelCombat';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_THARGOID } from './constants';
+import { drawLineShape } from './lineShapeRenderer';
 
 export function getEnemyColor(roles: CombatShipRoles, missionTag?: TravelCombatState['enemies'][number]['missionTag']) {
   if (missionTag?.role === 'target') {
@@ -43,22 +44,23 @@ export function drawWireframe(
   color = CGA_YELLOW,
   scale = 1
 ) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.scale(scale, scale);
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.shadowBlur = 6;
-  ctx.shadowColor = color;
-  ctx.beginPath();
-  ctx.moveTo(points[0][0], points[0][1]);
-  for (let i = 1; i < points.length; i += 1) {
-    ctx.lineTo(points[i][0], points[i][1]);
-  }
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
+  // Ships still use a single closed contour, but they now flow through the
+  // shared line-shape renderer so debug previews and future background objects
+  // match the exact same stroke treatment.
+  drawLineShape(
+    ctx,
+    [
+      {
+        points: points.map((point) => [point[0], point[1]] as [number, number]),
+        closed: true
+      }
+    ],
+    x,
+    y,
+    angle,
+    color,
+    scale
+  );
 }
 
 export function drawPlayer(ctx: CanvasRenderingContext2D, cw: number, ch: number, angle: number) {

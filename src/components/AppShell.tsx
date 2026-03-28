@@ -113,10 +113,11 @@ export function AppShell() {
   const latestMessage = missionMessages[0];
   const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
   const isTravelRoute = location.pathname === '/travel';
+  const isDebugBackgroundRoute = location.pathname === '/debug/backgrounds';
 
-  if (isTravelRoute) {
-    // The travel route owns its own full-screen chrome, so the shell strips
-    // everything back to an outlet container while the arcade segment is active.
+  if (isTravelRoute || isDebugBackgroundRoute) {
+    // Travel and debug playground routes own their own full-screen chrome, so
+    // the shell strips everything back to an outlet container while they are active.
     return (
       <div className="app-shell app-shell--travel">
         <main>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { cargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import { formatCredits } from '../utils/money';
@@ -170,6 +171,12 @@ export function SaveLoadScreen() {
           </button>
         </div>
         <p className="muted">Debug helper for quickly funding outfitting and trading tests.</p>
+        <div className="save-panel__actions">
+          <Link className="save-panel__debug-link" to="/debug/backgrounds">
+            Open background object playground
+          </Link>
+        </div>
+        <p className="muted">Inspect line-based asteroid, wreck, and ruined-station shapes on a dedicated preview canvas.</p>
         <label className="settings-toggle">
           <input
             type="checkbox"
