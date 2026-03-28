@@ -1,4 +1,5 @@
 import type { StarPoint } from './starsRenderer';
+
 /**
  * Fixed star depth bands for the WebGL renderer.
  *
@@ -25,6 +26,31 @@ export interface ShipPresentationAngles {
 }
 
 const MAX_PLAYER_BANK_RADIANS = 0.95;
+const PLAYER_BANK_RESPONSE = 0.18;
+
+export interface PlayerBankState {
+  turnProgress: number;
+  turnSign: number;
+  visualAngle: number;
+  previousJoystickHeading: number | null;
+}
+
+export interface StepPlayerBankArgs {
+  currentAngle: number;
+  previousAngle: number;
+  joystickHeading: number | null;
+  turnCommand: number;
+  dt: number;
+}
+
+export function createPlayerBankState(): PlayerBankState {
+  return {
+    turnProgress: 0,
+    turnSign: 0,
+    visualAngle: 0,
+    previousJoystickHeading: null
+  };
+}
 
 /**
  * Buckets stars into a few parallax layers while preserving deterministic star
@@ -91,6 +117,55 @@ export function getPlayerBankAngle(turnProgress: number, turnInput: number) {
     return 0;
   }
   return turnSign * Math.abs(Math.sin(turnProgress)) * MAX_PLAYER_BANK_RADIANS;
+}
+
+/**
+ * Player-bank state is isolated here so input-specific edge cases stay out of
+ * the main travel loop. Keyboard/auto-dock steering advances bank progress
+ * from ship heading deltas, while the virtual joystick advances it only when
+ * the joystick's own target heading changes.
+ */
+export function stepPlayerBankState(state: PlayerBankState, args: StepPlayerBankArgs): PlayerBankState {
+  const next: PlayerBankState = { ...state };
+
+  let joystickHeadingDelta = 0;
+  if (args.joystickHeading === null) {
+    next.previousJoystickHeading = null;
+  } else {
+    if (next.previousJoystickHeading !== null) {
+      joystickHeadingDelta = Math.atan2(
+        Math.sin(args.joystickHeading - next.previousJoystickHeading),
+        Math.cos(args.joystickHeading - next.previousJoystickHeading)
+      );
+    }
+    next.previousJoystickHeading = args.joystickHeading;
+  }
+
+  const bankInput = args.joystickHeading === null ? args.turnCommand : joystickHeadingDelta;
+  const turnSign = Math.sign(bankInput);
+  if (turnSign === 0) {
+    next.turnProgress = 0;
+    next.turnSign = 0;
+  } else {
+    if (next.turnSign !== turnSign) {
+      next.turnProgress = 0;
+      next.turnSign = turnSign;
+    }
+    const headingDelta = args.joystickHeading === null
+      ? Math.atan2(Math.sin(args.currentAngle - args.previousAngle), Math.cos(args.currentAngle - args.previousAngle))
+      : joystickHeadingDelta;
+    const signedHeadingDelta = headingDelta * turnSign;
+    if (signedHeadingDelta > 0) {
+      next.turnProgress += signedHeadingDelta;
+    }
+  }
+
+  const targetVisualAngle = getPlayerBankAngle(next.turnProgress, next.turnSign);
+  next.visualAngle += (targetVisualAngle - next.visualAngle) * Math.min(1, PLAYER_BANK_RESPONSE * args.dt);
+  if (Math.abs(next.visualAngle) < 0.0001) {
+    next.visualAngle = 0;
+  }
+  return next;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { selectShipPresenter } from './shipPresenter';
-import { bucketStarsByParallax, getPerspectiveCameraDistance, getPlayerBankAngle, getShipPresentationAngles, getWrappedStarScreenPosition } from './travelSceneMath';
+import { bucketStarsByParallax, createPlayerBankState, getPerspectiveCameraDistance, getPlayerBankAngle, getShipPresentationAngles, getWrappedStarScreenPosition, stepPlayerBankState } from './travelSceneMath';
 
 describe('bucketStarsByParallax', () => {
   it('splits the generated starfield into stable depth bands', () => {
@@ -55,6 +55,62 @@ describe('getPlayerBankAngle', () => {
 
   it('returns to neutral when steering stops regardless of turn progress', () => {
     expect(getPlayerBankAngle(Math.PI / 2, 0)).toBe(0);
+  });
+});
+
+describe('stepPlayerBankState', () => {
+  it('advances periodic bank progress from keyboard heading changes', () => {
+    const next = stepPlayerBankState(createPlayerBankState(), {
+      currentAngle: Math.PI / 2,
+      previousAngle: 0,
+      joystickHeading: null,
+      turnCommand: 1,
+      dt: 1
+    });
+
+    expect(next.turnProgress).toBeCloseTo(Math.PI / 2, 5);
+    expect(next.turnSign).toBe(1);
+    expect(next.visualAngle).toBeGreaterThan(0);
+  });
+
+  it('does not keep advancing joystick bank when the joystick heading is held steady', () => {
+    const started = stepPlayerBankState(createPlayerBankState(), {
+      currentAngle: 1,
+      previousAngle: 0,
+      joystickHeading: 1,
+      turnCommand: 1,
+      dt: 1
+    });
+    const held = stepPlayerBankState(started, {
+      currentAngle: 1,
+      previousAngle: 1,
+      joystickHeading: 1,
+      turnCommand: 1,
+      dt: 1
+    });
+
+    expect(held.turnProgress).toBeCloseTo(started.turnProgress, 5);
+  });
+
+  it('eases visual bank back toward neutral when steering stops', () => {
+    const turning = {
+      ...createPlayerBankState(),
+      turnProgress: Math.PI / 2,
+      turnSign: 1,
+      visualAngle: 0.95
+    };
+    const released = stepPlayerBankState(turning, {
+      currentAngle: Math.PI / 2,
+      previousAngle: Math.PI / 2,
+      joystickHeading: null,
+      turnCommand: 0,
+      dt: 1
+    });
+
+    expect(released.turnProgress).toBe(0);
+    expect(released.turnSign).toBe(0);
+    expect(released.visualAngle).toBeGreaterThan(0);
+    expect(released.visualAngle).toBeLessThan(0.95);
   });
 });
 

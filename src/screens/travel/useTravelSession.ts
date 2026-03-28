@@ -25,9 +25,8 @@ import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
-import { clampAngle } from '../../domain/combat/state';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
-import { getPlayerBankAngle } from './renderers/travelSceneMath';
+import { createPlayerBankState, stepPlayerBankState } from './renderers/travelSceneMath';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -104,7 +103,6 @@ const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
-const PLAYER_BANK_RESPONSE = 0.18;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
@@ -428,10 +426,7 @@ export function useTravelSession(
     let playerDestructionTimerMs = 0;
     let playerDestructionPulseTimerMs = 0;
     let respawnReady = false;
-    let playerBankTurnProgress = 0;
-    let playerBankTurnSign = 0;
-    let playerVisualBankAngle = 0;
-    let previousJoystickBankHeading: number | null = null;
+    let playerBankState = createPlayerBankState();
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
@@ -596,10 +591,7 @@ export function useTravelSession(
       playerDestructionTimerMs = 0;
       playerDestructionPulseTimerMs = 0;
       respawnReady = false;
-      playerBankTurnProgress = 0;
-      playerBankTurnSign = 0;
-      playerVisualBankAngle = 0;
-      previousJoystickBankHeading = null;
+      playerBankState = createPlayerBankState();
       showMessage(
         hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
         2400
@@ -708,16 +700,10 @@ export function useTravelSession(
       }
 
       const joystickHeadingActive = joyActiveRef.current && liveInput.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING';
-      let joystickHeadingDelta = 0;
+      let joystickHeading: number | null = null;
       if (joystickHeadingActive) {
-        const joystickHeading = Math.atan2(liveInput.vectorY, liveInput.vectorX);
-        if (previousJoystickBankHeading !== null) {
-          joystickHeadingDelta = clampAngle(joystickHeading - previousJoystickBankHeading);
-        }
-        previousJoystickBankHeading = joystickHeading;
+        joystickHeading = Math.atan2(liveInput.vectorY, liveInput.vectorX);
         combatState.player.angle = joystickHeading;
-      } else {
-        previousJoystickBankHeading = null;
       }
 
       if (jumpActivationFrames > 0) {
@@ -757,17 +743,6 @@ export function useTravelSession(
       }
 
       const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn;
-      const playerBankInput = joystickHeadingActive ? joystickHeadingDelta : playerTurnCommand;
-      const playerTurnSign = Math.sign(playerBankInput);
-      if (playerTurnSign === 0) {
-        playerBankTurnProgress = 0;
-        playerBankTurnSign = 0;
-      } else if (playerBankTurnSign !== playerTurnSign) {
-        // Starting a new steering action resets the periodic banking cycle so
-        // each turn begins from an upright hull at its current heading.
-        playerBankTurnProgress = 0;
-        playerBankTurnSign = playerTurnSign;
-      }
       const previousPlayerAngle = combatState.player.angle;
       const result = stepTravelCombat(
         combatState,
@@ -789,19 +764,13 @@ export function useTravelSession(
         commander.cargo,
         random
       );
-      if (playerTurnSign !== 0) {
-        // Keyboard and auto-dock steering expose an incremental turn command,
-        // so their banking cycle advances from the actual ship heading delta.
-        // The virtual joystick is different: it snaps the ship toward an
-        // absolute heading, so only changes in the joystick's target heading
-        // should advance bank progress. Holding the same joystick direction
-        // must not keep winding the bank cycle forward.
-        const headingDelta = joystickHeadingActive ? joystickHeadingDelta : clampAngle(combatState.player.angle - previousPlayerAngle);
-        const signedHeadingDelta = headingDelta * playerTurnSign;
-        if (signedHeadingDelta > 0) {
-          playerBankTurnProgress += signedHeadingDelta;
-        }
-      }
+      playerBankState = stepPlayerBankState(playerBankState, {
+        currentAngle: combatState.player.angle,
+        previousAngle: previousPlayerAngle,
+        joystickHeading,
+        turnCommand: playerTurnCommand,
+        dt
+      });
 
       if (combatState.player.combatReward > creditedCombatReward) {
         const newlyEarnedCredits = combatState.player.combatReward - creditedCombatReward;
@@ -942,18 +911,13 @@ export function useTravelSession(
       }
 
       updateHud();
-      const targetPlayerBankAngle = getPlayerBankAngle(playerBankTurnProgress, playerBankTurnSign);
-      // Bank is a presentation-only cue, so let it ease toward the target
-      // instead of snapping instantly. This keeps turn release from producing
-      // a jarring one-frame return to neutral.
-      playerVisualBankAngle += (targetPlayerBankAngle - playerVisualBankAngle) * Math.min(1, PLAYER_BANK_RESPONSE * dt);
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
         flightState,
         systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
         showTargetLock: Boolean(combatState.playerTargetLock),
-        playerBankAngle: playerVisualBankAngle,
+        playerBankAngle: playerBankState.visualAngle,
         radarInsetTop,
         radarInsetRight
       });
