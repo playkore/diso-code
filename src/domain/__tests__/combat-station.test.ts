@@ -58,7 +58,9 @@ describe('travel combat station rules', () => {
 
   it('destroys enemy missiles at the station safe-zone edge while the player is inside', () => {
     const rng = createDeterministicRandomSource([0, 0, 0]);
-    const state = createCombatState([0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.shield_generator = true;
+    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 0;
     state.player.y = 0;

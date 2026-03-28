@@ -22,6 +22,7 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
       const nextCommander = normalizeCommanderState({
         ...state.commander,
         cash: state.commander.cash - equipment.price,
+        energyBanks: equipment.setsEnergyBanksTo ?? state.commander.energyBanks,
         cargoCapacity: equipment.expandsCargoBayTo ?? state.commander.cargoCapacity,
         installedEquipment: {
           ...state.commander.installedEquipment,

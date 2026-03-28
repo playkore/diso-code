@@ -67,10 +67,14 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
     playerLoadout: {
       laserMounts: { front: 'pulse_laser', rear: null, left: null, right: null },
       installedEquipment: {
+        shield_generator: false,
         fuel_scoops: false,
         ecm: false,
         docking_computer: false,
         extra_energy_unit: false,
+        energy_box_2: false,
+        energy_box_3: false,
+        energy_box_4: false,
         large_cargo_bay: false,
         escape_pod: false,
         energy_bomb: false

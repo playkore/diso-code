@@ -105,6 +105,10 @@ function getPlayerMaxSpeed(_laserMounts: TravelCombatInit['laserMounts']): numbe
   return 6;
 }
 
+function getPlayerMaxShield(installedEquipment: TravelCombatInit['installedEquipment']): number {
+  return installedEquipment.shield_generator ? PLAYER_MAX_SHIELD : 0;
+}
+
 /**
  * Elite recharges one energy point on each classic recharge event, or two when
  * the extra energy unit is installed.
@@ -181,6 +185,7 @@ export function rechargePlayerDefense(state: TravelCombatState, dt: number) {
 export function createTravelCombatState(init: TravelCombatInit, random: RandomSource): TravelCombatState {
   const maxSpeed = getPlayerMaxSpeed(init.laserMounts);
   const maxEnergy = PLAYER_MAX_ENERGY;
+  const maxShield = getPlayerMaxShield(init.installedEquipment);
   const activeBlueprintFile = selectBlueprintFile({
     government: init.government,
     techLevel: init.techLevel,
@@ -200,8 +205,10 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       maxEnergy,
       energyBanks: init.energyBanks,
       energyPerBank: Math.ceil(maxEnergy / init.energyBanks),
-      shield: PLAYER_MAX_SHIELD,
-      maxShield: PLAYER_MAX_SHIELD,
+      // Shield presence is now loadout-driven, so a fresh combat session starts
+      // with either a full shield buffer or none at all.
+      shield: maxShield,
+      maxShield,
       laserHeat: createLaserHeatState(),
       maxLaserHeat: PLAYER_MAX_LASER_HEAT,
       laserHeatCooldownRate: PLAYER_LASER_COOL_RATE,

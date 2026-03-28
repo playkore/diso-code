@@ -471,7 +471,9 @@ describe('travel combat weapons', () => {
   });
 
   it('lets the shield absorb damage before energy banks collapse', () => {
-    const state = createCombatState([0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.shield_generator = true;
+    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
     state.player.shield = 5;
     state.projectiles.push({ id: 20, kind: 'laser', owner: 'enemy', x: 0, y: 0, vx: 0, vy: 0, damage: 12, life: 20 });
     moveProjectiles(state, 0, createDeterministicRandomSource([0]));
@@ -570,7 +572,9 @@ describe('travel combat weapons', () => {
   });
 
   it('recharges shields on the classic cadence and only above half energy', () => {
-    const state = createCombatState([0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.shield_generator = true;
+    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
     state.player.shield = 250;
     state.player.energy = 200;
 

@@ -56,25 +56,33 @@ type CompactCommanderPayload = [
  */
 function encodeInstalledEquipmentBits(commander: CommanderState): number {
   return (
-    (commander.installedEquipment.fuel_scoops ? 1 << 0 : 0) |
-    (commander.installedEquipment.ecm ? 1 << 1 : 0) |
-    (commander.installedEquipment.docking_computer ? 1 << 2 : 0) |
-    (commander.installedEquipment.extra_energy_unit ? 1 << 3 : 0) |
-    (commander.installedEquipment.large_cargo_bay ? 1 << 4 : 0) |
-    (commander.installedEquipment.escape_pod ? 1 << 5 : 0) |
-    (commander.installedEquipment.energy_bomb ? 1 << 6 : 0)
+    (commander.installedEquipment.shield_generator ? 1 << 0 : 0) |
+    (commander.installedEquipment.fuel_scoops ? 1 << 1 : 0) |
+    (commander.installedEquipment.ecm ? 1 << 2 : 0) |
+    (commander.installedEquipment.docking_computer ? 1 << 3 : 0) |
+    (commander.installedEquipment.extra_energy_unit ? 1 << 4 : 0) |
+    (commander.installedEquipment.energy_box_2 ? 1 << 5 : 0) |
+    (commander.installedEquipment.energy_box_3 ? 1 << 6 : 0) |
+    (commander.installedEquipment.energy_box_4 ? 1 << 7 : 0) |
+    (commander.installedEquipment.large_cargo_bay ? 1 << 8 : 0) |
+    (commander.installedEquipment.escape_pod ? 1 << 9 : 0) |
+    (commander.installedEquipment.energy_bomb ? 1 << 10 : 0)
   );
 }
 
 function decodeInstalledEquipmentBits(bits: number) {
   return {
-    fuel_scoops: (bits & (1 << 0)) !== 0,
-    ecm: (bits & (1 << 1)) !== 0,
-    docking_computer: (bits & (1 << 2)) !== 0,
-    extra_energy_unit: (bits & (1 << 3)) !== 0,
-    large_cargo_bay: (bits & (1 << 4)) !== 0,
-    escape_pod: (bits & (1 << 5)) !== 0,
-    energy_bomb: (bits & (1 << 6)) !== 0
+    shield_generator: (bits & (1 << 0)) !== 0,
+    fuel_scoops: (bits & (1 << 1)) !== 0,
+    ecm: (bits & (1 << 2)) !== 0,
+    docking_computer: (bits & (1 << 3)) !== 0,
+    extra_energy_unit: (bits & (1 << 4)) !== 0,
+    energy_box_2: (bits & (1 << 5)) !== 0,
+    energy_box_3: (bits & (1 << 6)) !== 0,
+    energy_box_4: (bits & (1 << 7)) !== 0,
+    large_cargo_bay: (bits & (1 << 8)) !== 0,
+    escape_pod: (bits & (1 << 9)) !== 0,
+    energy_bomb: (bits & (1 << 10)) !== 0
   };
 }
 

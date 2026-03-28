@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createDefaultCommander } from '../../domain/commander';
 import { getDriveStatus, getHudState } from './travelViewModel';
 import { createCombatState } from '../../domain/__tests__/combatTestUtils';
 
@@ -17,7 +18,12 @@ describe('travel drive status', () => {
   });
 
   it('maps player energy banks and shield fill for the HUD', () => {
-    const state = createCombatState([0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.shield_generator = true;
+    const state = createCombatState([0, 0, 0], {
+      installedEquipment: commander.installedEquipment,
+      energyBanks: 4
+    });
     state.player.energy = 160;
     state.player.shield = 128;
     state.player.laserHeat.front = 80;

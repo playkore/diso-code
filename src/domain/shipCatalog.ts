@@ -2,10 +2,14 @@ export type ShipType = 'cobra_mk_iii';
 export type LaserMountPosition = 'front' | 'rear' | 'left' | 'right';
 export type LaserId = 'pulse_laser' | 'beam_laser' | 'military_laser' | 'mining_laser';
 export type EquipmentId =
+  | 'shield_generator'
   | 'fuel_scoops'
   | 'ecm'
   | 'docking_computer'
   | 'extra_energy_unit'
+  | 'energy_box_2'
+  | 'energy_box_3'
+  | 'energy_box_4'
   | 'large_cargo_bay'
   | 'escape_pod'
   | 'energy_bomb';
@@ -46,6 +50,8 @@ export interface EquipmentDefinition {
   price: number;
   requiredTechLevel: number;
   description: string;
+  setsEnergyBanksTo?: number;
+  enablesShield?: boolean;
   affectsEnergyRecharge?: boolean;
   enablesAutoDock?: boolean;
   enablesFuelScooping?: boolean;
@@ -129,6 +135,15 @@ export const LASER_CATALOG: Record<LaserId, LaserDefinition> = {
 };
 
 export const EQUIPMENT_CATALOG: Record<EquipmentId, EquipmentDefinition> = {
+  shield_generator: {
+    id: 'shield_generator',
+    name: 'Shield',
+    price: 8000,
+    requiredTechLevel: 10,
+    description: 'Installs the ship shield generator and restores the classic defensive buffer.',
+    enablesShield: true,
+    unique: true
+  },
   fuel_scoops: {
     id: 'fuel_scoops',
     name: 'Fuel Scoops',
@@ -162,6 +177,33 @@ export const EQUIPMENT_CATALOG: Record<EquipmentId, EquipmentDefinition> = {
     requiredTechLevel: 9,
     description: 'Improves future energy recharge behavior.',
     affectsEnergyRecharge: true,
+    unique: true
+  },
+  energy_box_2: {
+    id: 'energy_box_2',
+    name: 'Energy Box 2',
+    price: 10000,
+    requiredTechLevel: 10,
+    description: 'Adds the second energy box to the Cobra power reserve.',
+    setsEnergyBanksTo: 2,
+    unique: true
+  },
+  energy_box_3: {
+    id: 'energy_box_3',
+    name: 'Energy Box 3',
+    price: 20000,
+    requiredTechLevel: 10,
+    description: 'Adds the third energy box once the second bank is already fitted.',
+    setsEnergyBanksTo: 3,
+    unique: true
+  },
+  energy_box_4: {
+    id: 'energy_box_4',
+    name: 'Energy Box 4',
+    price: 40000,
+    requiredTechLevel: 10,
+    description: 'Adds the fourth and final energy box for the full Cobra reserve.',
+    setsEnergyBanksTo: 4,
     unique: true
   },
   large_cargo_bay: {
@@ -200,10 +242,14 @@ export const MISSILE_CATALOG: MissileDefinition = {
 
 export const LASER_ORDER: LaserId[] = ['pulse_laser', 'beam_laser', 'mining_laser', 'military_laser'];
 export const EQUIPMENT_ORDER: EquipmentId[] = [
+  'shield_generator',
   'fuel_scoops',
   'ecm',
   'docking_computer',
   'extra_energy_unit',
+  'energy_box_2',
+  'energy_box_3',
+  'energy_box_4',
   'large_cargo_bay',
   'escape_pod',
   'energy_bomb'

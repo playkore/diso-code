@@ -59,6 +59,23 @@ export function canBuyEquipment(
   if (techLevel < equipment.requiredTechLevel) {
     return { ok: false, reason: `Requires tech level ${equipment.requiredTechLevel}.` };
   }
+  // Sequential upgrades stay explicit here so the equipment screen can explain
+  // why a later bank is visible but not yet orderable.
+  if (equipmentId === 'energy_box_2' && commander.energyBanks >= 2) {
+    return { ok: false, reason: 'Second energy box already installed.' };
+  }
+  if (equipmentId === 'energy_box_3' && !commander.installedEquipment.energy_box_2) {
+    return { ok: false, reason: 'Install the second energy box first.' };
+  }
+  if (equipmentId === 'energy_box_3' && commander.energyBanks >= 3) {
+    return { ok: false, reason: 'Third energy box already installed.' };
+  }
+  if (equipmentId === 'energy_box_4' && !commander.installedEquipment.energy_box_3) {
+    return { ok: false, reason: 'Install the third energy box first.' };
+  }
+  if (equipmentId === 'energy_box_4' && commander.energyBanks >= 4) {
+    return { ok: false, reason: 'Fourth energy box already installed.' };
+  }
   if (commander.installedEquipment[equipmentId]) {
     return { ok: false, reason: 'Already installed.' };
   }
@@ -91,6 +108,8 @@ export function getAvailableEquipmentForSystem(techLevel: number, commander: Com
     const result = canBuyEquipment(commander, techLevel, id);
     return {
       ...equipment,
+      // Once the system is advanced enough to stock an item, availability is a
+      // market property while `reason` explains commander-specific blockers.
       available: true,
       installed: commander.installedEquipment[id],
       reason: result.ok ? undefined : result.reason

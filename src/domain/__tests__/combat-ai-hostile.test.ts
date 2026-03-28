@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createDefaultCommander } from '../commander';
 import { createDeterministicRandomSource, stepTravelCombat } from '../travelCombat';
 import { createCombatState, createTestEnemy } from './combatTestUtils';
 
@@ -43,7 +44,11 @@ describe('travel combat hostile AI', () => {
 
   it('keeps hostile ships out of the station safe zone and prevents safe-zone laser hits', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
-    const state = createCombatState([0, 0, 0, 0]);
+    const commander = createDefaultCommander();
+    commander.installedEquipment.shield_generator = true;
+    const state = createCombatState([0, 0, 0, 0], {
+      installedEquipment: commander.installedEquipment
+    });
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 0;
     state.player.y = 0;

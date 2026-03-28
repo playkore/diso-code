@@ -53,6 +53,9 @@ describe('missions and commander persistence', () => {
     const commander = createDefaultCommander();
     commander.cash = 2222;
     commander.installedEquipment.ecm = true;
+    commander.installedEquipment.shield_generator = true;
+    commander.installedEquipment.energy_box_2 = true;
+    commander.energyBanks = 2;
     commander.laserMounts.rear = 'beam_laser';
     const accepted = acceptMissionOffer(generateMissionOffers({ currentSystem: 'Lave', nearbySystems: ['Diso', 'Leesti', 'Zaonce'], stardate: 3124 })[0]);
     commander.activeMissions = [accepted.mission];
@@ -63,10 +66,13 @@ describe('missions and commander persistence', () => {
     const fromBinary = decodeCommanderBinary256(binary);
     expect(fromJson.cash).toBe(2222);
     expect(fromJson.installedEquipment.ecm).toBe(true);
+    expect(fromJson.installedEquipment.shield_generator).toBe(true);
     expect(fromJson.activeMissions).toHaveLength(1);
     expect(fromBinary.activeMissions).toEqual([]);
     expect(fromBinary.missionCargo).toEqual([]);
     expect(fromBinary.laserMounts.rear).toBe('beam_laser');
+    expect(fromBinary.energyBanks).toBe(2);
+    expect(fromBinary.installedEquipment.shield_generator).toBe(true);
   });
 
   it('round-trips a full game snapshot through save slot JSON', () => {

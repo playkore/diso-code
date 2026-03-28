@@ -50,9 +50,13 @@ describe('outfitting store flows', () => {
   it('buys equipment, lasers, and missiles with store-side checks', () => {
     useGameStore.setState((state) => ({
       ...state,
-      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Lave', cash: 120000 }),
-      universe: { ...state.universe, currentSystem: 'Lave' }
+      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Zaonce', cash: 120000 }),
+      universe: { ...state.universe, currentSystem: 'Zaonce' }
     }));
+    useGameStore.getState().buyEquipment('shield_generator');
+    expect(useGameStore.getState().commander.installedEquipment.shield_generator).toBe(true);
+    useGameStore.getState().buyEquipment('energy_box_2');
+    expect(useGameStore.getState().commander.energyBanks).toBe(2);
     useGameStore.getState().buyEquipment('large_cargo_bay');
     expect(useGameStore.getState().commander.cargoCapacity).toBe(35);
     useGameStore.getState().buyLaser('rear', 'beam_laser');
@@ -86,6 +90,20 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.installedEquipment.ecm).toBe(true);
     useGameStore.getState().buyLaser('rear', 'military_laser');
     expect(useGameStore.getState().commander.laserMounts.rear).toBeNull();
+  });
+
+  it('rejects higher energy-box tiers until the previous box is installed', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Zaonce', cash: 120000 }),
+      universe: { ...state.universe, currentSystem: 'Zaonce' }
+    }));
+
+    useGameStore.getState().buyEquipment('energy_box_3');
+    expect(useGameStore.getState().commander.energyBanks).toBe(1);
+    useGameStore.getState().buyEquipment('energy_box_2');
+    useGameStore.getState().buyEquipment('energy_box_3');
+    expect(useGameStore.getState().commander.energyBanks).toBe(3);
   });
 
   it('lets the player redock at the origin without spending fuel', () => {

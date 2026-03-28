@@ -42,12 +42,18 @@ export interface CommanderState {
   missionCargo: MissionCargoItem[];
 }
 
+export const PLAYER_STARTING_ENERGY_BANKS = 1;
+
 function createInstalledEquipmentState(installed: EquipmentId[] = []): InstalledEquipmentState {
   return {
+    shield_generator: installed.includes('shield_generator'),
     fuel_scoops: installed.includes('fuel_scoops'),
     ecm: installed.includes('ecm'),
     docking_computer: installed.includes('docking_computer'),
     extra_energy_unit: installed.includes('extra_energy_unit'),
+    energy_box_2: installed.includes('energy_box_2'),
+    energy_box_3: installed.includes('energy_box_3'),
+    energy_box_4: installed.includes('energy_box_4'),
     large_cargo_bay: installed.includes('large_cargo_bay'),
     escape_pod: installed.includes('escape_pod'),
     energy_bomb: installed.includes('energy_bomb')
@@ -75,7 +81,9 @@ export function createDefaultCommander(): CommanderState {
     cargoCapacity: PLAYER_SHIP.baseCargoCapacity,
     maxCargoCapacity: PLAYER_SHIP.maxCargoCapacity,
     cargo: {},
-    energyBanks: PLAYER_SHIP.energyBanks,
+    // New commanders begin with a stripped-down Cobra: one energy box fitted
+    // and the shield generator left for the outfitting market.
+    energyBanks: PLAYER_STARTING_ENERGY_BANKS,
     energyPerBank: PLAYER_SHIP.energyPerBank,
     missileCapacity: PLAYER_SHIP.missileCapacity,
     missilesInstalled: 0,
@@ -158,6 +166,30 @@ function legacyLegalValue(status?: string): number {
   return 0;
 }
 
+function deriveEnergyBanks(installedEquipment: InstalledEquipmentState, explicitEnergyBanks?: number): number {
+  if (typeof explicitEnergyBanks === 'number') {
+    return Math.max(PLAYER_STARTING_ENERGY_BANKS, Math.min(PLAYER_SHIP.energyBanks, Math.trunc(explicitEnergyBanks)));
+  }
+
+  // Energy boxes are purchased in sequence, so the first missing upgrade caps
+  // the effective bank count even if a malformed save has later flags set.
+  let banks = PLAYER_STARTING_ENERGY_BANKS;
+  if (installedEquipment.energy_box_2) {
+    banks = 2;
+  } else {
+    return banks;
+  }
+  if (installedEquipment.energy_box_3) {
+    banks = 3;
+  } else {
+    return banks;
+  }
+  if (installedEquipment.energy_box_4) {
+    banks = 4;
+  }
+  return banks;
+}
+
 // Older save formats stored equipment as ad-hoc camelCase strings. They are
 // translated once here so the rest of the app can stay on typed catalog ids.
 function mapLegacyEquipment(legacyEquipment: string[]): EquipmentId[] {
@@ -195,7 +227,12 @@ export function normalizeCommanderState(
     commander.missionCargo ?? []
   );
   const legacyEquipment = 'equipment' in commander && Array.isArray(commander.equipment) ? commander.equipment : [];
-  const installedEquipment = commander.installedEquipment ?? createInstalledEquipmentState(mapLegacyEquipment(legacyEquipment));
+  // New equipment ids can appear after an old save was written, so the
+  // normalized commander always merges persisted flags onto a full default map.
+  const installedEquipment = {
+    ...createInstalledEquipmentState(mapLegacyEquipment(legacyEquipment)),
+    ...commander.installedEquipment
+  };
   // Cargo capacity defaults from installed equipment unless a caller already
   // provided an explicit capacity, which lets restored saves keep custom values.
   const cargoCapacity =
@@ -214,7 +251,7 @@ export function normalizeCommanderState(
     cargoCapacity,
     maxCargoCapacity: commander.maxCargoCapacity ?? PLAYER_SHIP.maxCargoCapacity,
     cargo: commander.cargo ?? {},
-    energyBanks: commander.energyBanks ?? PLAYER_SHIP.energyBanks,
+    energyBanks: deriveEnergyBanks(installedEquipment, commander.energyBanks),
     energyPerBank: commander.energyPerBank ?? PLAYER_SHIP.energyPerBank,
     missileCapacity: commander.missileCapacity ?? PLAYER_SHIP.missileCapacity,
     missilesInstalled: commander.missilesInstalled ?? 0,
