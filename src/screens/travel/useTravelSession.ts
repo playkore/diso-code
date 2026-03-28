@@ -27,7 +27,7 @@ import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
-import { createPlayerBankState, stepPlayerBankState } from './renderers/travelSceneMath';
+import { createShipBankState, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -437,7 +437,8 @@ export function useTravelSession(
     let playerDestructionTimerMs = 0;
     let playerDestructionPulseTimerMs = 0;
     let respawnReady = false;
-    let playerBankState = createPlayerBankState();
+    let playerBankState = createShipBankState();
+    let enemyBankStates = new Map<number, ShipBankState>();
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
@@ -602,7 +603,8 @@ export function useTravelSession(
       playerDestructionTimerMs = 0;
       playerDestructionPulseTimerMs = 0;
       respawnReady = false;
-      playerBankState = createPlayerBankState();
+      playerBankState = createShipBankState();
+      enemyBankStates = new Map();
       showMessage(
         hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
         2400
@@ -653,6 +655,7 @@ export function useTravelSession(
           systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
           showTargetLock: false,
           playerBankAngle: 0,
+          enemyBankAngles: new Map(),
           radarInsetTop,
           radarInsetRight
         });
@@ -756,6 +759,7 @@ export function useTravelSession(
         ? 0
         : autoDockCommand?.turn ?? (joystickHeading === null ? liveInput.turn : getJoystickTurnCommand(combatState.player.angle, joystickHeading));
       const previousPlayerAngle = combatState.player.angle;
+      const previousEnemyAngles = new Map<number, number>(combatState.enemies.map((enemy) => [enemy.id, enemy.angle]));
       const result = stepTravelCombat(
         combatState,
         {
@@ -776,13 +780,22 @@ export function useTravelSession(
         commander.cargo,
         random
       );
-      playerBankState = stepPlayerBankState(playerBankState, {
+      playerBankState = stepShipBankState(playerBankState, {
         currentAngle: combatState.player.angle,
         previousAngle: previousPlayerAngle,
-        joystickHeading: null,
-        turnCommand: playerTurnCommand,
         dt
       });
+      enemyBankStates = new Map<number, ShipBankState>(
+        combatState.enemies.map((enemy) => {
+          const previousAngle = previousEnemyAngles.get(enemy.id) ?? enemy.angle;
+          const previousState = enemyBankStates.get(enemy.id) ?? createShipBankState();
+          return [enemy.id, stepShipBankState(previousState, {
+            currentAngle: enemy.angle,
+            previousAngle,
+            dt
+          })];
+        })
+      );
 
       if (combatState.player.combatReward > creditedCombatReward) {
         const newlyEarnedCredits = combatState.player.combatReward - creditedCombatReward;
@@ -930,6 +943,7 @@ export function useTravelSession(
         systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
         showTargetLock: Boolean(combatState.playerTargetLock),
         playerBankAngle: playerBankState.visualAngle,
+        enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
         radarInsetTop,
         radarInsetRight
       });

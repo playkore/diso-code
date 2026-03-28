@@ -39,6 +39,7 @@ interface TravelSceneRenderArgs {
   systemLabel: string;
   showTargetLock: boolean;
   playerBankAngle: number;
+  enemyBankAngles: ReadonlyMap<number, number>;
   radarInsetTop: number;
   radarInsetRight: number;
 }
@@ -296,7 +297,7 @@ export class TravelSceneRenderer {
     this.flashMesh.position.set(this.width / 2, this.height / 2, 0);
   }
 
-  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, playerBankAngle, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
+  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, playerBankAngle, enemyBankAngles, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
     const cameraDistance = getPerspectiveCameraDistance(this.height, CAMERA_FOV_DEGREES);
     this.worldCamera.position.set(combatState.player.x, toSceneY(combatState.player.y), cameraDistance);
     this.worldCamera.up.set(0, 1, 0);
@@ -315,7 +316,7 @@ export class TravelSceneRenderer {
     }
 
     this.buildStarfield(stars, combatState, flightState);
-    this.buildWorld(combatState, playerBankAngle);
+    this.buildWorld(combatState, playerBankAngle, enemyBankAngles);
     this.buildOverlay(combatState, systemLabel, showTargetLock, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
 
@@ -382,7 +383,7 @@ export class TravelSceneRenderer {
     });
   }
 
-  private buildWorld(combatState: TravelCombatState, playerBankAngle: number) {
+  private buildWorld(combatState: TravelCombatState, playerBankAngle: number, enemyBankAngles: ReadonlyMap<number, number>) {
     if (combatState.station) {
       // The station hull intentionally leaves the docking slot open by drawing
       // two independent open contours instead of closing the hexagon.
@@ -407,9 +408,15 @@ export class TravelSceneRenderer {
         this.width,
         this.height
       );
-      ship.position.set(enemy.x, toSceneY(enemy.y), SHIP_Z);
-      ship.rotation.set(-presentation.pitch, presentation.yaw, -enemy.angle);
-      this.worldGroup.add(ship);
+      const enemyAnchor = new Group();
+      enemyAnchor.position.set(enemy.x, toSceneY(enemy.y), SHIP_Z);
+      // Enemy heading stays on the outer anchor for the same reason as the
+      // player ship: bank should lean the hull onto its side without changing
+      // the world-space axis that rotates the ship toward the camera.
+      enemyAnchor.rotation.z = -enemy.angle;
+      ship.rotation.set((enemyBankAngles.get(enemy.id) ?? 0) - presentation.pitch, presentation.yaw, 0);
+      enemyAnchor.add(ship);
+      this.worldGroup.add(enemyAnchor);
 
       const laserTrace = getEnemyLaserTrace(enemy, combatState);
       if (laserTrace) {

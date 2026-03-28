@@ -28,27 +28,23 @@ export interface ShipPresentationAngles {
 const MAX_PLAYER_BANK_RADIANS = 0.95;
 const PLAYER_BANK_RESPONSE = 0.18;
 
-export interface PlayerBankState {
+export interface ShipBankState {
   turnProgress: number;
   turnSign: number;
   visualAngle: number;
-  previousJoystickHeading: number | null;
 }
 
-export interface StepPlayerBankArgs {
+export interface StepShipBankArgs {
   currentAngle: number;
   previousAngle: number;
-  joystickHeading: number | null;
-  turnCommand: number;
   dt: number;
 }
 
-export function createPlayerBankState(): PlayerBankState {
+export function createShipBankState(): ShipBankState {
   return {
     turnProgress: 0,
     turnSign: 0,
-    visualAngle: 0,
-    previousJoystickHeading: null
+    visualAngle: 0
   };
 }
 
@@ -120,29 +116,15 @@ export function getPlayerBankAngle(turnProgress: number, turnInput: number) {
 }
 
 /**
- * Player-bank state is isolated here so input-specific edge cases stay out of
- * the main travel loop. Keyboard/auto-dock steering advances bank progress
- * from ship heading deltas, while the virtual joystick advances it only when
- * the joystick's own target heading changes.
+ * Ship-bank state advances purely from the ship's real heading delta. That
+ * keeps player and enemy visuals on the same rule: any hull that is actually
+ * turning accumulates bank progress, changes bank side when the turn direction
+ * flips, and eases back toward neutral after rotation stops.
  */
-export function stepPlayerBankState(state: PlayerBankState, args: StepPlayerBankArgs): PlayerBankState {
-  const next: PlayerBankState = { ...state };
-
-  let joystickHeadingDelta = 0;
-  if (args.joystickHeading === null) {
-    next.previousJoystickHeading = null;
-  } else {
-    if (next.previousJoystickHeading !== null) {
-      joystickHeadingDelta = Math.atan2(
-        Math.sin(args.joystickHeading - next.previousJoystickHeading),
-        Math.cos(args.joystickHeading - next.previousJoystickHeading)
-      );
-    }
-    next.previousJoystickHeading = args.joystickHeading;
-  }
-
-  const bankInput = args.joystickHeading === null ? args.turnCommand : joystickHeadingDelta;
-  const turnSign = Math.sign(bankInput);
+export function stepShipBankState(state: ShipBankState, args: StepShipBankArgs): ShipBankState {
+  const next: ShipBankState = { ...state };
+  const headingDelta = Math.atan2(Math.sin(args.currentAngle - args.previousAngle), Math.cos(args.currentAngle - args.previousAngle));
+  const turnSign = Math.sign(headingDelta);
   if (turnSign === 0) {
     next.turnProgress = 0;
     next.turnSign = 0;
@@ -151,9 +133,6 @@ export function stepPlayerBankState(state: PlayerBankState, args: StepPlayerBank
       next.turnProgress = 0;
       next.turnSign = turnSign;
     }
-    const headingDelta = args.joystickHeading === null
-      ? Math.atan2(Math.sin(args.currentAngle - args.previousAngle), Math.cos(args.currentAngle - args.previousAngle))
-      : joystickHeadingDelta;
     const signedHeadingDelta = headingDelta * turnSign;
     if (signedHeadingDelta > 0) {
       next.turnProgress += signedHeadingDelta;
