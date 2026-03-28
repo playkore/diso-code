@@ -1,7 +1,7 @@
 import { Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
 import { createLowPolyPlayerObject, selectShipPresenter } from './shipPresenter';
-import { CGA_BLACK, CGA_YELLOW } from './constants';
+import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
 
 describe('createLowPolyPlayerObject', () => {
   it('builds a black-faced ship with a yellow wireframe edge overlay', () => {
@@ -24,11 +24,29 @@ describe('createLowPolyPlayerObject', () => {
 });
 
 describe('selectShipPresenter geometry split', () => {
-  it('keeps enemy ships on the line-shape path while the player uses a mesh', () => {
+  it('uses mesh-backed geometry for both enemy and player ships in the default presenter', () => {
     const presenter = selectShipPresenter();
+    const enemy = presenter.createEnemyObject?.('enemy', CGA_RED) as Group;
 
-    expect(presenter.enemyGeometryMode).toBe('line-shape');
+    expect(presenter.enemyGeometryMode).toBe('mesh');
     expect(presenter.playerGeometryMode).toBe('mesh');
+    expect(enemy).toBeInstanceOf(Group);
+    expect(enemy.children[0]).toBeInstanceOf(Mesh);
+    expect(enemy.children[1]).toBeInstanceOf(LineSegments);
+    expect(((enemy.children[0] as Mesh).material as MeshBasicMaterial).color.getHexString()).toBe(CGA_BLACK.slice(1));
+    expect(((enemy.children[1] as LineSegments).material as LineBasicMaterial).color.getHexString()).toBe(CGA_RED.slice(1));
     expect(presenter.createPlayerObject?.()).toBeInstanceOf(Group);
+  });
+
+  it('keeps separate authored 3D meshes for police and thargoids', () => {
+    const presenter = selectShipPresenter();
+    const police = presenter.createEnemyObject?.('police', CGA_YELLOW) as Group;
+    const thargoid = presenter.createEnemyObject?.('thargoid', CGA_YELLOW) as Group;
+
+    expect(police).toBeInstanceOf(Group);
+    expect(thargoid).toBeInstanceOf(Group);
+    expect((police.children[1] as LineSegments).geometry.getAttribute('position').count).not.toBe(
+      (thargoid.children[1] as LineSegments).geometry.getAttribute('position').count
+    );
   });
 });

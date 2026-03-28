@@ -6,20 +6,27 @@ type HullPoint = readonly [x: number, y: number, z: number];
 type Triangle = readonly [HullPoint, HullPoint, HullPoint];
 type Edge = readonly [HullPoint, HullPoint];
 
+export type EnemyShipMeshId = 'enemy' | 'police' | 'thargoid';
+
+export interface ShipMeshDefinition {
+  hullTriangles: readonly Triangle[];
+  wireEdges: readonly Edge[];
+}
+
 export interface ShipPresenter {
-  id: 'flat-wireframe' | 'low-poly-player';
-  enemyGeometryMode: 'line-shape';
+  id: 'flat-wireframe' | 'low-poly-ships';
+  enemyGeometryMode: 'line-shape' | 'mesh';
   playerGeometryMode: 'line-shape' | 'mesh';
+  createEnemyObject?: (shipId: EnemyShipMeshId, edgeColor: string) => Object3D;
   createPlayerObject?: () => Object3D;
 }
 
 export type RequestedShipPresenter = ShipPresenter['id'];
 
 /**
- * Builds a non-indexed triangle list because this renderer values explicit
- * face ownership over vertex deduplication. That keeps the low-poly ship easy
- * to reshape and lets the hull surface and edge overlay share the exact same
- * triangle layout instead of depending on a separate authored line asset.
+ * Every 3D ship now has an explicit authored mesh definition instead of being
+ * derived from the legacy 2D contour on the fly. That keeps renderer logic
+ * simple and lets each hull evolve independently in the future.
  */
 function createTriangleGeometry(triangles: readonly Triangle[]) {
   const geometry = new BufferGeometry();
@@ -28,16 +35,177 @@ function createTriangleGeometry(triangles: readonly Triangle[]) {
   return geometry;
 }
 
-/**
- * The wire overlay is authored explicitly instead of derived from triangle
- * edges. That keeps the visible frame symmetric even when the fill geometry
- * needs uneven triangulation under the hood.
- */
 function createEdgeGeometry(edges: readonly Edge[]) {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(edges.flatMap((edge) => [...edge[0], ...edge[1]]), 3));
   return geometry;
 }
+
+function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: string) {
+  const hull = new Mesh(
+    createTriangleGeometry(definition.hullTriangles),
+    new MeshBasicMaterial({
+      color: CGA_BLACK,
+      // Faces stay slightly behind the edge overlay so role-colored outlines do
+      // not flicker or break when the camera compresses diagonal segments.
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1
+    })
+  );
+  const edges = new LineSegments(
+    createEdgeGeometry(definition.wireEdges),
+    new LineBasicMaterial({
+      color: edgeColor,
+      depthWrite: false
+    })
+  );
+
+  const ship = new Group();
+  ship.rotation.set(0, 0, 0);
+  hull.renderOrder = 0;
+  edges.renderOrder = 1;
+  ship.add(hull);
+  ship.add(edges);
+  return ship;
+}
+
+const PLAYER_MESH: ShipMeshDefinition = {
+  hullTriangles: [
+    [[15, 0, 0], [4, 9, 2], [1, 0, 5]],
+    [[15, 0, 0], [1, 0, 5], [4, -9, 2]],
+    [[4, 9, 2], [-12, 6, 1], [1, 0, 5]],
+    [[1, 0, 5], [-12, 6, 1], [-14, 0, 2]],
+    [[1, 0, 5], [-14, 0, 2], [-12, -6, 1]],
+    [[1, 0, 5], [-12, -6, 1], [4, -9, 2]],
+    [[15, 0, 0], [4, -9, 2], [-7, -4, -3]],
+    [[15, 0, 0], [-7, -4, -3], [-7, 4, -3]],
+    [[15, 0, 0], [-7, 4, -3], [4, 9, 2]],
+    [[4, 9, 2], [-7, 4, -3], [-12, 6, 1]],
+    [[-12, 6, 1], [-7, 4, -3], [-15, 0, -1]],
+    [[-15, 0, -1], [-7, -4, -3], [-12, -6, 1]],
+    [[-12, -6, 1], [-7, -4, -3], [4, -9, 2]]
+  ],
+  wireEdges: [
+    [[15, 0, 0], [4, 9, 2]],
+    [[4, 9, 2], [-12, 6, 1]],
+    [[-12, 6, 1], [-14, 0, 2]],
+    [[-14, 0, 2], [-12, -6, 1]],
+    [[-12, -6, 1], [4, -9, 2]],
+    [[4, -9, 2], [15, 0, 0]],
+    [[15, 0, 0], [1, 0, 5]],
+    [[1, 0, 5], [-14, 0, 2]],
+    [[15, 0, 0], [-7, 4, -3]],
+    [[-7, 4, -3], [-15, 0, -1]],
+    [[-15, 0, -1], [-7, -4, -3]],
+    [[-7, -4, -3], [15, 0, 0]],
+    [[4, 9, 2], [-7, 4, -3]],
+    [[4, -9, 2], [-7, -4, -3]],
+    [[-12, 6, 1], [-15, 0, -1]],
+    [[-12, -6, 1], [-15, 0, -1]]
+  ]
+};
+
+const ENEMY_MESH: ShipMeshDefinition = {
+  hullTriangles: [
+    [[12, 0, 0], [-2, 9, 2], [-2, -9, 2]],
+    [[12, 0, 0], [-2, -9, 2], [-8, 0, 5]],
+    [[12, 0, 0], [-8, 0, 5], [-2, 9, 2]],
+    [[12, 0, 0], [-2, 6, -3], [-6, 0, -4]],
+    [[12, 0, 0], [-6, 0, -4], [-2, -6, -3]],
+    [[12, 0, 0], [-2, -6, -3], [-2, 6, -3]],
+    [[-2, 9, 2], [-8, 0, 5], [-8, 10, 0]],
+    [[-2, -9, 2], [-8, -10, 0], [-8, 0, 5]],
+    [[-2, 6, -3], [-8, 10, 0], [-6, 0, -4]],
+    [[-2, -6, -3], [-6, 0, -4], [-8, -10, 0]],
+    [[-8, 10, 0], [-8, 0, 5], [-8, -10, 0]],
+    [[-8, 10, 0], [-8, -10, 0], [-6, 0, -4]]
+  ],
+  wireEdges: [
+    [[12, 0, 0], [-2, 9, 2]],
+    [[12, 0, 0], [-2, -9, 2]],
+    [[12, 0, 0], [-2, 6, -3]],
+    [[12, 0, 0], [-2, -6, -3]],
+    [[-2, 9, 2], [-8, 10, 0]],
+    [[-2, -9, 2], [-8, -10, 0]],
+    [[-2, 6, -3], [-6, 0, -4]],
+    [[-2, -6, -3], [-6, 0, -4]],
+    [[-8, 10, 0], [-8, 0, 5]],
+    [[-8, 0, 5], [-8, -10, 0]],
+    [[-8, 10, 0], [-6, 0, -4]],
+    [[-6, 0, -4], [-8, -10, 0]]
+  ]
+};
+
+const POLICE_MESH: ShipMeshDefinition = {
+  hullTriangles: [
+    [[13, 0, 0], [0, 0, 5], [0, 12, 0]],
+    [[13, 0, 0], [0, -12, 0], [0, 0, 5]],
+    [[13, 0, 0], [0, 12, 0], [0, 0, -5]],
+    [[13, 0, 0], [0, 0, -5], [0, -12, 0]],
+    [[0, 12, 0], [-10, 0, 0], [0, 0, 5]],
+    [[0, 0, 5], [-10, 0, 0], [0, -12, 0]],
+    [[0, 12, 0], [0, 0, -5], [-10, 0, 0]],
+    [[0, 0, -5], [0, -12, 0], [-10, 0, 0]]
+  ],
+  wireEdges: [
+    [[13, 0, 0], [0, 12, 0]],
+    [[13, 0, 0], [0, -12, 0]],
+    [[13, 0, 0], [0, 0, 5]],
+    [[13, 0, 0], [0, 0, -5]],
+    [[0, 12, 0], [-10, 0, 0]],
+    [[-10, 0, 0], [0, -12, 0]],
+    [[0, 12, 0], [0, 0, 5]],
+    [[0, 0, 5], [0, -12, 0]],
+    [[0, 12, 0], [0, 0, -5]],
+    [[0, 0, -5], [0, -12, 0]],
+    [[0, 0, 5], [-10, 0, 0]],
+    [[-10, 0, 0], [0, 0, -5]]
+  ]
+};
+
+const THARGOID_MESH: ShipMeshDefinition = {
+  hullTriangles: [
+    [[12, 0, 0], [4, 12, 0], [0, 0, 5]],
+    [[4, 12, 0], [-8, 8, 0], [0, 0, 5]],
+    [[-8, 8, 0], [-12, 0, 0], [0, 0, 5]],
+    [[-12, 0, 0], [-8, -8, 0], [0, 0, 5]],
+    [[-8, -8, 0], [4, -12, 0], [0, 0, 5]],
+    [[4, -12, 0], [12, 0, 0], [0, 0, 5]],
+    [[4, 12, 0], [12, 0, 0], [0, 0, -5]],
+    [[-8, 8, 0], [4, 12, 0], [0, 0, -5]],
+    [[-12, 0, 0], [-8, 8, 0], [0, 0, -5]],
+    [[-8, -8, 0], [-12, 0, 0], [0, 0, -5]],
+    [[4, -12, 0], [-8, -8, 0], [0, 0, -5]],
+    [[12, 0, 0], [4, -12, 0], [0, 0, -5]]
+  ],
+  wireEdges: [
+    [[12, 0, 0], [4, 12, 0]],
+    [[4, 12, 0], [-8, 8, 0]],
+    [[-8, 8, 0], [-12, 0, 0]],
+    [[-12, 0, 0], [-8, -8, 0]],
+    [[-8, -8, 0], [4, -12, 0]],
+    [[4, -12, 0], [12, 0, 0]],
+    [[12, 0, 0], [0, 0, 5]],
+    [[4, 12, 0], [0, 0, 5]],
+    [[-8, 8, 0], [0, 0, 5]],
+    [[-12, 0, 0], [0, 0, 5]],
+    [[-8, -8, 0], [0, 0, 5]],
+    [[4, -12, 0], [0, 0, 5]],
+    [[12, 0, 0], [0, 0, -5]],
+    [[4, 12, 0], [0, 0, -5]],
+    [[-8, 8, 0], [0, 0, -5]],
+    [[-12, 0, 0], [0, 0, -5]],
+    [[-8, -8, 0], [0, 0, -5]],
+    [[4, -12, 0], [0, 0, -5]]
+  ]
+};
+
+const ENEMY_SHIP_MESHES: Record<EnemyShipMeshId, ShipMeshDefinition> = {
+  enemy: ENEMY_MESH,
+  police: POLICE_MESH,
+  thargoid: THARGOID_MESH
+};
 
 /**
  * The player hull uses the renderer's native Three.js axes:
@@ -45,88 +213,15 @@ function createEdgeGeometry(edges: readonly Edge[]) {
  * - `+Y` spans the ship's left/right silhouette in screen space
  * - `+Z` lifts the dorsal hump toward the camera
  *
- * Travel rendering never enables scene lights, so the player ship now gets its
- * depth from silhouette and edge definition rather than shaded faces. The hull
- * stays pure black so it never leaves the CGA palette, while a yellow edge
- * overlay keeps the low-poly form readable against the starfield.
+ * Travel rendering never enables scene lights, so every ship stays inside the
+ * CGA palette by using black hull faces plus colored wire edges only.
  */
 export function createLowPolyPlayerObject() {
-  const nose: HullPoint = [15, 0, 0];
-  const leftShoulder: HullPoint = [4, 9, 2];
-  const rightShoulder: HullPoint = [4, -9, 2];
-  const cockpit: HullPoint = [1, 0, 5];
-  const leftTail: HullPoint = [-12, 6, 1];
-  const rightTail: HullPoint = [-12, -6, 1];
-  const spine: HullPoint = [-14, 0, 2];
-  const leftKeel: HullPoint = [-7, 4, -3];
-  const rightKeel: HullPoint = [-7, -4, -3];
-  const exhaust: HullPoint = [-15, 0, -1];
+  return createWireframeMeshObject(PLAYER_MESH, CGA_YELLOW);
+}
 
-  const hullGeometry = createTriangleGeometry([
-    [nose, leftShoulder, cockpit],
-    [nose, cockpit, rightShoulder],
-    [leftShoulder, leftTail, cockpit],
-    [cockpit, leftTail, spine],
-    [cockpit, spine, rightTail],
-    [cockpit, rightTail, rightShoulder],
-    [nose, rightShoulder, rightKeel],
-    [nose, rightKeel, leftKeel],
-    [nose, leftKeel, leftShoulder],
-    [leftShoulder, leftKeel, leftTail],
-    [leftTail, leftKeel, exhaust],
-    [exhaust, rightKeel, rightTail],
-    [rightTail, rightKeel, rightShoulder]
-  ]);
-  const edgeGeometry = createEdgeGeometry([
-    [nose, leftShoulder],
-    [leftShoulder, leftTail],
-    [leftTail, spine],
-    [spine, rightTail],
-    [rightTail, rightShoulder],
-    [rightShoulder, nose],
-    [nose, cockpit],
-    [cockpit, spine],
-    [nose, leftKeel],
-    [leftKeel, exhaust],
-    [exhaust, rightKeel],
-    [rightKeel, nose],
-    [leftShoulder, leftKeel],
-    [rightShoulder, rightKeel],
-    [leftTail, exhaust],
-    [rightTail, exhaust]
-  ]);
-
-  const ship = new Group();
-  const hull = new Mesh(
-    hullGeometry,
-    new MeshBasicMaterial({
-      color: CGA_BLACK,
-      // The face fill should sit just behind the wire overlay so the depth
-      // buffer does not randomly punch holes through diagonal line segments.
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1
-    })
-  );
-  const edges = new LineSegments(
-    edgeGeometry,
-    new LineBasicMaterial({
-      color: CGA_YELLOW,
-      depthWrite: false
-    })
-  );
-  // The player ship now stays aligned with the shared world plane so its
-  // silhouette reads as a strict front-facing wireframe instead of a tilted
-  // pseudo-3D object. Heading still comes from the parent object's Z rotation
-  // inside the travel scene renderer.
-  ship.rotation.set(0, 0, 0);
-  hull.renderOrder = 0;
-  edges.renderOrder = 1;
-  ship.add(hull);
-  // The edge pass carries the visual identity now: the face fill stays black,
-  // and the yellow contour gives the hull a deliberate "wireframe" read.
-  ship.add(edges);
-  return ship;
+export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: string) {
+  return createWireframeMeshObject(ENEMY_SHIP_MESHES[shipId], edgeColor);
 }
 
 export const FLAT_WIREFRAME_SHIP_PRESENTER: ShipPresenter = {
@@ -135,16 +230,17 @@ export const FLAT_WIREFRAME_SHIP_PRESENTER: ShipPresenter = {
   playerGeometryMode: 'line-shape'
 };
 
-export const LOW_POLY_PLAYER_SHIP_PRESENTER: ShipPresenter = {
-  id: 'low-poly-player',
-  enemyGeometryMode: 'line-shape',
+export const LOW_POLY_SHIP_PRESENTER: ShipPresenter = {
+  id: 'low-poly-ships',
+  enemyGeometryMode: 'mesh',
   playerGeometryMode: 'mesh',
+  createEnemyObject: createLowPolyEnemyObject,
   createPlayerObject: createLowPolyPlayerObject
 };
 
-export function selectShipPresenter(requested: RequestedShipPresenter = 'low-poly-player'): ShipPresenter {
+export function selectShipPresenter(requested: RequestedShipPresenter = 'low-poly-ships'): ShipPresenter {
   if (requested === 'flat-wireframe') {
     return FLAT_WIREFRAME_SHIP_PRESENTER;
   }
-  return LOW_POLY_PLAYER_SHIP_PRESENTER;
+  return LOW_POLY_SHIP_PRESENTER;
 }

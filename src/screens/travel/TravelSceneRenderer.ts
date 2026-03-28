@@ -28,7 +28,7 @@ import type { LineShape } from './background/types';
 import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_STATION, SHAPE_THARGOID } from './renderers/constants';
 import { getEnemyHealthBarState, getEnemyLaserTrace } from './renderers/projectilesRenderer';
 import { getEnemyColor, getProjectileColor } from './renderers/shipsRenderer';
-import { selectShipPresenter } from './renderers/shipPresenter';
+import { selectShipPresenter, type EnemyShipMeshId } from './renderers/shipPresenter';
 import { createStars, type StarPoint } from './renderers/starsRenderer';
 import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './renderers/travelSceneMath';
 
@@ -228,6 +228,16 @@ function getEnemyShape(enemy: TravelCombatState['enemies'][number]) {
   return SHAPE_ENEMY;
 }
 
+function getEnemyMeshId(enemy: TravelCombatState['enemies'][number]): EnemyShipMeshId {
+  if (enemy.roles.cop) {
+    return 'police';
+  }
+  if (enemy.blueprintId === 'thargoid' || enemy.blueprintId === 'thargon') {
+    return 'thargoid';
+  }
+  return 'enemy';
+}
+
 /**
  * The WebGL travel renderer keeps the combat simulation completely outside the
  * scene graph. Its only job is to translate the current mutable combat state
@@ -388,9 +398,9 @@ export class TravelSceneRenderer {
     }
 
     for (const enemy of combatState.enemies) {
-      const ship = this.shipPresenter.enemyGeometryMode === 'line-shape'
-        ? createClosedShape(getEnemyShape(enemy), getEnemyColor(enemy.roles, enemy.missionTag))
-        : new Group();
+      const ship = this.shipPresenter.enemyGeometryMode === 'mesh'
+        ? this.shipPresenter.createEnemyObject?.(getEnemyMeshId(enemy), getEnemyColor(enemy.roles, enemy.missionTag)) ?? new Group()
+        : createClosedShape(getEnemyShape(enemy), getEnemyColor(enemy.roles, enemy.missionTag));
       const presentation = getShipPresentationAngles(
         enemy.x - combatState.player.x,
         enemy.y - combatState.player.y,

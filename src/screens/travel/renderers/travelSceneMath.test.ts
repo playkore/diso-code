@@ -124,10 +124,10 @@ describe('getWrappedStarScreenPosition', () => {
 });
 
 describe('selectShipPresenter', () => {
-  it('defaults to the low-poly player presenter while keeping enemies as line shapes', () => {
+  it('defaults to the low-poly ship presenter for both enemy and player meshes', () => {
     expect(selectShipPresenter()).toMatchObject({
-      id: 'low-poly-player',
-      enemyGeometryMode: 'line-shape',
+      id: 'low-poly-ships',
+      enemyGeometryMode: 'mesh',
       playerGeometryMode: 'mesh'
     });
   });
