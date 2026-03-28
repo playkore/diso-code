@@ -7,6 +7,7 @@ import {
   LineBasicMaterial,
   LineDashedMaterial,
   LineLoop,
+  LineSegments,
   Mesh,
   MeshBasicMaterial,
   Object3D,
@@ -132,6 +133,25 @@ function createClosedShape(points: readonly (readonly [number, number])[], color
       {
         points: points.map(([x, y]) => [x, y] as [number, number]),
         closed: true
+      }
+    ],
+    color
+  );
+}
+
+function createStationShape(color: string) {
+  return createLineShapeObject(
+    [
+      {
+        points: SHAPE_STATION.slice(0, 5).map(([x, y]) => [x, y] as [number, number]),
+        closed: false
+      },
+      {
+        points: [
+          [SHAPE_STATION[5][0], SHAPE_STATION[5][1]],
+          [SHAPE_STATION[0][0], SHAPE_STATION[0][1]]
+        ],
+        closed: false
       }
     ],
     color
@@ -325,7 +345,9 @@ export class TravelSceneRenderer {
         }
         const geometry = new BufferGeometry();
         geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
-        this.starGroup.add(new Line(geometry, createLineMaterial(flightState === 'HYPERSPACE' ? CGA_RED : CGA_YELLOW)));
+        // Jump and hyperspace streaks are independent star trails, so they
+        // must render as disjoint segments instead of one connected polyline.
+        this.starGroup.add(new LineSegments(geometry, createLineMaterial(flightState === 'HYPERSPACE' ? CGA_RED : CGA_YELLOW)));
         return;
       }
 
@@ -351,7 +373,9 @@ export class TravelSceneRenderer {
 
   private buildWorld(combatState: TravelCombatState) {
     if (combatState.station) {
-      const station = createClosedShape(SHAPE_STATION, CGA_YELLOW);
+      // The station hull intentionally leaves the docking slot open by drawing
+      // two independent open contours instead of closing the hexagon.
+      const station = createStationShape(CGA_YELLOW);
       station.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z);
       station.scale.setScalar(1.8);
       station.rotation.z = -combatState.station.angle;
@@ -486,32 +510,48 @@ export class TravelSceneRenderer {
   private buildTargetIndicator(screenX: number, screenY: number) {
     const arm = 8;
     const gap = 10;
-    const geometry = new BufferGeometry();
-    geometry.setAttribute(
-      'position',
-      new Float32BufferAttribute(
+    // Each chevron arm is its own open contour so no diagonal connector is
+    // drawn between corners when the target box is assembled.
+    this.overlayGroup.add(
+      createLineShapeObject(
         [
-          screenX - gap - arm, screenY - gap, 0,
-          screenX - gap, screenY - gap, 0,
-          screenX - gap, screenY - gap, 0,
-          screenX - gap, screenY - gap - arm, 0,
-          screenX + gap + arm, screenY - gap, 0,
-          screenX + gap, screenY - gap, 0,
-          screenX + gap, screenY - gap, 0,
-          screenX + gap, screenY - gap - arm, 0,
-          screenX - gap - arm, screenY + gap, 0,
-          screenX - gap, screenY + gap, 0,
-          screenX - gap, screenY + gap, 0,
-          screenX - gap, screenY + gap + arm, 0,
-          screenX + gap + arm, screenY + gap, 0,
-          screenX + gap, screenY + gap, 0,
-          screenX + gap, screenY + gap, 0,
-          screenX + gap, screenY + gap + arm, 0
+          {
+            points: [
+              [screenX - gap - arm, screenY - gap],
+              [screenX - gap, screenY - gap],
+              [screenX - gap, screenY - gap - arm]
+            ],
+            closed: false
+          },
+          {
+            points: [
+              [screenX + gap + arm, screenY - gap],
+              [screenX + gap, screenY - gap],
+              [screenX + gap, screenY - gap - arm]
+            ],
+            closed: false
+          },
+          {
+            points: [
+              [screenX - gap - arm, screenY + gap],
+              [screenX - gap, screenY + gap],
+              [screenX - gap, screenY + gap + arm]
+            ],
+            closed: false
+          },
+          {
+            points: [
+              [screenX + gap + arm, screenY + gap],
+              [screenX + gap, screenY + gap],
+              [screenX + gap, screenY + gap + arm]
+            ],
+            closed: false
+          }
         ],
-        3
+        CGA_GREEN,
+        false
       )
     );
-    this.overlayGroup.add(new Line(geometry, createLineMaterial(CGA_GREEN)));
   }
 
   private buildRadar(combatState: TravelCombatState, systemLabel: string, radarInsetTop: number, radarInsetRight: number) {
