@@ -847,24 +847,22 @@ export function useTravelSession(
         // Manual docking is resolved outside the combat step so the hook can
         // decide whether to finish travel, bounce the ship, or show guidance.
         const docking = assessDockingApproach(combatState.station, combatState.player);
-        if (docking.distance < combatState.station.radius + 15) {
-          if (docking.collidesWithHull) {
-            combatState.player.energy = Math.max(0, combatState.player.energy - 20);
-            combatState.player.vx *= -1.5;
-            combatState.player.vy *= -1.5;
+        if (docking.collidesWithHull) {
+          combatState.player.energy = Math.max(0, combatState.player.energy - 20);
+          combatState.player.vx *= -1.5;
+          combatState.player.vy *= -1.5;
+          autoDockActive = false;
+          autoDockWaitLatched = false;
+          showMessage('COLLISION WARNING', 1000);
+        } else if (docking.isInDockingGap) {
+          if (docking.canDock) {
             autoDockActive = false;
             autoDockWaitLatched = false;
-            showMessage('COLLISION WARNING', 1000);
-          } else if (docking.isInDockingGap && docking.distance < combatState.station.radius - 18) {
-            if (docking.canDock) {
-              autoDockActive = false;
-              autoDockWaitLatched = false;
-              completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
-              return;
-            }
-            if (!docking.isFacingHangar || docking.speed >= 3.6) {
-              showMessage('ENTER SLOT NOSE-IN AT LOW SPEED', 1000);
-            }
+            completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
+            return;
+          }
+          if (!docking.isFacingHangar || docking.speed >= 3.6) {
+            showMessage('ENTER SLOT NOSE-IN AT LOW SPEED', 1000);
           }
         }
       }

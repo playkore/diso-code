@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createDefaultCommander } from '../commander';
 import { assessDockingApproach, createDeterministicRandomSource, enterArrivalSpace, enterStationSpace, getStationSlotAngle, stepTravelCombat } from '../travelCombat';
 import { clampAngle } from '../combat/state';
+import { getStationDockDirection, getStationDockMouthPoint, getStationDockPoint, getStationRenderScale, STATION_TUNNEL_END_X } from '../combat/station/stationGeometry';
 import { createCombatState } from './combatTestUtils';
 
 describe('travel combat station rules', () => {
@@ -28,7 +29,7 @@ describe('travel combat station rules', () => {
     const speed = Math.hypot(state.player.vx, state.player.vy);
     const outwardVelocity = dx * state.player.vx + dy * state.player.vy;
 
-    expect(distance).toBeCloseTo(state.station!.radius + 28);
+    expect(distance).toBeCloseTo(STATION_TUNNEL_END_X * getStationRenderScale(state.station!) + 28);
     expect(clampAngle(radialAngle - slotAngle)).toBeCloseTo(0);
     expect(clampAngle(state.player.angle - slotAngle)).toBeCloseTo(0);
     expect(speed).toBeCloseTo(2.4);
@@ -75,12 +76,13 @@ describe('travel combat station rules', () => {
 
   it('treats the visible station split as open for docking', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    const dockPoint = getStationDockPoint(station);
     const slotAngle = getStationSlotAngle(station.angle);
     const player = {
-      x: Math.cos(slotAngle) * 60,
-      y: Math.sin(slotAngle) * 60,
+      x: dockPoint.x,
+      y: dockPoint.y,
       vx: 0.5,
-      vy: 0.5,
+      vy: 0,
       angle: slotAngle + Math.PI
     };
     const docking = assessDockingApproach(station, player);
@@ -93,27 +95,28 @@ describe('travel combat station rules', () => {
   it('counts the visible docking-door mouth as docked', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);
+    const dockMouth = getStationDockMouthPoint(station);
     const player = {
-      x: Math.cos(slotAngle) * 85,
-      y: Math.sin(slotAngle) * 85,
-      vx: 0.3,
-      vy: 0.3,
+      x: dockMouth.x - 6,
+      y: dockMouth.y,
+      vx: -0.3,
+      vy: 0,
       angle: slotAngle + Math.PI
     };
     const docking = assessDockingApproach(station, player);
     expect(docking.isInDockingGap).toBe(true);
-    expect(docking.canDock).toBe(true);
+    expect(docking.canDock).toBe(false);
   });
 
   it('collides when crossing the ring away from the visible split', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
-    const slotAngle = getStationSlotAngle(station.angle);
+    const dockDirection = getStationDockDirection(station);
     const player = {
-      x: Math.cos(slotAngle + Math.PI / 2) * 70,
-      y: Math.sin(slotAngle + Math.PI / 2) * 70,
+      x: station.x - dockDirection.y * 40,
+      y: station.y + dockDirection.x * 40,
       vx: 0.5,
       vy: 0.5,
-      angle: slotAngle + Math.PI
+      angle: Math.PI
     };
     const docking = assessDockingApproach(station, player);
     expect(docking.isInsideSlot).toBe(false);

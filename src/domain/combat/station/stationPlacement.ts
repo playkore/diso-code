@@ -1,5 +1,6 @@
 import { pushMessage } from '../state';
 import { getStationSlotAngle } from './docking';
+import { getStationRenderScale, STATION_TUNNEL_END_X } from './stationGeometry';
 import type { RandomSource, TravelCombatState } from '../types';
 
 const STATION_LAUNCH_CLEARANCE = 28;
@@ -25,7 +26,7 @@ export function enterStationSpace(
     safeZoneRadius: 360
   };
   const slotAngle = getStationSlotAngle(state.station.angle);
-  const launchDistance = state.station.radius + STATION_LAUNCH_CLEARANCE;
+  const launchDistance = STATION_TUNNEL_END_X * getStationRenderScale(state.station) + STATION_LAUNCH_CLEARANCE;
   const launchAngle = slotAngle;
   // Launches start just outside the visible docking door and already drifting
   // outward so leaving a station reads as a continuation of motion rather than

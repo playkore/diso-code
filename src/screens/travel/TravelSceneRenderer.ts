@@ -24,6 +24,7 @@ import {
   WebGLRenderer
 } from 'three';
 import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type FlightPhase, type TravelCombatState } from '../../domain/travelCombat';
+import { getStationRenderScale } from '../../domain/combat/station/stationGeometry';
 import type { LineShape } from './background/types';
 import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_THARGOID } from './renderers/constants';
 import { getEnemyHealthBarState, getEnemyLaserTrace } from './renderers/projectilesRenderer';
@@ -369,7 +370,7 @@ export class TravelSceneRenderer {
       const station = createStationObject();
       const stationAnchor = new Group();
       stationAnchor.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z);
-      stationAnchor.scale.setScalar(3.6);
+      stationAnchor.scale.setScalar(getStationRenderScale(combatState.station));
       // The outer anchor spins around the camera-facing axis, while the inner
       // hull spins around its own local X axis after that Z rotation has already
       // been applied. That gives the station a compound Elite-like tumble.

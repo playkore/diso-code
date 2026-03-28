@@ -1,6 +1,6 @@
 import { clampAngle } from '../state';
 import type { CombatPlayer, CombatStation } from '../types';
-import { getStationSlotAngle } from './docking';
+import { getStationDockDirection, getStationDockMouthPoint, getStationDockPoint, getStationTunnelHalfWidth } from './stationGeometry';
 
 /**
  * Auto-dock steering output for one simulation frame.
@@ -37,9 +37,9 @@ export interface AutoDockCommand {
   };
 }
 
-const AUTO_DOCK_WALL_STANDOFF = 10;
-const AUTO_DOCK_STAGE_RADIUS_PADDING = 3;
-const AUTO_DOCK_DOCK_WINDOW = Math.PI / 20;
+const AUTO_DOCK_WALL_STANDOFF = 12;
+const AUTO_DOCK_STAGE_RADIUS_PADDING = 4;
+const AUTO_DOCK_DOCK_WINDOW = 6;
 const AUTO_DOCK_APPROACH_SPEED = 0.75;
 const AUTO_DOCK_INWARD_SPEED = 2.8;
 const AUTO_DOCK_POSITION_HOLD_SPEED = 0.35;
@@ -48,7 +48,6 @@ const AUTO_DOCK_WAIT_ENTRY_SPEED = 0.6;
 const AUTO_DOCK_WAIT_ENTRY_BAND = 10;
 const AUTO_DOCK_STOPPING_FACTOR = 70;
 const AUTO_DOCK_STOPPING_BUFFER = 8;
-const AUTO_DOCK_SLOT_LEAD_FRAMES = 10;
 
 function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
@@ -59,52 +58,54 @@ function getTargetTurn(currentAngle: number, desiredAngle: number) {
 }
 
 export function getAutoDockCommand(station: CombatStation, player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>): AutoDockCommand {
-  const stageRadius = station.radius + AUTO_DOCK_WALL_STANDOFF;
+  const dockDirection = getStationDockDirection(station);
+  const slotAngle = Math.atan2(dockDirection.y, dockDirection.x);
+  const inwardAngle = slotAngle + Math.PI;
+  const dockMouth = getStationDockMouthPoint(station);
+  const dockPoint = getStationDockPoint(station);
+  const stagePoint = {
+    x: dockMouth.x + dockDirection.x * AUTO_DOCK_WALL_STANDOFF,
+    y: dockMouth.y + dockDirection.y * AUTO_DOCK_WALL_STANDOFF
+  };
+  const offsetX = player.x - stagePoint.x;
+  const offsetY = player.y - stagePoint.y;
   const distanceFromStation = Math.hypot(player.x - station.x, player.y - station.y);
-  const slotAngle = getStationSlotAngle(station.angle);
-  const relativeAngle = Math.atan2(player.y - station.y, player.x - station.x);
-  const slotOffset = clampAngle(relativeAngle - slotAngle);
-  const projectedSlotAngle = getStationSlotAngle(station.angle + station.rotSpeed * AUTO_DOCK_SLOT_LEAD_FRAMES);
-  const projectedSlotOffset = clampAngle(relativeAngle - projectedSlotAngle);
-  const inwardAngle = Math.atan2(station.y - player.y, station.x - player.x);
-  const outwardAngle = relativeAngle;
-  const noseAlignment = clampAngle(player.angle - (slotAngle + Math.PI));
-  const projectedNoseAlignment = clampAngle(player.angle - (projectedSlotAngle + Math.PI));
+  const distanceToStage = Math.hypot(offsetX, offsetY);
+  const slotOffset = offsetX * -dockDirection.y + offsetY * dockDirection.x;
   const vx = player.vx;
   const vy = player.vy;
-  const radialSpeed = vx * Math.cos(inwardAngle) + vy * Math.sin(inwardAngle);
-  const tangentialSpeed = Math.abs(vx * Math.cos(relativeAngle + Math.PI / 2) + vy * Math.sin(relativeAngle + Math.PI / 2));
-  const remainingDistance = Math.max(0, distanceFromStation - stageRadius);
+  const radialSpeed = -(vx * dockDirection.x + vy * dockDirection.y);
+  const tangentialSpeed = Math.abs(vx * -dockDirection.y + vy * dockDirection.x);
+  const remainingDistance = Math.max(0, distanceToStage);
   const stoppingDistance = Math.max(0, radialSpeed) * AUTO_DOCK_STOPPING_FACTOR + AUTO_DOCK_STOPPING_BUFFER;
-  const onStageRing = Math.abs(distanceFromStation - stageRadius) <= AUTO_DOCK_STAGE_RADIUS_PADDING * 2;
-  const withinWaitBand = Math.abs(distanceFromStation - stageRadius) <= AUTO_DOCK_WAIT_ENTRY_BAND;
+  const onStageRing = distanceToStage <= AUTO_DOCK_STAGE_RADIUS_PADDING * 2;
+  const withinWaitBand = distanceToStage <= AUTO_DOCK_WAIT_ENTRY_BAND;
   const readyToWait = Math.abs(radialSpeed) <= AUTO_DOCK_POSITION_HOLD_SPEED && tangentialSpeed <= AUTO_DOCK_TANGENTIAL_HOLD_SPEED;
   const canEnterWait = withinWaitBand && radialSpeed <= AUTO_DOCK_WAIT_ENTRY_SPEED;
-  const doorInFront =
-    (Math.abs(slotOffset) <= AUTO_DOCK_DOCK_WINDOW && Math.abs(noseAlignment) <= AUTO_DOCK_DOCK_WINDOW) ||
-    (Math.abs(projectedSlotOffset) <= AUTO_DOCK_DOCK_WINDOW && Math.abs(projectedNoseAlignment) <= AUTO_DOCK_DOCK_WINDOW);
+  const noseAlignment = clampAngle(player.angle - inwardAngle);
+  const doorInFront = Math.abs(slotOffset) <= Math.min(AUTO_DOCK_DOCK_WINDOW, getStationTunnelHalfWidth(station)) && Math.abs(noseAlignment) <= AUTO_DOCK_DOCK_WINDOW * 0.05;
 
-  if ((onStageRing || withinWaitBand) && doorInFront) {
+  if (distanceToStage <= AUTO_DOCK_STAGE_RADIUS_PADDING && doorInFront) {
     return {
       turn: getTargetTurn(player.angle, inwardAngle),
-      thrust: Math.max(0, radialSpeed) < AUTO_DOCK_INWARD_SPEED ? 1 : 0,
+      thrust: Math.hypot(player.x - dockPoint.x, player.y - dockPoint.y) > 8 && Math.max(0, radialSpeed) < AUTO_DOCK_INWARD_SPEED ? 1 : 0,
       mode: 'dock',
       debug: {
         currentSlotAngle: slotAngle,
-        expectedSlotAngle: projectedSlotAngle,
-        playerRadialAngle: relativeAngle,
+        expectedSlotAngle: slotAngle,
+        playerRadialAngle: Math.atan2(player.y - station.y, player.x - station.x),
         slotOffset,
-        projectedSlotOffset,
+        projectedSlotOffset: slotOffset,
         onStageRing,
         withinWaitBand,
         readyToWait,
         canEnterWait,
         doorInFront,
         distanceFromStation,
-        stageRadius,
+        stageRadius: distanceToStage,
         radialSpeed,
         tangentialSpeed,
-        stageRadiusError: distanceFromStation - stageRadius
+        stageRadiusError: distanceToStage
       }
     };
   }
@@ -119,55 +120,53 @@ export function getAutoDockCommand(station: CombatStation, player: Pick<CombatPl
       mode: 'wait',
       debug: {
         currentSlotAngle: slotAngle,
-        expectedSlotAngle: projectedSlotAngle,
-        playerRadialAngle: relativeAngle,
+        expectedSlotAngle: slotAngle,
+        playerRadialAngle: Math.atan2(player.y - station.y, player.x - station.x),
         slotOffset,
-        projectedSlotOffset,
+        projectedSlotOffset: slotOffset,
         onStageRing,
         withinWaitBand,
         readyToWait,
         canEnterWait,
         doorInFront,
         distanceFromStation,
-        stageRadius,
+        stageRadius: distanceToStage,
         radialSpeed,
         tangentialSpeed,
-        stageRadiusError: distanceFromStation - stageRadius
+        stageRadiusError: distanceToStage
       }
     };
   }
 
-  // Approach is intentionally radial: face the center and let the current
-  // inward velocity bleed off near the wall by releasing thrust in advance.
-  // If the ship drifts too close, point outward and back off to the staging
-  // ring before trying again.
-  if (distanceFromStation < stageRadius - AUTO_DOCK_STAGE_RADIUS_PADDING) {
+  // Approach now aims at the tunnel mouth staging point instead of the station
+  // center, so both manual docking and auto-dock converge on the visible tube.
+  if (distanceToStage < AUTO_DOCK_STAGE_RADIUS_PADDING) {
     return {
-      turn: getTargetTurn(player.angle, outwardAngle),
+      turn: getTargetTurn(player.angle, slotAngle),
       thrust: 1,
       mode: 'approach',
       debug: {
         currentSlotAngle: slotAngle,
-        expectedSlotAngle: projectedSlotAngle,
-        playerRadialAngle: relativeAngle,
+        expectedSlotAngle: slotAngle,
+        playerRadialAngle: Math.atan2(player.y - station.y, player.x - station.x),
         slotOffset,
-        projectedSlotOffset,
+        projectedSlotOffset: slotOffset,
         onStageRing,
         withinWaitBand,
         readyToWait,
         canEnterWait,
         doorInFront,
         distanceFromStation,
-        stageRadius,
+        stageRadius: distanceToStage,
         radialSpeed,
         tangentialSpeed,
-        stageRadiusError: distanceFromStation - stageRadius
+        stageRadiusError: distanceToStage
       }
     };
   }
 
   const shouldBrake = remainingDistance <= stoppingDistance;
-  const turn = getTargetTurn(player.angle, inwardAngle);
+  const turn = getTargetTurn(player.angle, Math.atan2(stagePoint.y - player.y, stagePoint.x - player.x));
   const shouldThrust = !shouldBrake && radialSpeed < AUTO_DOCK_APPROACH_SPEED;
 
   return {
@@ -176,20 +175,20 @@ export function getAutoDockCommand(station: CombatStation, player: Pick<CombatPl
     mode: 'approach',
     debug: {
       currentSlotAngle: slotAngle,
-      expectedSlotAngle: projectedSlotAngle,
-      playerRadialAngle: relativeAngle,
+      expectedSlotAngle: slotAngle,
+      playerRadialAngle: Math.atan2(player.y - station.y, player.x - station.x),
       slotOffset,
-      projectedSlotOffset,
+      projectedSlotOffset: slotOffset,
       onStageRing,
       withinWaitBand,
       readyToWait,
       canEnterWait,
       doorInFront,
       distanceFromStation,
-      stageRadius,
+      stageRadius: distanceToStage,
       radialSpeed,
       tangentialSpeed,
-      stageRadiusError: distanceFromStation - stageRadius
+      stageRadiusError: distanceToStage
     }
   };
 }

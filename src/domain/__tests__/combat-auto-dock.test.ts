@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getAutoDockCommand } from '../combat/station/autoDock';
 import { getStationSlotAngle } from '../travelCombat';
+import { getStationDockDirection, getStationDockMouthPoint } from '../combat/station/stationGeometry';
 
 describe('auto-dock steering', () => {
   it('faces the station center during the radial approach', () => {
@@ -20,12 +21,14 @@ describe('auto-dock steering', () => {
 
   it('releases thrust early enough to brake near the wall', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    const dockDirection = getStationDockDirection(station);
+    const dockMouth = getStationDockMouthPoint(station);
     const command = getAutoDockCommand(station, {
-      x: 0,
-      y: 120,
-      vx: 0,
-      vy: -1,
-      angle: -Math.PI / 2
+      x: dockMouth.x + dockDirection.x * 24,
+      y: dockMouth.y + dockDirection.y * 24,
+      vx: -dockDirection.x,
+      vy: -dockDirection.y,
+      angle: getStationSlotAngle(station.angle) + Math.PI
     });
 
     expect(command.mode).toBe('approach');
@@ -35,13 +38,14 @@ describe('auto-dock steering', () => {
   it('waits on the wall until the door lines up exactly in front', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0.12, rotSpeed: 0.005, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);
-    const playerAngle = slotAngle + 0.22;
+    const dockDirection = getStationDockDirection(station);
+    const dockMouth = getStationDockMouthPoint(station);
     const command = getAutoDockCommand(station, {
-      x: Math.cos(playerAngle) * 90,
-      y: Math.sin(playerAngle) * 90,
+      x: dockMouth.x + dockDirection.x * 8,
+      y: dockMouth.y + dockDirection.y * 8,
       vx: 0,
       vy: 0,
-      angle: playerAngle + Math.PI
+      angle: slotAngle + Math.PI
     });
 
     expect(command.mode).toBe('wait');
@@ -51,13 +55,14 @@ describe('auto-dock steering', () => {
   it('enters wait even with small sideways drift once radial motion has stopped', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0.12, rotSpeed: 0.005, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);
-    const playerAngle = slotAngle + 0.22;
+    const dockDirection = getStationDockDirection(station);
+    const dockMouth = getStationDockMouthPoint(station);
     const command = getAutoDockCommand(station, {
-      x: Math.cos(playerAngle) * 90,
-      y: Math.sin(playerAngle) * 90,
-      vx: -0.2,
-      vy: 0.2,
-      angle: playerAngle + Math.PI
+      x: dockMouth.x + dockDirection.x * 8,
+      y: dockMouth.y + dockDirection.y * 8,
+      vx: 0.1,
+      vy: -0.1,
+      angle: slotAngle + Math.PI
     });
 
     expect(command.mode).toBe('wait');
@@ -66,10 +71,12 @@ describe('auto-dock steering', () => {
   it('turns nose-in and advances through the slot once lined up', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const slotAngle = getStationSlotAngle(station.angle);
+    const dockDirection = getStationDockDirection(station);
+    const dockMouth = getStationDockMouthPoint(station);
     const command = getAutoDockCommand(station, {
-      x: Math.cos(slotAngle) * 90,
-      y: Math.sin(slotAngle) * 90,
-      vx: 0.2,
+      x: dockMouth.x + dockDirection.x * 12,
+      y: dockMouth.y + dockDirection.y * 12,
+      vx: 0,
       vy: 0,
       angle: slotAngle + Math.PI
     });
