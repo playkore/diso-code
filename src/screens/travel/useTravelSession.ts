@@ -104,6 +104,7 @@ const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
+const PLAYER_BANK_RESPONSE = 0.18;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
@@ -429,6 +430,7 @@ export function useTravelSession(
     let respawnReady = false;
     let playerBankTurnProgress = 0;
     let playerBankTurnSign = 0;
+    let playerVisualBankAngle = 0;
     let previousJoystickBankHeading: number | null = null;
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
@@ -596,6 +598,7 @@ export function useTravelSession(
       respawnReady = false;
       playerBankTurnProgress = 0;
       playerBankTurnSign = 0;
+      playerVisualBankAngle = 0;
       previousJoystickBankHeading = null;
       showMessage(
         hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
@@ -939,14 +942,18 @@ export function useTravelSession(
       }
 
       updateHud();
-      const playerBankAngle = getPlayerBankAngle(playerBankTurnProgress, playerBankTurnSign);
+      const targetPlayerBankAngle = getPlayerBankAngle(playerBankTurnProgress, playerBankTurnSign);
+      // Bank is a presentation-only cue, so let it ease toward the target
+      // instead of snapping instantly. This keeps turn release from producing
+      // a jarring one-frame return to neutral.
+      playerVisualBankAngle += (targetPlayerBankAngle - playerVisualBankAngle) * Math.min(1, PLAYER_BANK_RESPONSE * dt);
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
         flightState,
         systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
         showTargetLock: Boolean(combatState.playerTargetLock),
-        playerBankAngle,
+        playerBankAngle: playerVisualBankAngle,
         radarInsetTop,
         radarInsetRight
       });
