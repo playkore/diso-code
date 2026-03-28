@@ -51,6 +51,10 @@ const PROJECTILE_Z = 14;
 const PARTICLE_Z = 22;
 const PLAYER_Z = 28;
 
+function toSceneY(worldY: number) {
+  return -worldY;
+}
+
 function createLineMaterial(color: string, dashed = false) {
   return dashed
     ? new LineDashedMaterial({
@@ -102,19 +106,22 @@ function clearGroup(group: Group) {
   }
 }
 
-function createContourObject(points: readonly (readonly [number, number])[], color: string, closed = false) {
+function createContourObject(points: readonly (readonly [number, number])[], color: string, closed = false, invertY = true) {
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute(points.flatMap(([x, y]) => [x, y, 0]), 3));
+  // Combat simulation uses the canvas convention where positive Y points
+  // downward. Three.js world space uses positive Y upward, so every world-space
+  // wireframe point is converted here instead of baking a mirrored camera.
+  geometry.setAttribute('position', new Float32BufferAttribute(points.flatMap(([x, y]) => [x, invertY ? -y : y, 0]), 3));
   return closed ? new LineLoop(geometry, createLineMaterial(color)) : new Line(geometry, createLineMaterial(color));
 }
 
-function createLineShapeObject(shape: LineShape, color: string) {
+function createLineShapeObject(shape: LineShape, color: string, invertY = true) {
   const group = new Group();
   for (const contour of shape) {
     if (contour.points.length === 0) {
       continue;
     }
-    group.add(createContourObject(contour.points, color, Boolean(contour.closed)));
+    group.add(createContourObject(contour.points, color, Boolean(contour.closed), invertY));
   }
   return group;
 }
@@ -131,12 +138,12 @@ function createClosedShape(points: readonly (readonly [number, number])[], color
   );
 }
 
-function createCircleLoop(radius: number, segments: number, color: string, dashed = false) {
+function createCircleLoop(radius: number, segments: number, color: string, dashed = false, invertY = true) {
   const geometry = new BufferGeometry();
   const positions: number[] = [];
   for (let step = 0; step < segments; step += 1) {
     const angle = (step / segments) * Math.PI * 2;
-    positions.push(Math.cos(angle) * radius, Math.sin(angle) * radius, 0);
+    positions.push(Math.cos(angle) * radius, (invertY ? -1 : 1) * Math.sin(angle) * radius, 0);
   }
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
   const circle = new LineLoop(geometry, createLineMaterial(color, dashed));
@@ -148,7 +155,7 @@ function createCircleLoop(radius: number, segments: number, color: string, dashe
 
 function createSegmentObject(startX: number, startY: number, endX: number, endY: number, color: string, z = 0) {
   const geometry = new BufferGeometry();
-  geometry.setAttribute('position', new Float32BufferAttribute([startX, startY, z, endX, endY, z], 3));
+  geometry.setAttribute('position', new Float32BufferAttribute([startX, toSceneY(startY), z, endX, toSceneY(endY), z], 3));
   return new Line(geometry, createLineMaterial(color));
 }
 
@@ -260,9 +267,9 @@ export class TravelSceneRenderer {
 
   renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
     const cameraDistance = getPerspectiveCameraDistance(this.height, CAMERA_FOV_DEGREES);
-    this.worldCamera.position.set(combatState.player.x, combatState.player.y, cameraDistance);
-    this.worldCamera.up.set(0, -1, 0);
-    this.worldCamera.lookAt(combatState.player.x, combatState.player.y, 0);
+    this.worldCamera.position.set(combatState.player.x, toSceneY(combatState.player.y), cameraDistance);
+    this.worldCamera.up.set(0, 1, 0);
+    this.worldCamera.lookAt(combatState.player.x, toSceneY(combatState.player.y), 0);
     this.worldCamera.updateProjectionMatrix();
 
     clearGroup(this.starGroup);
@@ -345,13 +352,13 @@ export class TravelSceneRenderer {
   private buildWorld(combatState: TravelCombatState) {
     if (combatState.station) {
       const station = createClosedShape(SHAPE_STATION, CGA_YELLOW);
-      station.position.set(combatState.station.x, combatState.station.y, STATION_Z);
+      station.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z);
       station.scale.setScalar(1.8);
-      station.rotation.z = combatState.station.angle;
+      station.rotation.z = -combatState.station.angle;
       this.worldGroup.add(station);
 
       const safeZone = createCircleLoop(combatState.station.safeZoneRadius, 96, combatState.encounter.safeZone ? CGA_GREEN : CGA_RED, true);
-      safeZone.position.set(combatState.station.x, combatState.station.y, STATION_Z - 1);
+      safeZone.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z - 1);
       this.worldGroup.add(safeZone);
     }
 
@@ -365,8 +372,8 @@ export class TravelSceneRenderer {
         this.width,
         this.height
       );
-      ship.position.set(enemy.x, enemy.y, SHIP_Z);
-      ship.rotation.set(presentation.pitch, presentation.yaw, enemy.angle);
+      ship.position.set(enemy.x, toSceneY(enemy.y), SHIP_Z);
+      ship.rotation.set(-presentation.pitch, presentation.yaw, -enemy.angle);
       this.worldGroup.add(ship);
 
       const laserTrace = getEnemyLaserTrace(enemy, combatState);
@@ -376,8 +383,8 @@ export class TravelSceneRenderer {
     }
 
     const player = createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
-    player.position.set(combatState.player.x, combatState.player.y, PLAYER_Z);
-    player.rotation.z = combatState.player.angle;
+    player.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
+    player.rotation.z = -combatState.player.angle;
     this.worldGroup.add(player);
 
     for (const projectile of combatState.projectiles) {
@@ -398,7 +405,7 @@ export class TravelSceneRenderer {
       const ageRatio = 1 - lifeRatio;
       const size = particle.color === CGA_GREEN ? particle.size + ageRatio * 2.8 : particle.size + ageRatio * 1.8;
       const quad = createQuad(size, size, particle.color);
-      quad.position.set(particle.x, particle.y, PARTICLE_Z);
+      quad.position.set(particle.x, toSceneY(particle.y), PARTICLE_Z);
       this.worldGroup.add(quad);
     }
   }
@@ -411,7 +418,7 @@ export class TravelSceneRenderer {
     radarInsetRight: number
   ) {
     for (const enemy of combatState.enemies) {
-      const projected = new Vector3(enemy.x, enemy.y, SHIP_Z).project(this.worldCamera);
+      const projected = new Vector3(enemy.x, toSceneY(enemy.y), SHIP_Z).project(this.worldCamera);
       if (projected.z < -1 || projected.z > 1) {
         continue;
       }
@@ -456,7 +463,8 @@ export class TravelSceneRenderer {
             closed: true
           }
         ],
-        CGA_YELLOW
+        CGA_YELLOW,
+        false
       )
     );
 
@@ -530,14 +538,15 @@ export class TravelSceneRenderer {
             closed: true
           }
         ],
-        CGA_GREEN
+        CGA_GREEN,
+        false
       )
     );
 
-    const outer = createCircleLoop(radarRadius, 64, CGA_GREEN);
+    const outer = createCircleLoop(radarRadius, 64, CGA_GREEN, false, false);
     outer.position.set(radarCenterX, radarCenterY, 0);
     this.overlayGroup.add(outer);
-    const inner = createCircleLoop(radarRadius * 0.55, 64, CGA_GREEN);
+    const inner = createCircleLoop(radarRadius * 0.55, 64, CGA_GREEN, false, false);
     inner.position.set(radarCenterX, radarCenterY, 0);
     this.overlayGroup.add(inner);
     this.overlayGroup.add(createSegmentObject(radarCenterX - radarRadius, radarCenterY, radarCenterX + radarRadius, radarCenterY, CGA_GREEN));
@@ -560,7 +569,7 @@ export class TravelSceneRenderer {
       const distance = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
       const radarDistance = Math.min(radarRadius - 8, distance * 0.08);
-      const blip = createCircleLoop(4, 18, CGA_YELLOW);
+      const blip = createCircleLoop(4, 18, CGA_YELLOW, false, false);
       blip.position.set(radarCenterX + Math.cos(angle) * radarDistance, radarCenterY + Math.sin(angle) * radarDistance, 0);
       this.overlayGroup.add(blip);
     }
@@ -571,7 +580,7 @@ export class TravelSceneRenderer {
       const distance = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
       const radarDistance = Math.min(radarRadius - 4, distance * 0.06);
-      const blip = createCircleLoop(2.5, 12, getEnemyColor(enemy.roles, enemy.missionTag));
+      const blip = createCircleLoop(2.5, 12, getEnemyColor(enemy.roles, enemy.missionTag), false, false);
       blip.position.set(radarCenterX + Math.cos(angle) * radarDistance, radarCenterY + Math.sin(angle) * radarDistance, 0);
       this.overlayGroup.add(blip);
     }
