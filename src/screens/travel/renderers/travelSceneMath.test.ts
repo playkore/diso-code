@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { selectShipPresenter } from './shipPresenter';
-import { bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './travelSceneMath';
+import { bucketStarsByParallax, getPerspectiveCameraDistance, getPlayerBankAngle, getShipPresentationAngles, getWrappedStarScreenPosition } from './travelSceneMath';
 
 describe('bucketStarsByParallax', () => {
   it('splits the generated starfield into stable depth bands', () => {
@@ -33,6 +33,19 @@ describe('getShipPresentationAngles', () => {
       pitch: -0.18,
       yaw: -0.28
     });
+  });
+});
+
+describe('getPlayerBankAngle', () => {
+  it('leans left for left turn input and right for right turn input', () => {
+    expect(getPlayerBankAngle(-1)).toBeCloseTo(-0.95, 5);
+    expect(getPlayerBankAngle(1)).toBeCloseTo(0.95, 5);
+  });
+
+  it('clamps over-range turn input and returns to neutral at zero', () => {
+    expect(getPlayerBankAngle(-5)).toBeCloseTo(-0.95, 5);
+    expect(getPlayerBankAngle(0)).toBe(0);
+    expect(getPlayerBankAngle(5)).toBeCloseTo(0.95, 5);
   });
 });
 

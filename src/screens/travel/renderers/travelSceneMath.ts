@@ -25,6 +25,8 @@ export interface ShipPresentationAngles {
   yaw: number;
 }
 
+const MAX_PLAYER_BANK_RADIANS = 0.95;
+
 /**
  * Buckets stars into a few parallax layers while preserving deterministic star
  * membership for a given generated field.
@@ -70,6 +72,16 @@ export function getShipPresentationAngles(
     pitch: -yRatio * 0.18,
     yaw: xRatio * 0.28
   };
+}
+
+/**
+ * The player ship banks only as a presentation cue. It tracks the live turn
+ * command instead of angular velocity so the lean begins immediately with the
+ * pilot's input and snaps back to neutral as soon as steering stops.
+ */
+export function getPlayerBankAngle(turnInput: number) {
+  const clampedTurn = Math.max(-1, Math.min(1, turnInput));
+  return clampedTurn * MAX_PLAYER_BANK_RADIANS;
 }
 
 /**

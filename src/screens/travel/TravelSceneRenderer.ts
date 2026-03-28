@@ -38,6 +38,7 @@ interface TravelSceneRenderArgs {
   flightState: FlightPhase;
   systemLabel: string;
   showTargetLock: boolean;
+  playerBankAngle: number;
   radarInsetTop: number;
   radarInsetRight: number;
 }
@@ -285,7 +286,7 @@ export class TravelSceneRenderer {
     this.flashMesh.position.set(this.width / 2, this.height / 2, 0);
   }
 
-  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
+  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, playerBankAngle, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
     const cameraDistance = getPerspectiveCameraDistance(this.height, CAMERA_FOV_DEGREES);
     this.worldCamera.position.set(combatState.player.x, toSceneY(combatState.player.y), cameraDistance);
     this.worldCamera.up.set(0, 1, 0);
@@ -304,7 +305,7 @@ export class TravelSceneRenderer {
     }
 
     this.buildStarfield(stars, combatState, flightState);
-    this.buildWorld(combatState);
+    this.buildWorld(combatState, playerBankAngle);
     this.buildOverlay(combatState, systemLabel, showTargetLock, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
 
@@ -371,7 +372,7 @@ export class TravelSceneRenderer {
     });
   }
 
-  private buildWorld(combatState: TravelCombatState) {
+  private buildWorld(combatState: TravelCombatState, playerBankAngle: number) {
     if (combatState.station) {
       // The station hull intentionally leaves the docking slot open by drawing
       // two independent open contours instead of closing the hexagon.
@@ -409,9 +410,17 @@ export class TravelSceneRenderer {
     const player = this.shipPresenter.playerGeometryMode === 'mesh'
       ? this.shipPresenter.createPlayerObject?.() ?? new Group()
       : createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
-    player.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
-    player.rotation.z = -combatState.player.angle;
-    this.worldGroup.add(player);
+    const playerAnchor = new Group();
+    playerAnchor.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
+    // Heading stays on the outer anchor so the ship still rotates around the
+    // axis from the player toward the camera. The child ship can then bank
+    // around its own forward axis without corrupting the heading axis itself.
+    playerAnchor.rotation.z = -combatState.player.angle;
+    // The hull uses +X as its nose direction, so rolling around local X makes
+    // the ship lean onto its left/right side instead of skewing its turn axis.
+    player.rotation.set(playerBankAngle, 0, 0);
+    playerAnchor.add(player);
+    this.worldGroup.add(playerAnchor);
 
     for (const projectile of combatState.projectiles) {
       this.worldGroup.add(

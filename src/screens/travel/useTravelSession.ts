@@ -26,6 +26,7 @@ import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
+import { getPlayerBankAngle } from './renderers/travelSceneMath';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -638,6 +639,7 @@ export function useTravelSession(
           flightState,
           systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
           showTargetLock: false,
+          playerBankAngle: 0,
           radarInsetTop,
           radarInsetRight
         });
@@ -735,6 +737,7 @@ export function useTravelSession(
         autoDockWaitLatched = false;
       }
 
+      const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn;
       const result = stepTravelCombat(
         combatState,
         {
@@ -742,7 +745,7 @@ export function useTravelSession(
           // low-level turn/thrust controls a pilot would use, so the ship
           // still follows the normal flight model and station collision rules.
           thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.thrust ?? liveInput.thrust,
-          turn: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn,
+          turn: playerTurnCommand,
           toggleLasers: flightState === 'HYPERSPACE' ? false : liveInput.toggleLasers,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
@@ -895,12 +898,14 @@ export function useTravelSession(
       }
 
       updateHud();
+      const playerBankAngle = getPlayerBankAngle(playerTurnCommand);
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
         flightState,
         systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
         showTargetLock: Boolean(combatState.playerTargetLock),
+        playerBankAngle,
         radarInsetTop,
         radarInsetRight
       });
