@@ -48,11 +48,11 @@ const CAMERA_FOV_DEGREES = 36;
 const CAMERA_NEAR = 1;
 const CAMERA_FAR = 5000;
 const STARFIELD_Z = -900;
-const STATION_Z = -20;
+const PLAYER_Z = 28;
+const STATION_Z = PLAYER_Z;
 const SHIP_Z = 0;
 const PROJECTILE_Z = 14;
 const PARTICLE_Z = 22;
-const PLAYER_Z = 28;
 
 function toSceneY(worldY: number) {
   return -worldY;

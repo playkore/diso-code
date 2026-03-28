@@ -209,8 +209,6 @@ const ENEMY_SHIP_MESHES: Record<EnemyShipMeshId, ShipMeshDefinition> = {
 
 const STATION_MESH: ShipMeshDefinition = {
   hullTriangles: [
-    [[18, 18, 18], [18, -18, 18], [18, -18, -18]],
-    [[18, 18, 18], [18, -18, -18], [18, 18, -18]],
     [[-18, 18, 18], [-18, -18, -18], [-18, -18, 18]],
     [[-18, 18, 18], [-18, 18, -18], [-18, -18, -18]],
     [[18, 18, 18], [18, 18, -18], [-18, 18, -18]],
@@ -220,7 +218,25 @@ const STATION_MESH: ShipMeshDefinition = {
     [[18, 18, 18], [-18, 18, 18], [-18, -18, 18]],
     [[18, 18, 18], [-18, -18, 18], [18, -18, 18]],
     [[18, 18, -18], [18, -18, -18], [-18, -18, -18]],
-    [[18, 18, -18], [-18, -18, -18], [-18, 18, -18]]
+    [[18, 18, -18], [-18, -18, -18], [-18, 18, -18]],
+    [[18, 18, 18], [18, -18, 18], [18, -8, 8]],
+    [[18, 18, 18], [18, -8, 8], [18, 8, 8]],
+    [[18, -18, 18], [18, -18, -18], [18, -8, -8]],
+    [[18, -18, 18], [18, -8, -8], [18, -8, 8]],
+    [[18, 18, -18], [18, 8, -8], [18, -8, -8]],
+    [[18, 18, -18], [18, -8, -8], [18, -18, -18]],
+    [[18, 18, 18], [18, 8, 8], [18, 8, -8]],
+    [[18, 18, 18], [18, 8, -8], [18, 18, -18]],
+    // Each tunnel wall keeps outward-facing winding so the opaque black faces
+    // survive normal back-face culling instead of turning transparent.
+    [[18, 8, 8], [32, -8, 8], [32, 8, 8]],
+    [[18, 8, 8], [18, -8, 8], [32, -8, 8]],
+    [[18, -8, -8], [32, 8, -8], [32, -8, -8]],
+    [[18, -8, -8], [18, 8, -8], [32, 8, -8]],
+    [[18, -8, 8], [32, -8, -8], [32, -8, 8]],
+    [[18, -8, 8], [18, -8, -8], [32, -8, -8]],
+    [[18, 8, -8], [32, 8, 8], [32, 8, -8]],
+    [[18, 8, -8], [18, 8, 8], [32, 8, 8]]
   ],
   wireEdges: [
     [[18, 18, 18], [18, -18, 18]],
@@ -234,7 +250,19 @@ const STATION_MESH: ShipMeshDefinition = {
     [[18, 18, 18], [-18, 18, 18]],
     [[18, -18, 18], [-18, -18, 18]],
     [[18, -18, -18], [-18, -18, -18]],
-    [[18, 18, -18], [-18, 18, -18]]
+    [[18, 18, -18], [-18, 18, -18]],
+    [[18, 8, 8], [18, -8, 8]],
+    [[18, -8, 8], [18, -8, -8]],
+    [[18, -8, -8], [18, 8, -8]],
+    [[18, 8, -8], [18, 8, 8]],
+    [[32, 8, 8], [32, -8, 8]],
+    [[32, -8, 8], [32, -8, -8]],
+    [[32, -8, -8], [32, 8, -8]],
+    [[32, 8, -8], [32, 8, 8]],
+    [[18, 8, 8], [32, 8, 8]],
+    [[18, -8, 8], [32, -8, 8]],
+    [[18, -8, -8], [32, -8, -8]],
+    [[18, 8, -8], [32, 8, -8]]
   ]
 };
 
@@ -256,8 +284,9 @@ export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: str
 }
 
 /**
- * The station currently uses a simple authored cube so its silhouette reads
- * clearly while the renderer experiments with compound 3D rotation behavior.
+ * The station uses a simple cube hull plus a short square docking tunnel on
+ * the +X face. The tunnel keeps the target readable in motion without forcing
+ * the renderer to cut a more complex opening through the whole station body.
  */
 export function createStationObject() {
   return createWireframeMeshObject(STATION_MESH, CGA_YELLOW);

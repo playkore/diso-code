@@ -52,7 +52,7 @@ describe('selectShipPresenter geometry split', () => {
 });
 
 describe('createStationObject', () => {
-  it('builds an authored cube station mesh', () => {
+  it('builds an authored cube station mesh with a docking tunnel', () => {
     const station = createStationObject();
     const hull = station.children[0] as Mesh;
     const edges = station.children[1] as LineSegments;
@@ -62,6 +62,6 @@ describe('createStationObject', () => {
     expect(edges).toBeInstanceOf(LineSegments);
     expect(((hull.material as MeshBasicMaterial).color.getHexString())).toBe(CGA_BLACK.slice(1));
     expect(((edges.material as LineBasicMaterial).color.getHexString())).toBe(CGA_YELLOW.slice(1));
-    expect(edges.geometry.getAttribute('position').count).toBe(24);
+    expect(edges.geometry.getAttribute('position').count).toBe(48);
   });
 });
