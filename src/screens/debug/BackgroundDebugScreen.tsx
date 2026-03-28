@@ -86,7 +86,8 @@ export function BackgroundDebugScreen() {
 
     const previewScale = selected.defaultScale * zoom;
     drawLineShape(ctx, selected.shape, width / 2, height / 2, selected.defaultAngle, selected.color, previewScale, {
-      preserveScreenLineWidth: true
+      preserveScreenLineWidth: true,
+      lineDash: selected.lineDash
     });
 
     ctx.save();

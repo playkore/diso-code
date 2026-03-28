@@ -15,6 +15,7 @@ export const BACKGROUND_OBJECT_DEFINITIONS: BackgroundObjectDefinition[] = [
     label: 'Extracted Station',
     kind: 'station',
     color: CGA_YELLOW,
+    lineDash: [1, 3],
     // The imported line set is already normalized into an approximately
     // +/-50 coordinate box, so a moderate preview scale keeps it readable
     // without clipping the debug canvas.
@@ -27,6 +28,7 @@ export const BACKGROUND_OBJECT_DEFINITIONS: BackgroundObjectDefinition[] = [
     label: 'Jagged Asteroid',
     kind: 'asteroid',
     color: CGA_YELLOW,
+    lineDash: [1, 3],
     defaultScale: 2.2,
     defaultAngle: Math.PI / 10,
     shape: [
@@ -60,6 +62,7 @@ export const BACKGROUND_OBJECT_DEFINITIONS: BackgroundObjectDefinition[] = [
     label: 'Debris Cluster',
     kind: 'debrisCluster',
     color: CGA_RED,
+    lineDash: [1, 3],
     defaultScale: 2,
     defaultAngle: 0,
     shape: [
@@ -108,6 +111,7 @@ export const BACKGROUND_OBJECT_DEFINITIONS: BackgroundObjectDefinition[] = [
     label: 'Wrecked Freighter',
     kind: 'wreck',
     color: CGA_RED,
+    lineDash: [1, 3],
     defaultScale: 2.4,
     defaultAngle: -Math.PI / 14,
     shape: [
@@ -150,6 +154,7 @@ export const BACKGROUND_OBJECT_DEFINITIONS: BackgroundObjectDefinition[] = [
     label: 'Ruined Station Ring',
     kind: 'ruinedStation',
     color: CGA_GREEN,
+    lineDash: [1, 3],
     defaultScale: 1.85,
     defaultAngle: Math.PI / 8,
     shape: [

@@ -34,6 +34,7 @@ export interface BackgroundObjectDefinition {
   label: string;
   kind: 'asteroid' | 'wreck' | 'ruinedStation' | 'debrisCluster' | 'station';
   color: string;
+  lineDash?: readonly number[];
   defaultScale: number;
   defaultAngle: number;
   shape: LineShape;

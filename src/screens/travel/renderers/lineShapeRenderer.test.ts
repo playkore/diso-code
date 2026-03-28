@@ -9,6 +9,7 @@ function createMockContext() {
     translate: vi.fn(),
     rotate: vi.fn(),
     scale: vi.fn(),
+    setLineDash: vi.fn(),
     beginPath: vi.fn(),
     moveTo: vi.fn(),
     lineTo: vi.fn(),
@@ -39,6 +40,7 @@ describe('drawLineShape', () => {
 
     expect(ctx.save).toHaveBeenCalledTimes(1);
     expect(ctx.translate).toHaveBeenCalledWith(100, 120);
+    expect(ctx.setLineDash).toHaveBeenCalledWith([]);
     expect(ctx.closePath).toHaveBeenCalledTimes(1);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
   });
@@ -84,5 +86,24 @@ describe('drawLineShape', () => {
     drawLineShape(ctx, shape, 0, 0, 0, '#ffff55', 4, { preserveScreenLineWidth: true });
 
     expect(ctx.lineWidth).toBeCloseTo(0.375);
+  });
+
+  it('applies dashed strokes when requested', () => {
+    const ctx = createMockContext();
+    const shape: LineShape = [
+      {
+        points: [
+          [0, 0],
+          [8, 0]
+        ]
+      }
+    ];
+
+    drawLineShape(ctx, shape, 0, 0, 0, '#ffff55', 2, {
+      preserveScreenLineWidth: true,
+      lineDash: [1, 3]
+    });
+
+    expect(ctx.setLineDash).toHaveBeenCalledWith([0.5, 1.5]);
   });
 });

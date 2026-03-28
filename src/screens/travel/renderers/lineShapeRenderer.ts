@@ -2,6 +2,7 @@ import type { LineShape } from '../background/types';
 
 interface DrawLineShapeOptions {
   preserveScreenLineWidth?: boolean;
+  lineDash?: readonly number[];
 }
 
 /**
@@ -27,6 +28,13 @@ export function drawLineShape(
   // compensate for canvas transforms to keep the perceived stroke width equal
   // to the ship wireframe baseline instead of ballooning with zoom.
   ctx.lineWidth = options.preserveScreenLineWidth ? 1.5 / Math.max(Math.abs(scale), 0.0001) : 1.5;
+  // Background object previews can zoom aggressively, so dash spacing can be
+  // kept in screen space too; otherwise the gaps grow with the transformed geometry.
+  ctx.setLineDash(
+    options.lineDash
+      ? options.lineDash.map((segment) => (options.preserveScreenLineWidth ? segment / Math.max(Math.abs(scale), 0.0001) : segment))
+      : []
+  );
   ctx.shadowBlur = 6;
   ctx.shadowColor = color;
 
