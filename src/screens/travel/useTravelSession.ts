@@ -19,14 +19,13 @@ import {
   type FlightPhase
 } from '../../domain/travelCombat';
 import type { TravelState } from '../../store/types';
-import { renderCanvas } from './renderCanvas';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
-import { createStars } from './renderers/starsRenderer';
 import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
+import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -36,7 +35,8 @@ import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
  * must trigger re-renders: HUD text/colors, overlay messages, and joystick UI.
  * The combat state, phase machine, timers, and star field remain mutable locals
  * inside the effect so the animation loop can advance them every frame without
- * paying React reconciliation costs.
+ * paying React reconciliation costs, while the Three.js viewport consumes that
+ * mutable snapshot strictly as a rendering concern.
  */
 const INITIAL_HUD = {
   energyBanks: [1, 1, 1, 1],
@@ -369,6 +369,10 @@ export function useTravelSession(
     if (!originSystem || !destinationSystem) {
       return undefined;
     }
+    // Undocking reuses the travel-session contract with origin===destination
+    // and zero jump fuel. Treat that as "no hyperspace route selected" so the
+    // HUD and controls do not imply a destination jump exists.
+    const hasHyperspaceRoute = session.fuelUnits > 0 && session.originSystem !== session.destinationSystem;
 
     const canvas = refs.canvasRef.current;
     const viewport = refs.viewportRef.current;
@@ -376,10 +380,7 @@ export function useTravelSession(
       return undefined;
     }
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return undefined;
-    }
+    const travelSceneRenderer = new TravelSceneRenderer(canvas);
 
     const random = createMathRandomSource();
     const combatState = createTravelCombatState(
@@ -404,6 +405,7 @@ export function useTravelSession(
     const resize = () => {
       cw = canvas.width = viewport.clientWidth;
       ch = canvas.height = viewport.clientHeight;
+      travelSceneRenderer.resize(cw, ch);
     };
     resize();
 
@@ -472,7 +474,7 @@ export function useTravelSession(
       setEcmState({
         visible: combatState.playerLoadout.installedEquipment.ecm
       });
-      setHyperspaceHiddenState(jumpCompleted);
+      setHyperspaceHiddenState(!hasHyperspaceRoute || jumpCompleted);
       // The DOCK control is a purchased capability. Once owned, it stays on
       // screen so the player can see when station position enables it again,
       // and whether the docking computer currently owns the controls.
@@ -533,6 +535,11 @@ export function useTravelSession(
       if (flightState === 'HYPERSPACE' || flightState === 'GAMEOVER' || jumpCompleted) {
         return;
       }
+      if (!hasHyperspaceRoute) {
+        inputRef.current.hyperspace = false;
+        updateHud();
+        return;
+      }
       if (isPlayerInStationSafeZone(combatState)) {
         showMessage('SAFE ZONE', 900);
         inputRef.current.hyperspace = false;
@@ -582,7 +589,10 @@ export function useTravelSession(
       playerDestructionTimerMs = 0;
       playerDestructionPulseTimerMs = 0;
       respawnReady = false;
-      showMessage(`ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}`, 2400);
+      showMessage(
+        hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
+        2400
+      );
       updateHud();
       resetInput();
     };
@@ -622,18 +632,15 @@ export function useTravelSession(
         if (playerDestructionTimerMs <= 0 && respawnReady && liveInput.toggleLasers) {
           resetPrototype();
         }
-        renderCanvas(
-          ctx,
+        travelSceneRenderer.renderFrame({
           combatState,
           stars,
           flightState,
-          cw,
-          ch,
-          jumpCompleted ? session.destinationSystem : session.originSystem,
-          false,
+          systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
+          showTargetLock: false,
           radarInsetTop,
           radarInsetRight
-        );
+        });
         pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
         if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
           publishPerfSnapshot(timestamp);
@@ -888,18 +895,15 @@ export function useTravelSession(
       }
 
       updateHud();
-      renderCanvas(
-        ctx,
+      travelSceneRenderer.renderFrame({
         combatState,
         stars,
         flightState,
-        cw,
-        ch,
-        jumpCompleted ? session.destinationSystem : session.originSystem,
-        Boolean(combatState.playerTargetLock),
+        systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
+        showTargetLock: Boolean(combatState.playerTargetLock),
         radarInsetTop,
         radarInsetRight
-      );
+      });
       pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
       if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
         publishPerfSnapshot(timestamp);
@@ -916,6 +920,7 @@ export function useTravelSession(
       // leak held inputs into the next session.
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
+      travelSceneRenderer.dispose();
       resetInput();
     };
   }, [commander, completeTravel, inputRef, joyActiveRef, jumpPointerIdRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
