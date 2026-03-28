@@ -429,6 +429,7 @@ export function useTravelSession(
     let respawnReady = false;
     let playerBankTurnProgress = 0;
     let playerBankTurnSign = 0;
+    let previousJoystickBankHeading: number | null = null;
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
@@ -595,6 +596,7 @@ export function useTravelSession(
       respawnReady = false;
       playerBankTurnProgress = 0;
       playerBankTurnSign = 0;
+      previousJoystickBankHeading = null;
       showMessage(
         hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
         2400
@@ -702,8 +704,17 @@ export function useTravelSession(
         flightState = 'PLAYING';
       }
 
-      if (joyActiveRef.current && liveInput.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
-        combatState.player.angle = Math.atan2(liveInput.vectorY, liveInput.vectorX);
+      const joystickHeadingActive = joyActiveRef.current && liveInput.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING';
+      let joystickHeadingDelta = 0;
+      if (joystickHeadingActive) {
+        const joystickHeading = Math.atan2(liveInput.vectorY, liveInput.vectorX);
+        if (previousJoystickBankHeading !== null) {
+          joystickHeadingDelta = clampAngle(joystickHeading - previousJoystickBankHeading);
+        }
+        previousJoystickBankHeading = joystickHeading;
+        combatState.player.angle = joystickHeading;
+      } else {
+        previousJoystickBankHeading = null;
       }
 
       if (jumpActivationFrames > 0) {
@@ -743,7 +754,8 @@ export function useTravelSession(
       }
 
       const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.turn ?? liveInput.turn;
-      const playerTurnSign = Math.sign(playerTurnCommand);
+      const playerBankInput = joystickHeadingActive ? joystickHeadingDelta : playerTurnCommand;
+      const playerTurnSign = Math.sign(playerBankInput);
       if (playerTurnSign === 0) {
         playerBankTurnProgress = 0;
         playerBankTurnSign = 0;
@@ -774,13 +786,15 @@ export function useTravelSession(
         commander.cargo,
         random
       );
-      let signedHeadingDelta = 0;
       if (playerTurnSign !== 0) {
-        // Only count heading change that continues turning in the commanded
-        // direction. Virtual joystick steering can apply tiny corrective
-        // back-and-forth adjustments while holding a steady heading; those
-        // should not keep advancing the bank cycle.
-        signedHeadingDelta = clampAngle(combatState.player.angle - previousPlayerAngle) * playerTurnSign;
+        // Keyboard and auto-dock steering expose an incremental turn command,
+        // so their banking cycle advances from the actual ship heading delta.
+        // The virtual joystick is different: it snaps the ship toward an
+        // absolute heading, so only changes in the joystick's target heading
+        // should advance bank progress. Holding the same joystick direction
+        // must not keep winding the bank cycle forward.
+        const headingDelta = joystickHeadingActive ? joystickHeadingDelta : clampAngle(combatState.player.angle - previousPlayerAngle);
+        const signedHeadingDelta = headingDelta * playerTurnSign;
         if (signedHeadingDelta > 0) {
           playerBankTurnProgress += signedHeadingDelta;
         }
@@ -926,22 +940,6 @@ export function useTravelSession(
 
       updateHud();
       const playerBankAngle = getPlayerBankAngle(playerBankTurnProgress, playerBankTurnSign);
-      if (Math.abs(playerTurnCommand) > 0.01) {
-        // Temporary joystick/bank debug: shows whether held steering keeps
-        // advancing the bank cycle even when heading should be stable.
-        console.log('[travel-bank-debug]', {
-          turn: Number(playerTurnCommand.toFixed(3)),
-          turnSign: playerTurnSign,
-          angle: Number(combatState.player.angle.toFixed(3)),
-          delta: Number(signedHeadingDelta.toFixed(4)),
-          progress: Number(playerBankTurnProgress.toFixed(4)),
-          bank: Number(playerBankAngle.toFixed(4)),
-          joyActive: joyActiveRef.current,
-          vectorX: Number(liveInput.vectorX.toFixed(3)),
-          vectorY: Number(liveInput.vectorY.toFixed(3)),
-          vectorStrength: Number(liveInput.vectorStrength.toFixed(3))
-        });
-      }
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
