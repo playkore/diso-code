@@ -4,7 +4,7 @@ import { useGameStore } from '../store/useGameStore';
 
 export function SystemDataScreen() {
   const universe = useGameStore((state) => state.universe);
-  const system = getSystemByName(universe.currentSystem)?.data;
+  const system = getSystemByName(universe.currentSystem, universe.galaxyIndex)?.data;
 
   if (!system) {
     return (
@@ -24,6 +24,8 @@ export function SystemDataScreen() {
     <section className="screen">
       <h2>Data on System</h2>
       <dl className="detail-grid">
+        <dt>Galaxy</dt>
+        <dd>{universe.galaxyIndex + 1}</dd>
         <dt>Name</dt>
         <dd>{system.name}</dd>
         <dt>Economy</dt>

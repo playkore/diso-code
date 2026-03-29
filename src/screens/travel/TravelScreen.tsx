@@ -23,6 +23,7 @@ export function TravelScreen() {
       cargo: state.commander.cargo,
       missionCargo: state.commander.missionCargo,
       legalValue: state.commander.legalValue,
+      galaxyIndex: state.universe.galaxyIndex,
       energyBanks: state.commander.energyBanks,
       energyPerBank: state.commander.energyPerBank,
       laserMounts: state.commander.laserMounts,

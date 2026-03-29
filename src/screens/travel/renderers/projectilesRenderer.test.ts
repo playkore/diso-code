@@ -71,6 +71,7 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
         fuel_scoops: false,
         ecm: false,
         docking_computer: false,
+        galactic_hyperdrive: false,
         extra_energy_unit: false,
         energy_box_2: false,
         energy_box_3: false,

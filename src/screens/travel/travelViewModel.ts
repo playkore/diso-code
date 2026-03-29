@@ -69,7 +69,7 @@ export function getHudState(
     laserHeat,
     jump: drives.jump,
     hyperspace: drives.hyperspace,
-    legal: `${getLegalStatus(state.legalValue)} ${state.legalValue}`,
+    legal: `${getLegalStatus(state.legalValue, { docked: false })} ${state.legalValue}`,
     hostileCount,
     threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount}`,
     arc: `${state.lastPlayerArc.toUpperCase()} ${state.encounter.ecmTimer > 0 ? ' ECM' : ''}${bombVisible ? ' BOMB' : ''}`,

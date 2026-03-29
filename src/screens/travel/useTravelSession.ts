@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getSystemByName, getSystemHeading } from '../../domain/galaxyCatalog';
-import { applyLaunchLegalFloor, type CommanderState } from '../../domain/commander';
+import type { CommanderState } from '../../domain/commander';
 import { dispatchScenarioEvent, getScenarioFlightOverlay, type PersistedScenarioState, type ScenarioFlightOverlay, type ScenarioToast } from '../../domain/scenarios';
 import { clampAngle } from '../../domain/combat/state';
 import {
@@ -83,6 +83,7 @@ interface CombatCommanderSnapshot {
   cargo: CommanderState['cargo'];
   missionCargo: CommanderState['missionCargo'];
   legalValue: CommanderState['legalValue'];
+  galaxyIndex: number;
   energyBanks: CommanderState['energyBanks'];
   energyPerBank: CommanderState['energyPerBank'];
   laserMounts: CommanderState['laserMounts'];
@@ -396,8 +397,8 @@ export function useTravelSession(
 
     // Resolve all fixed session dependencies up front. If any of them are
     // missing, the travel view bails out instead of running a partial loop.
-    const originSystem = getSystemByName(session.originSystem)?.data;
-    const destinationSystem = getSystemByName(session.destinationSystem)?.data;
+    const originSystem = getSystemByName(session.originSystem, commander.galaxyIndex)?.data;
+    const destinationSystem = getSystemByName(session.destinationSystem, commander.galaxyIndex)?.data;
     if (!originSystem || !destinationSystem) {
       return undefined;
     }
@@ -417,9 +418,7 @@ export function useTravelSession(
     const random = createMathRandomSource();
     const combatState = createTravelCombatState(
       {
-        // The live flight session starts from launch-time FIST, including the
-        // temporary contraband floor that BBC Elite applies when leaving dock.
-        legalValue: applyLaunchLegalFloor(commander.legalValue, commander.cargo, commander.missionCargo),
+        legalValue: commander.legalValue,
         government: originSystem.government,
         techLevel: originSystem.techLevel,
         missionContext: session.missionContext,
@@ -635,7 +634,7 @@ export function useTravelSession(
       }
       // Align the ship with the selected chart route so the hyperspace tunnel
       // launches toward the destination the same way the maps present it.
-      const hyperspaceHeading = getSystemHeading(session.originSystem, session.destinationSystem);
+      const hyperspaceHeading = getSystemHeading(session.originSystem, session.destinationSystem, commander.galaxyIndex);
       if (hyperspaceHeading !== null) {
         combatState.player.angle = hyperspaceHeading;
       }
@@ -652,7 +651,7 @@ export function useTravelSession(
     const resetPrototype = () => {
       const fresh = createTravelCombatState(
         {
-          legalValue: applyLaunchLegalFloor(commander.legalValue, commander.cargo, commander.missionCargo),
+          legalValue: commander.legalValue,
           government: originSystem.government,
           techLevel: originSystem.techLevel,
           missionContext: session.missionContext,

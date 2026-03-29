@@ -45,7 +45,7 @@ type CompactCommanderPayload = [
   [LaserId | null, LaserId | null, LaserId | null, LaserId | null],
   number,
   number,
-  string,
+  number,
   string
 ];
 
@@ -60,13 +60,14 @@ function encodeInstalledEquipmentBits(commander: CommanderState): number {
     (commander.installedEquipment.fuel_scoops ? 1 << 1 : 0) |
     (commander.installedEquipment.ecm ? 1 << 2 : 0) |
     (commander.installedEquipment.docking_computer ? 1 << 3 : 0) |
-    (commander.installedEquipment.extra_energy_unit ? 1 << 4 : 0) |
-    (commander.installedEquipment.energy_box_2 ? 1 << 5 : 0) |
-    (commander.installedEquipment.energy_box_3 ? 1 << 6 : 0) |
-    (commander.installedEquipment.energy_box_4 ? 1 << 7 : 0) |
-    (commander.installedEquipment.large_cargo_bay ? 1 << 8 : 0) |
-    (commander.installedEquipment.escape_pod ? 1 << 9 : 0) |
-    (commander.installedEquipment.energy_bomb ? 1 << 10 : 0)
+    (commander.installedEquipment.galactic_hyperdrive ? 1 << 4 : 0) |
+    (commander.installedEquipment.extra_energy_unit ? 1 << 5 : 0) |
+    (commander.installedEquipment.energy_box_2 ? 1 << 6 : 0) |
+    (commander.installedEquipment.energy_box_3 ? 1 << 7 : 0) |
+    (commander.installedEquipment.energy_box_4 ? 1 << 8 : 0) |
+    (commander.installedEquipment.large_cargo_bay ? 1 << 9 : 0) |
+    (commander.installedEquipment.escape_pod ? 1 << 10 : 0) |
+    (commander.installedEquipment.energy_bomb ? 1 << 11 : 0)
   );
 }
 
@@ -76,13 +77,14 @@ function decodeInstalledEquipmentBits(bits: number) {
     fuel_scoops: (bits & (1 << 1)) !== 0,
     ecm: (bits & (1 << 2)) !== 0,
     docking_computer: (bits & (1 << 3)) !== 0,
-    extra_energy_unit: (bits & (1 << 4)) !== 0,
-    energy_box_2: (bits & (1 << 5)) !== 0,
-    energy_box_3: (bits & (1 << 6)) !== 0,
-    energy_box_4: (bits & (1 << 7)) !== 0,
-    large_cargo_bay: (bits & (1 << 8)) !== 0,
-    escape_pod: (bits & (1 << 9)) !== 0,
-    energy_bomb: (bits & (1 << 10)) !== 0
+    galactic_hyperdrive: (bits & (1 << 4)) !== 0,
+    extra_energy_unit: (bits & (1 << 5)) !== 0,
+    energy_box_2: (bits & (1 << 6)) !== 0,
+    energy_box_3: (bits & (1 << 7)) !== 0,
+    energy_box_4: (bits & (1 << 8)) !== 0,
+    large_cargo_bay: (bits & (1 << 9)) !== 0,
+    escape_pod: (bits & (1 << 10)) !== 0,
+    energy_bomb: (bits & (1 << 11)) !== 0
   };
 }
 
@@ -109,7 +111,7 @@ function toCompactPayload(commander: CommanderState): CompactCommanderPayload {
     ],
     encodeInstalledEquipmentBits(commander),
     commander.tally,
-    commander.rating,
+    commander.combatRatingScore,
     commander.currentSystem
   ];
 }
@@ -137,6 +139,7 @@ function fromCompactPayload(payload: CompactCommanderPayload): CommanderState {
     },
     installedEquipment: decodeInstalledEquipmentBits(payload[14]),
     tally: payload[15],
+    combatRatingScore: payload[16],
     currentSystem: payload[17]
   });
 }

@@ -2,7 +2,7 @@ import { createDefaultCommander, normalizeCommanderState, type CommanderState } 
 import { encodeCommanderBinary256 } from '../domain/commanderPersistence';
 import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/gamePersistence';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
-import { getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
+import { getGalaxySystems, getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../domain/market';
 import { createScenarioSnapshot, getScenarioMissionPanel, type PersistedScenarioState } from '../domain/scenarios';
 import { formatCredits } from '../utils/money';
@@ -74,7 +74,7 @@ export function refreshItems(session: DockedMarketSession): MarketState {
  */
 export function updateMissionLog(commander: CommanderState): MissionsState {
   return {
-    availableContracts: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem), 3124).availableContracts,
+    availableContracts: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem, 0), 3124).availableContracts,
     activeMissionMessages: []
   };
 }
@@ -91,14 +91,16 @@ export function getCheapestCommodity(session: DockedMarketSession) {
  */
 export function createInitialGameState(commander: CommanderState) {
   const normalizedCommander = normalizeCommanderState(commander);
-  const system = getSystemByName(normalizedCommander.currentSystem);
+  const galaxyIndex = 0;
+  const system = getSystemByName(normalizedCommander.currentSystem, galaxyIndex);
   const economy = system?.data.economy ?? 5;
   const scenarioSnapshot = createScenarioSnapshot({ currentSystem: normalizedCommander.currentSystem });
 
   return {
     universe: {
+      galaxyIndex,
       currentSystem: normalizedCommander.currentSystem,
-      nearbySystems: getNearbySystemNames(normalizedCommander.currentSystem),
+      nearbySystems: getNearbySystemNames(normalizedCommander.currentSystem, galaxyIndex),
       stardate: 3124,
       economy,
       marketFluctuation: 0
@@ -128,8 +130,8 @@ export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' |
 /**
  * Safe lookup for a system's tech level.
  */
-export function getCurrentTechLevel(systemName: string): number {
-  return getSystemByName(systemName)?.data.techLevel ?? 0;
+export function getCurrentTechLevel(systemName: string, galaxyIndex = 0): number {
+  return getSystemByName(systemName, galaxyIndex)?.data.techLevel ?? 0;
 }
 
 /**
@@ -143,7 +145,7 @@ export function createDockedState(
 ) {
   // Validate the jump before mutating anything if this transition is supposed
   // to consume hyperspace fuel.
-  const distance = getSystemDistance(state.universe.currentSystem, systemName);
+  const distance = getSystemDistance(state.universe.currentSystem, systemName, state.universe.galaxyIndex);
   const jumpFuelUnits = getJumpFuelUnits(distance);
   const availableFuelUnits = getFuelUnits(state.commander.fuel);
   if (options.spendJumpFuel && (!Number.isFinite(distance) || jumpFuelUnits <= 0 || jumpFuelUnits > availableFuelUnits)) {
@@ -156,7 +158,7 @@ export function createDockedState(
   if (options.spendJumpFuel) {
     nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
   }
-  const nextSystem = getSystemByName(systemName);
+  const nextSystem = getSystemByName(systemName, state.universe.galaxyIndex);
   const nextEconomy = nextSystem?.data.economy ?? state.universe.economy;
   const fluctuation = (state.universe.stardate + systemName.length) & 0xff;
   const nextMarket = createMarketState(systemName, nextEconomy, fluctuation);
@@ -167,7 +169,7 @@ export function createDockedState(
     universe: {
       ...state.universe,
       currentSystem: systemName,
-      nearbySystems: getNearbySystemNames(systemName),
+      nearbySystems: getNearbySystemNames(systemName, state.universe.galaxyIndex),
       economy: nextEconomy,
       marketFluctuation: fluctuation,
       stardate: state.universe.stardate + (options.stardateDelta ?? 1)
@@ -175,7 +177,7 @@ export function createDockedState(
     commander: nextCommander,
     market: nextMarket,
     missions: {
-      ...createInitialMissionState(systemName, getNearbySystemNames(systemName), state.universe.stardate + (options.stardateDelta ?? 1)),
+      ...createInitialMissionState(systemName, getNearbySystemNames(systemName, state.universe.galaxyIndex), state.universe.stardate + (options.stardateDelta ?? 1)),
       activeMissionMessages: []
     },
     ui: withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
@@ -187,7 +189,7 @@ export function createDockedState(
  * `createDockedState` and then adds the arrival-specific UI summary.
  */
 export function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
-  const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName));
+  const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName, state.universe.galaxyIndex));
   const nextState = createDockedState(state, systemName, {
     spendJumpFuel: true,
     title: `Docked at ${systemName}`,
@@ -211,6 +213,66 @@ export function createArrivalState(state: Pick<GameStore, 'universe' | 'commande
 }
 
 /**
+ * Galactic hyperdrive is a docked-only world transition in this codebase. It
+ * switches to the next generated galaxy, rebuilds the docked market context,
+ * and consumes the installed drive without invoking the in-flight travel loop.
+ */
+export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander' | 'universe' | 'ui' | 'scenario'>) {
+  const nextGalaxyIndex = (state.universe.galaxyIndex + 1) % 8;
+  const currentSystem = getSystemByName(state.universe.currentSystem, state.universe.galaxyIndex);
+  const nextGalaxySystems = getGalaxySystems(nextGalaxyIndex);
+  const namedTarget = getSystemByName(state.universe.currentSystem, nextGalaxyIndex);
+  const indexedTarget = typeof currentSystem?.index === 'number' ? nextGalaxySystems[currentSystem.index] : undefined;
+  const destinationSystem = namedTarget ?? indexedTarget ?? nextGalaxySystems[0];
+  if (!destinationSystem) {
+    return null;
+  }
+
+  const commander = normalizeCommanderState({
+    ...state.commander,
+    currentSystem: destinationSystem.data.name,
+    installedEquipment: {
+      ...state.commander.installedEquipment,
+      galactic_hyperdrive: false
+    }
+  });
+  const fluctuation = (state.universe.stardate + destinationSystem.data.name.length) & 0xff;
+  const nearbySystems = getNearbySystemNames(destinationSystem.data.name, nextGalaxyIndex);
+
+  return {
+    commander,
+    universe: {
+      ...state.universe,
+      galaxyIndex: nextGalaxyIndex,
+      currentSystem: destinationSystem.data.name,
+      nearbySystems,
+      economy: destinationSystem.data.economy,
+      marketFluctuation: fluctuation
+    },
+    market: createMarketState(destinationSystem.data.name, destinationSystem.data.economy, fluctuation),
+    missions: {
+      ...createInitialMissionState(destinationSystem.data.name, nearbySystems, state.universe.stardate),
+      activeMissionMessages: []
+    },
+    scenario: createScenarioState(
+      {
+        activePluginId: state.scenario.activePluginId,
+        runtimeState: state.scenario.runtimeState
+      },
+      destinationSystem.data.name
+    ),
+    ui: withUiMessage(
+      state.ui,
+      createUiMessage(
+        'success',
+        'Galactic Hyperdrive engaged',
+        `Arrived in galaxy ${nextGalaxyIndex + 1} at ${destinationSystem.data.name}.`
+      )
+    )
+  };
+}
+
+/**
  * Rehydrates a saved snapshot into live store-ready state.
  */
 export function restoreSnapshot(snapshot: GameSnapshot) {
@@ -221,10 +283,15 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
     universe: {
       ...snapshot.universe,
       currentSystem: commander.currentSystem,
-      nearbySystems: getNearbySystemNames(commander.currentSystem)
+      galaxyIndex: snapshot.universe.galaxyIndex ?? 0,
+      nearbySystems: getNearbySystemNames(commander.currentSystem, snapshot.universe.galaxyIndex ?? 0)
     },
     market: refreshItems(snapshot.marketSession),
-    missions: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem), snapshot.universe.stardate),
+    missions: createInitialMissionState(
+      commander.currentSystem,
+      getNearbySystemNames(commander.currentSystem, snapshot.universe.galaxyIndex ?? 0),
+      snapshot.universe.stardate
+    ),
     scenario: createScenarioState(scenarioSnapshot, commander.currentSystem)
   };
 }

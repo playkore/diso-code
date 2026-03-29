@@ -4,6 +4,7 @@ import type { MissionMessage, MissionOffer, MissionTravelContext } from '../doma
 import type { ScenarioMissionPanel, ScenarioToast } from '../domain/scenarios';
 
 export interface UniverseState {
+  galaxyIndex: number;
   currentSystem: string;
   nearbySystems: string[];
   stardate: number;

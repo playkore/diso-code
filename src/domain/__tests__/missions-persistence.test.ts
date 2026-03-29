@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyLaunchLegalFloor,
-  coolLegalValueAfterHyperspace,
   createDefaultCommander,
-  getCombatRating,
+  getDosCombatRating,
   getCargoBadness,
   getLegalStatus,
   getMissionCargoLegalBadness,
@@ -23,7 +21,8 @@ describe('missions and commander persistence', () => {
     expect(getCargoBadness({ slaves: 2, narcotics: 3, firearms: 5 })).toBe(15);
     expect(getLegalStatus(0)).toBe('clean');
     expect(getLegalStatus(10)).toBe('offender');
-    expect(getLegalStatus(50)).toBe('fugitive');
+    expect(getLegalStatus(10, { docked: true })).toBe('offender');
+    expect(getLegalStatus(16)).toBe('fugitive');
   });
 
   it('accounts for mission cargo tonnage and legal badness', () => {
@@ -32,41 +31,36 @@ describe('missions and commander persistence', () => {
     ];
     expect(missionCargoUsedTonnes(missionCargo)).toBe(0);
     expect(getMissionCargoLegalBadness(missionCargo)).toBe(2);
-    expect(applyLaunchLegalFloor(0, {}, missionCargo)).toBe(2);
   });
 
-  it('maps BBC 1984 tally thresholds to combat ratings', () => {
-    expect(getCombatRating(0)).toBe('Harmless');
-    expect(getCombatRating(7)).toBe('Harmless');
-    expect(getCombatRating(8)).toBe('Mostly Harmless');
-    expect(getCombatRating(15)).toBe('Mostly Harmless');
-    expect(getCombatRating(16)).toBe('Poor');
-    expect(getCombatRating(31)).toBe('Poor');
-    expect(getCombatRating(32)).toBe('Average');
-    expect(getCombatRating(63)).toBe('Average');
-    expect(getCombatRating(64)).toBe('Above Average');
-    expect(getCombatRating(127)).toBe('Above Average');
-    expect(getCombatRating(128)).toBe('Competent');
-    expect(getCombatRating(511)).toBe('Competent');
-    expect(getCombatRating(512)).toBe('Dangerous');
-    expect(getCombatRating(2559)).toBe('Dangerous');
-    expect(getCombatRating(2560)).toBe('Deadly');
-    expect(getCombatRating(6399)).toBe('Deadly');
-    expect(getCombatRating(6400)).toBe('Elite');
+  it('maps DOS Elite Plus score thresholds to combat ratings', () => {
+    expect(getDosCombatRating(0)).toBe('Harmless');
+    expect(getDosCombatRating(1)).toBe('Harmless');
+    expect(getDosCombatRating(2)).toBe('Mostly Harmless');
+    expect(getDosCombatRating(3)).toBe('Mostly Harmless');
+    expect(getDosCombatRating(4)).toBe('Poor');
+    expect(getDosCombatRating(8)).toBe('Poor');
+    expect(getDosCombatRating(9)).toBe('Average');
+    expect(getDosCombatRating(19)).toBe('Average');
+    expect(getDosCombatRating(20)).toBe('Above Average');
+    expect(getDosCombatRating(34)).toBe('Above Average');
+    expect(getDosCombatRating(35)).toBe('Competent');
+    expect(getDosCombatRating(89)).toBe('Competent');
+    expect(getDosCombatRating(90)).toBe('Dangerous');
+    expect(getDosCombatRating(154)).toBe('Dangerous');
+    expect(getDosCombatRating(155)).toBe('Deadly');
+    expect(getDosCombatRating(999)).toBe('Deadly');
+    expect(getDosCombatRating(1000)).toBe('Elite');
   });
 
-  it('recomputes rating from tally during normalization', () => {
+  it('recomputes rating from DOS combat score during normalization', () => {
     const commander = normalizeCommanderState({
       ...createDefaultCommander(),
       tally: 128,
+      combatRatingScore: 90,
       rating: 'Harmless'
     });
-    expect(commander.rating).toBe('Competent');
-  });
-
-  it('cools legal value after hyperspace without reapplying cargo pressure', () => {
-    expect(coolLegalValueAfterHyperspace(50)).toBe(25);
-    expect(coolLegalValueAfterHyperspace(51)).toBe(25);
+    expect(commander.rating).toBe('Dangerous');
   });
 
   it('accepts offers and generates inbox messages from mission state', () => {
@@ -89,7 +83,8 @@ describe('missions and commander persistence', () => {
   it('round-trips commander through JSON and binary saves', () => {
     const commander = createDefaultCommander();
     commander.cash = 2222;
-    commander.tally = 512;
+    commander.tally = 12;
+    commander.combatRatingScore = 155;
     commander.rating = 'Harmless';
     commander.installedEquipment.ecm = true;
     commander.installedEquipment.shield_generator = true;
@@ -106,14 +101,16 @@ describe('missions and commander persistence', () => {
     expect(fromJson.cash).toBe(2222);
     expect(fromJson.installedEquipment.ecm).toBe(true);
     expect(fromJson.installedEquipment.shield_generator).toBe(true);
-    expect(fromJson.rating).toBe('Dangerous');
+    expect(fromJson.rating).toBe('Deadly');
+    expect(fromJson.combatRatingScore).toBe(155);
     expect(fromJson.activeMissions).toHaveLength(1);
     expect(fromBinary.activeMissions).toEqual([]);
     expect(fromBinary.missionCargo).toEqual([]);
     expect(fromBinary.laserMounts.rear).toBe('beam_laser');
     expect(fromBinary.energyBanks).toBe(2);
     expect(fromBinary.installedEquipment.shield_generator).toBe(true);
-    expect(fromBinary.rating).toBe('Dangerous');
+    expect(fromBinary.rating).toBe('Deadly');
+    expect(fromBinary.combatRatingScore).toBe(155);
   });
 
   it('round-trips a full game snapshot through save slot JSON', () => {
@@ -122,6 +119,7 @@ describe('missions and commander persistence', () => {
       {
         commander,
         universe: {
+          galaxyIndex: 0,
           currentSystem: 'Lave',
           nearbySystems: ['Leesti'],
           stardate: 3124,
@@ -144,7 +142,7 @@ describe('missions and commander persistence', () => {
     const first = serializeGameJson(
       {
         commander: createDefaultCommander(),
-        universe: { currentSystem: 'Lave', nearbySystems: ['Leesti'], stardate: 3124, economy: 5, marketFluctuation: 0 },
+        universe: { galaxyIndex: 0, currentSystem: 'Lave', nearbySystems: ['Leesti'], stardate: 3124, economy: 5, marketFluctuation: 0 },
         marketSession: createDockedMarketSession('Lave', 5, 0)
       },
       '2026-03-15T00:00:00.000Z'
@@ -154,7 +152,7 @@ describe('missions and commander persistence', () => {
     const second = serializeGameJson(
       {
         commander: secondCommander,
-        universe: { currentSystem: 'Diso', nearbySystems: ['Lave'], stardate: 3125, economy: 0, marketFluctuation: 4 },
+        universe: { galaxyIndex: 0, currentSystem: 'Diso', nearbySystems: ['Lave'], stardate: 3125, economy: 0, marketFluctuation: 4 },
         marketSession: createDockedMarketSession('Diso', 0, 4)
       },
       '2026-03-16T00:00:00.000Z'

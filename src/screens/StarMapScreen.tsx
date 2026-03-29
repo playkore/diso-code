@@ -22,13 +22,11 @@ const GALAXY_MAP_PADDING = 4;
 
 type MapMode = 'local' | 'galaxy';
 
-// The map is centered on the current system. Y is halved to mimic the classic
-// chart aspect ratio used by the original short-range star map.
-function getRelativePoint(currentSystem: string, targetSystem: string, availableFuel: number): StarPoint {
-  const current = getSystemByName(currentSystem)?.data;
-  const target = getSystemByName(targetSystem)?.data;
+function getRelativePoint(currentSystem: string, targetSystem: string, galaxyIndex: number, availableFuel: number): StarPoint {
+  const current = getSystemByName(currentSystem, galaxyIndex)?.data;
+  const target = getSystemByName(targetSystem, galaxyIndex)?.data;
   const { dx, dy } = current && target ? getWrappedChartDelta(current, target) : { dx: 0, dy: 0 };
-  const distance = getSystemDistance(currentSystem, targetSystem);
+  const distance = getSystemDistance(currentSystem, targetSystem, galaxyIndex);
 
   return {
     name: targetSystem,
@@ -39,8 +37,8 @@ function getRelativePoint(currentSystem: string, targetSystem: string, available
   };
 }
 
-function getGalaxyPoint(targetSystem: string, currentSystem: string) {
-  const target = getSystemByName(targetSystem)?.data;
+function getGalaxyPoint(targetSystem: string, currentSystem: string, galaxyIndex: number) {
+  const target = getSystemByName(targetSystem, galaxyIndex)?.data;
 
   return {
     name: targetSystem,
@@ -63,24 +61,27 @@ export function StarMapScreen() {
 
   useEffect(() => {
     setSelectedSystem(null);
-  }, [universe.currentSystem]);
+  }, [universe.currentSystem, universe.galaxyIndex]);
 
   const starPoints = useMemo<StarPoint[]>(
-    () => getVisibleSystems(universe.currentSystem).map((system) => getRelativePoint(universe.currentSystem, system.data.name, currentFuel)),
-    [currentFuel, universe.currentSystem]
+    () =>
+      getVisibleSystems(universe.currentSystem, universe.galaxyIndex).map((system) =>
+        getRelativePoint(universe.currentSystem, system.data.name, universe.galaxyIndex, currentFuel)
+      ),
+    [currentFuel, universe.currentSystem, universe.galaxyIndex]
   );
   const galaxyPoints = useMemo(
-    () => getGalaxySystems().map((system) => getGalaxyPoint(system.data.name, universe.currentSystem)),
-    [universe.currentSystem]
+    () => getGalaxySystems(universe.galaxyIndex).map((system) => getGalaxyPoint(system.data.name, universe.currentSystem, universe.galaxyIndex)),
+    [universe.currentSystem, universe.galaxyIndex]
   );
 
   const selectedPoint = starPoints.find((star) => star.name === selectedSystem) ?? null;
-  const selectedSystemData = selectedSystem ? getSystemByName(selectedSystem)?.data ?? null : null;
+  const selectedSystemData = selectedSystem ? getSystemByName(selectedSystem, universe.galaxyIndex)?.data ?? null : null;
   const selectedSystemFacts = selectedSystemData ? getSystemFacts(selectedSystemData) : null;
-  const selectedDistance = selectedSystem ? getJumpFuelCost(getSystemDistance(universe.currentSystem, selectedSystem)) : null;
+  const selectedDistance = selectedSystem ? getJumpFuelCost(getSystemDistance(universe.currentSystem, selectedSystem, universe.galaxyIndex)) : null;
   const fuelAfterJump = selectedDistance === null ? null : Math.max(0, currentFuel - selectedDistance);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
-  const currentSystemData = getSystemByName(universe.currentSystem)?.data ?? null;
+  const currentSystemData = getSystemByName(universe.currentSystem, universe.galaxyIndex)?.data ?? null;
   const currentSystemFacts = currentSystemData ? getSystemFacts(currentSystemData) : null;
   const detailsSystemName = selectedSystem ?? universe.currentSystem;
   const detailsSystemFacts = selectedSystemFacts ?? currentSystemFacts;
@@ -89,6 +90,7 @@ export function StarMapScreen() {
   return (
     <section className="screen">
       <h2>Local Star Map</h2>
+      <p className="muted">Galaxy {universe.galaxyIndex + 1}</p>
       <div className="segment-control" role="tablist" aria-label="Star map mode">
         <button
           type="button"

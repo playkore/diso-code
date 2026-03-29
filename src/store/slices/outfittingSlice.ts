@@ -3,13 +3,13 @@ import { EQUIPMENT_CATALOG, LASER_CATALOG, MISSILE_CATALOG } from '../../domain/
 import { normalizeCommanderState } from '../../domain/commander';
 import { formatCredits } from '../../utils/money';
 import { createUiMessage, withUiMessage } from '../uiMessages';
-import { getCurrentTechLevel } from '../gameStateFactory';
+import { createGalacticHyperdriveState, getCurrentTechLevel } from '../gameStateFactory';
 import type { GameSlice, GameStore } from '../storeTypes';
 
-export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | 'buyLaser' | 'buyMissile'>> = (set) => ({
+export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | 'buyLaser' | 'buyMissile' | 'useGalacticHyperdrive'>> = (set) => ({
   buyEquipment: (equipmentId) =>
     set((state) => {
-      const techLevel = getCurrentTechLevel(state.universe.currentSystem);
+      const techLevel = getCurrentTechLevel(state.universe.currentSystem, state.universe.galaxyIndex);
       const equipment = EQUIPMENT_CATALOG[equipmentId];
       const check = canBuyEquipment(state.commander, techLevel, equipmentId);
       if (!check.ok) {
@@ -39,7 +39,7 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
     }),
   buyLaser: (mount, laserId) =>
     set((state) => {
-      const techLevel = getCurrentTechLevel(state.universe.currentSystem);
+      const techLevel = getCurrentTechLevel(state.universe.currentSystem, state.universe.galaxyIndex);
       const laser = LASER_CATALOG[laserId];
       const check = canInstallLaser(state.commander, techLevel, mount, laserId);
       if (!check.ok) {
@@ -69,7 +69,7 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
     }),
   buyMissile: () =>
     set((state) => {
-      const techLevel = getCurrentTechLevel(state.universe.currentSystem);
+      const techLevel = getCurrentTechLevel(state.universe.currentSystem, state.universe.galaxyIndex);
       const check = canBuyMissile(state.commander, techLevel);
       if (!check.ok) {
         return {
@@ -90,5 +90,20 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           createUiMessage('success', 'Missile loaded', `Spent ${formatCredits(MISSILE_CATALOG.price)}. Rack now ${nextCommander.missilesInstalled}/${nextCommander.missileCapacity}.`)
         )
       };
+    }),
+  useGalacticHyperdrive: () =>
+    set((state) => {
+      if (!state.commander.installedEquipment.galactic_hyperdrive) {
+        return {
+          ui: withUiMessage(state.ui, createUiMessage('error', 'Galactic Hyperdrive unavailable', 'Install a Galactic Hyperdrive before trying to use it.'))
+        };
+      }
+      const nextState = createGalacticHyperdriveState(state);
+      if (!nextState) {
+        return {
+          ui: withUiMessage(state.ui, createUiMessage('error', 'Galactic jump failed', 'The navigation computer could not resolve a valid destination system.'))
+        };
+      }
+      return nextState;
     })
 });

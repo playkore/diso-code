@@ -26,7 +26,7 @@ describe('galaxy catalog toroidal geometry', () => {
   });
 
   it('shows opposite-edge systems on the local map when the seam route is closer', () => {
-    const systems = getGalaxySystems();
+    const systems = getGalaxySystems(0);
     const origin = systems.find((system) => system.data.x <= 8);
     expect(origin).toBeDefined();
 
@@ -39,11 +39,11 @@ describe('galaxy catalog toroidal geometry', () => {
     });
 
     expect(seamNeighbor).toBeDefined();
-    expect(getVisibleSystems(origin!.data.name).map((system) => system.data.name)).toContain(seamNeighbor!.data.name);
+    expect(getVisibleSystems(origin!.data.name, 0).map((system) => system.data.name)).toContain(seamNeighbor!.data.name);
   });
 
   it('measures jump distance across the seam using the wrapped route', () => {
-    const systems = getGalaxySystems();
+    const systems = getGalaxySystems(0);
     const pair = systems.reduce<{ origin: string; target: string; distance: number } | null>((best, origin) => {
       if (origin.data.x > 8) {
         return best;
@@ -61,7 +61,7 @@ describe('galaxy catalog toroidal geometry', () => {
         return best;
       }
 
-      const distance = getSystemDistance(origin.data.name, candidate.data.name);
+      const distance = getSystemDistance(origin.data.name, candidate.data.name, 0);
       if (!best || distance < best.distance) {
         return { origin: origin.data.name, target: candidate.data.name, distance };
       }
@@ -69,8 +69,8 @@ describe('galaxy catalog toroidal geometry', () => {
     }, null);
 
     expect(pair).not.toBeNull();
-    const origin = getSystemByName(pair!.origin);
-    const target = getSystemByName(pair!.target);
+    const origin = getSystemByName(pair!.origin, 0);
+    const target = getSystemByName(pair!.target, 0);
     expect(origin).toBeDefined();
     expect(target).toBeDefined();
 
@@ -85,7 +85,7 @@ describe('galaxy catalog toroidal geometry', () => {
   });
 
   it('returns a system heading using the same wrapped map route as jump distance', () => {
-    const systems = getGalaxySystems();
+    const systems = getGalaxySystems(0);
     const pair = systems.reduce<{ origin: string; target: string } | null>((best, origin) => {
       if (best || origin.data.x > 8) {
         return best;
@@ -103,10 +103,16 @@ describe('galaxy catalog toroidal geometry', () => {
     }, null);
 
     expect(pair).not.toBeNull();
-    const origin = getSystemByName(pair!.origin);
-    const target = getSystemByName(pair!.target);
+    const origin = getSystemByName(pair!.origin, 0);
+    const target = getSystemByName(pair!.target, 0);
     expect(origin).toBeDefined();
     expect(target).toBeDefined();
-    expect(getSystemHeading(pair!.origin, pair!.target)).toBeCloseTo(getWrappedChartHeading(origin!.data, target!.data));
+    expect(getSystemHeading(pair!.origin, pair!.target, 0)).toBeCloseTo(getWrappedChartHeading(origin!.data, target!.data));
+  });
+
+  it('returns different system catalogs for different galaxies', () => {
+    const firstGalaxy = getGalaxySystems(0);
+    const secondGalaxy = getGalaxySystems(1);
+    expect(firstGalaxy[0]?.data.name).not.toBe(secondGalaxy[0]?.data.name);
   });
 });

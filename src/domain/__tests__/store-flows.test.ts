@@ -33,6 +33,7 @@ describe('outfitting store flows', () => {
       commander,
       universe: {
         ...state.universe,
+        galaxyIndex: 0,
         currentSystem: commander.currentSystem,
         nearbySystems: ['Diso'],
         stardate: 3124,
@@ -116,14 +117,14 @@ describe('outfitting store flows', () => {
 
   it('spends fuel only after docking in the destination system', () => {
     const startingFuel = useGameStore.getState().commander.fuel;
-    const expectedFuel = startingFuel - getJumpFuelCost(getSystemDistance('Lave', 'Diso'));
+    const expectedFuel = startingFuel - getJumpFuelCost(getSystemDistance('Lave', 'Diso', 0));
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
     expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
     expect(useGameStore.getState().commander.fuel).toBe(expectedFuel);
   });
 
-  it('applies contraband legal pressure at launch only', () => {
+  it('does not mutate legal status simply by launching with contraband', () => {
     useGameStore.setState((state) => ({
       ...state,
       commander: normalizeCommanderState({
@@ -137,16 +138,16 @@ describe('outfitting store flows', () => {
 
     expect(useGameStore.getState().commander.legalValue).toBe(0);
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    expect(useGameStore.getState().commander.legalValue).toBe(5);
+    expect(useGameStore.getState().commander.legalValue).toBe(0);
   });
 
-  it('cools legal value after a successful jump without reapplying cargo badness while docked', () => {
+  it('preserves legal value across a successful jump', () => {
     useGameStore.setState((state) => ({
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
         currentSystem: 'Lave',
-        legalValue: 0,
+        legalValue: 20,
         cargo: { slaves: 10 }
       }),
       universe: { ...state.universe, currentSystem: 'Lave' }
@@ -155,7 +156,7 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
     expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
-    expect(useGameStore.getState().commander.legalValue).toBe(10);
+    expect(useGameStore.getState().commander.legalValue).toBe(20);
   });
 
   it('credits combat rewards immediately through the travel slice helper', () => {
@@ -184,6 +185,24 @@ describe('outfitting store flows', () => {
     expect(restoredSession?.activeTab).toBe('missions');
     expect(restoredSession?.restoredState.commander.currentSystem).toBe('Diso');
     expect(restoredSession?.restoredState.commander.cash).toBe(4242);
+  });
+
+  it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        installedEquipment: {
+          ...createDefaultCommander().installedEquipment,
+          galactic_hyperdrive: true
+        }
+      })
+    }));
+
+    useGameStore.getState().useGalacticHyperdrive();
+
+    expect(useGameStore.getState().universe.galaxyIndex).toBe(1);
+    expect(useGameStore.getState().commander.installedEquipment.galactic_hyperdrive).toBe(false);
   });
 
   it('keeps the last docked autosave while travel is in progress', () => {

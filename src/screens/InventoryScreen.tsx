@@ -1,4 +1,4 @@
-import { getCombatRating, getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
+import { getDosCombatRating, getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
 import { MAX_FUEL, getFuelUnits } from '../domain/fuel';
 import { getInstalledEquipmentList } from '../domain/outfitting';
 import { LASER_CATALOG } from '../domain/shipCatalog';
@@ -8,11 +8,12 @@ import { formatLightYears } from '../utils/distance';
 
 export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
+  const galaxyIndex = useGameStore((state) => state.universe.galaxyIndex);
   const buyFuel = useGameStore((state) => state.buyFuel);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(commander.fuel));
   const installedEquipment = getInstalledEquipmentList(commander);
-  const rating = getCombatRating(commander.tally);
+  const rating = getDosCombatRating(commander.combatRatingScore);
   const laserEntries = Object.entries(commander.laserMounts).map(([mount, laserId]) => ({
     mount,
     name: laserId ? LASER_CATALOG[laserId].name : 'Empty'
@@ -29,9 +30,11 @@ export function InventoryScreen() {
         <dt>Fuel</dt>
         <dd>{formatLightYears(commander.fuel)}</dd>
         <dt>Legal</dt>
-        <dd>{getLegalStatus(commander.legalValue)} ({commander.legalValue})</dd>
+        <dd>{getLegalStatus(commander.legalValue, { docked: true })} ({commander.legalValue})</dd>
         <dt>Rating</dt>
         <dd>{rating}</dd>
+        <dt>Galaxy</dt>
+        <dd>{galaxyIndex + 1}</dd>
         <dt>Tally</dt>
         <dd>{commander.tally}</dd>
         <dt>Ship</dt>

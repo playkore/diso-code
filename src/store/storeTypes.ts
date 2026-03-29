@@ -96,6 +96,7 @@ export interface GameStore {
   buyEquipment: (equipmentId: EquipmentId) => void;
   buyLaser: (mount: LaserMountPosition, laserId: LaserId) => void;
   buyMissile: () => void;
+  useGalacticHyperdrive: () => void;
   acceptMission: (offerId: string) => void;
   declineMission: (offerId: string) => void;
   resolveMissionChoice: (missionId: string, choiceId: string) => void;

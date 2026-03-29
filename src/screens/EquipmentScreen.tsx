@@ -16,10 +16,12 @@ const LASER_MOUNTS: LaserMountPosition[] = ['front', 'rear', 'left', 'right'];
 export function EquipmentScreen() {
   const commander = useGameStore((state) => state.commander);
   const currentSystem = useGameStore((state) => state.universe.currentSystem);
+  const galaxyIndex = useGameStore((state) => state.universe.galaxyIndex);
   const buyEquipment = useGameStore((state) => state.buyEquipment);
   const buyLaser = useGameStore((state) => state.buyLaser);
   const buyMissile = useGameStore((state) => state.buyMissile);
-  const techLevel = getSystemByName(currentSystem)?.data.techLevel ?? 0;
+  const useGalacticHyperdrive = useGameStore((state) => state.useGalacticHyperdrive);
+  const techLevel = getSystemByName(currentSystem, galaxyIndex)?.data.techLevel ?? 0;
   const equipmentOffers = getAvailableEquipmentForSystem(techLevel, commander);
   const installedEquipment = getInstalledEquipmentList(commander);
   const missileState = canBuyMissile(commander, techLevel);
@@ -29,7 +31,7 @@ export function EquipmentScreen() {
     <section className="screen">
       <h2>Equipment Market</h2>
       <p className="muted">
-        {currentSystem} tech level {techLevel}
+        Galaxy {galaxyIndex + 1} · {currentSystem} tech level {techLevel}
       </p>
 
       <section className="subpanel">
@@ -61,6 +63,11 @@ export function EquipmentScreen() {
               <li key={name}>{name}</li>
             ))}
           </ul>
+        ) : null}
+        {commander.installedEquipment.galactic_hyperdrive ? (
+          <button type="button" onClick={() => useGalacticHyperdrive()}>
+            Use Galactic Hyperdrive
+          </button>
         ) : null}
       </section>
 

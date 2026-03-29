@@ -6,6 +6,7 @@ export type EquipmentId =
   | 'fuel_scoops'
   | 'ecm'
   | 'docking_computer'
+  | 'galactic_hyperdrive'
   | 'extra_energy_unit'
   | 'energy_box_2'
   | 'energy_box_3'
@@ -170,6 +171,14 @@ export const EQUIPMENT_CATALOG: Record<EquipmentId, EquipmentDefinition> = {
     enablesAutoDock: true,
     unique: true
   },
+  galactic_hyperdrive: {
+    id: 'galactic_hyperdrive',
+    name: 'Galactic Hyperdrive',
+    price: 5000,
+    requiredTechLevel: 10,
+    description: 'Single-use drive that shifts the commander to the next galaxy while docked.',
+    unique: true
+  },
   extra_energy_unit: {
     id: 'extra_energy_unit',
     name: 'Extra Energy Unit',
@@ -246,6 +255,7 @@ export const EQUIPMENT_ORDER: EquipmentId[] = [
   'fuel_scoops',
   'ecm',
   'docking_computer',
+  'galactic_hyperdrive',
   'extra_energy_unit',
   'energy_box_2',
   'energy_box_3',

@@ -1,8 +1,7 @@
 export {
-  applyLaunchLegalFloor,
   clampLegalValue,
-  coolLegalValueAfterHyperspace,
   getCargoBadness,
   getLegalStatus,
+  getDosCombatRating,
   getMinimumLegalValue
 } from './commander';

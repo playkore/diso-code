@@ -9,8 +9,8 @@ import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, t
  * That function is the authority for:
  * - default values for missing fields
  * - migration from legacy `legalStatus` and `equipment` shapes
- * - canonical BBC 1984 derivation of rating from TALLY
- * - preservation of the stored FIST byte while docked
+ * - canonical DOS Elite Plus derivation of rating from a dedicated rank score
+ * - preservation of the stored legal byte across docked saves
  * - equipment-derived capacity defaults such as the cargo bay upgrade
  */
 export type LegalStatus = 'clean' | 'offender' | 'fugitive';
@@ -46,6 +46,7 @@ export interface CommanderState {
   laserMounts: LaserMountState;
   installedEquipment: InstalledEquipmentState;
   tally: number;
+  combatRatingScore: number;
   rating: CombatRating;
   currentSystem: string;
   activeMissions: MissionInstance[];
@@ -61,6 +62,7 @@ function createInstalledEquipmentState(installed: EquipmentId[] = []): Installed
     fuel_scoops: installed.includes('fuel_scoops'),
     ecm: installed.includes('ecm'),
     docking_computer: installed.includes('docking_computer'),
+    galactic_hyperdrive: installed.includes('galactic_hyperdrive'),
     extra_energy_unit: installed.includes('extra_energy_unit'),
     energy_box_2: installed.includes('energy_box_2'),
     energy_box_3: installed.includes('energy_box_3'),
@@ -92,8 +94,8 @@ export function createDefaultCommander(): CommanderState {
     cargoCapacity: PLAYER_SHIP.baseCargoCapacity,
     maxCargoCapacity: PLAYER_SHIP.maxCargoCapacity,
     cargo: {},
-    // New commanders begin with a stripped-down Cobra: one energy box fitted
-    // and the shield generator left for the outfitting market.
+    // New commanders begin with a stripped-down Cobra so the current
+    // outfitting loop still has early upgrades to sell.
     energyBanks: PLAYER_STARTING_ENERGY_BANKS,
     energyPerBank: PLAYER_SHIP.energyPerBank,
     missileCapacity: PLAYER_SHIP.missileCapacity,
@@ -101,10 +103,11 @@ export function createDefaultCommander(): CommanderState {
     laserMounts: createDefaultLaserMounts(),
     installedEquipment: createInstalledEquipmentState(),
     tally: 0,
-    // BBC Micro Elite stores TALLY as an integer kill counter, so the visible
-    // combat rating is always derived from thresholds rather than persisted as
-    // independent progression state.
-    rating: getCombatRating(0),
+    // DOS Elite Plus stores rating progression separately from the visible
+    // label, so rank is derived from this dedicated score rather than from the
+    // legacy tally field.
+    combatRatingScore: 0,
+    rating: getDosCombatRating(0),
     currentSystem: 'Lave',
     activeMissions: [],
     completedMissions: [],
@@ -134,50 +137,57 @@ export function clampLegalValue(value: number): number {
 }
 
 /**
- * Maps the BBC Micro 1984 TALLY thresholds onto the classic rank labels.
+ * Maps DOS Elite Plus rating-score thresholds onto the classic rank labels.
  *
- * In this ruleset every destroyed ship contributes exactly one kill, so rank
- * progression is a pure function of the integer tally value.
+ * Elite Plus stores a separate numeric rank score and uses DOS-specific
+ * thresholds rather than the BBC 1984 TALLY cutoffs.
  */
-export function getCombatRating(tally: number): CombatRating {
-  const normalizedTally = Math.max(0, Math.trunc(tally));
-  if (normalizedTally >= 0x1900) {
+export function getDosCombatRating(score: number): CombatRating {
+  const normalizedScore = Math.max(0, Math.trunc(score));
+  if (normalizedScore >= 1000) {
     return 'Elite';
   }
-  if (normalizedTally >= 0x0a00) {
+  if (normalizedScore >= 155) {
     return 'Deadly';
   }
-  if (normalizedTally >= 0x0200) {
+  if (normalizedScore >= 90) {
     return 'Dangerous';
   }
-  if (normalizedTally >= 0x0080) {
+  if (normalizedScore >= 35) {
     return 'Competent';
   }
-  if (normalizedTally >= 0x0040) {
+  if (normalizedScore >= 20) {
     return 'Above Average';
   }
-  if (normalizedTally >= 0x0020) {
+  if (normalizedScore >= 9) {
     return 'Average';
   }
-  if (normalizedTally >= 0x0010) {
+  if (normalizedScore >= 4) {
     return 'Poor';
   }
-  if (normalizedTally >= 0x0008) {
+  if (normalizedScore >= 2) {
     return 'Mostly Harmless';
   }
   return 'Harmless';
 }
 
-export function getLegalStatus(legalValue: number): LegalStatus {
-  if (legalValue >= 50) {
-    return 'fugitive';
+/**
+ * Elite Plus savegames only persist Clean and Offender because saving is
+ * docked-only. Docked screens therefore project any positive legal byte as
+ * Offender, while the flight HUD can still escalate higher values to Fugitive.
+ */
+export function getLegalStatus(legalValue: number, options: { docked?: boolean } = {}): LegalStatus {
+  const normalizedLegalValue = clampLegalValue(legalValue);
+  if (normalizedLegalValue <= 0) {
+    return 'clean';
   }
-
-  if (legalValue >= 1) {
+  if (options.docked) {
     return 'offender';
   }
-
-  return 'clean';
+  if (normalizedLegalValue >= 16) {
+    return 'fugitive';
+  }
+  return 'offender';
 }
 
 export function getCargoBadness(cargo: Record<string, number>): number {
@@ -199,30 +209,13 @@ export function getMinimumLegalValue(cargo: Record<string, number>): number {
   return clampLegalValue(getCargoBadness(cargo));
 }
 
-/**
- * BBC Elite only forces contraband badness onto FIST when the commander
- * launches. While cargo remains aboard, the legal byte itself still represents
- * the current real status rather than a permanent cargo-derived maximum.
- */
-export function applyLaunchLegalFloor(legalValue: number, cargo: Record<string, number>, missionCargo: MissionCargoItem[] = []): number {
-  return Math.max(clampLegalValue(legalValue), clampLegalValue(getCargoBadness(cargo) + getMissionCargoLegalBadness(missionCargo)));
-}
-
-/**
- * After a successful hyperspace jump, BBC Elite cools FIST by shifting it
- * right one bit. This halves the legal pressure before the next launch.
- */
-export function coolLegalValueAfterHyperspace(legalValue: number): number {
-  return clampLegalValue(legalValue) >> 1;
-}
-
 function legacyLegalValue(status?: string): number {
   if (status === 'fugitive') {
-    return 50;
+    return 16;
   }
 
   if (status === 'offender') {
-    return 40;
+    return 1;
   }
 
   return 0;
@@ -282,11 +275,14 @@ export function normalizeCommanderState(
     | CommanderState
     | (Partial<CommanderState> & { legalStatus?: string; equipment?: string[]; missionTP?: number; missionVariant?: string; rating?: string })
 ): CommanderState {
-  // Legacy saves may only carry a status label, but BBC-style flows treat the
-  // numeric FIST byte as the only source of truth while docked. Contraband can
-  // temporarily floor it at launch, but normalization must not re-apply that.
+  // Legacy saves may only carry a status label. Elite Plus keeps the raw legal
+  // byte as stored state and derives the docked label from it later.
   const legacyStatus = 'legalStatus' in commander ? commander.legalStatus : undefined;
   const tally = Math.max(0, Math.trunc(commander.tally ?? 0));
+  const combatRatingScore = Math.max(
+    0,
+    Math.trunc(typeof commander.combatRatingScore === 'number' ? commander.combatRatingScore : tally)
+  );
   const legalValue = clampLegalValue(typeof commander.legalValue === 'number' ? commander.legalValue : legacyLegalValue(legacyStatus));
   const legacyEquipment = 'equipment' in commander && Array.isArray(commander.equipment) ? commander.equipment : [];
   // New equipment ids can appear after an old save was written, so the
@@ -323,9 +319,10 @@ export function normalizeCommanderState(
     },
     installedEquipment,
     tally,
-    // Persisted rating strings are compatibility baggage only; the canonical
-    // BBC status screen always derives rank directly from TALLY.
-    rating: getCombatRating(tally),
+    combatRatingScore,
+    // Persisted rating strings are compatibility baggage only; Elite Plus
+    // recalculates the visible rank from its dedicated combat score.
+    rating: getDosCombatRating(combatRatingScore),
     currentSystem: commander.currentSystem ?? 'Lave',
     activeMissions: commander.activeMissions ?? [],
     completedMissions: commander.completedMissions ?? [],
