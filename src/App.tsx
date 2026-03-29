@@ -1,6 +1,6 @@
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
-import { MobileFullscreenGate } from './components/MobileFullscreenGate';
+import { StartScreenGate } from './components/StartScreenGate';
 import { BackgroundDebugScreen } from './screens/BackgroundDebugScreen';
 import { EquipmentScreen } from './screens/EquipmentScreen';
 import { GalaxyChartScreen } from './screens/GalaxyChartScreen';
@@ -37,7 +37,7 @@ export default function App() {
   return (
     <>
       <RouterProvider router={router} />
-      <MobileFullscreenGate />
+      <StartScreenGate />
     </>
   );
 }

@@ -38,9 +38,17 @@ interface TravelSceneRenderArgs {
   stars: StarPoint[];
   flightState: FlightPhase;
   systemLabel: string;
+  showRadar?: boolean;
+  showSafeZoneRing?: boolean;
   showTargetLock: boolean;
   playerBankAngle: number;
   enemyBankAngles: ReadonlyMap<number, number>;
+  starfieldAnchor?: {
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+  };
   cameraOverride?: {
     position: { x: number; y: number; z: number };
     lookAt: { x: number; y: number; z: number };
@@ -288,9 +296,12 @@ export class TravelSceneRenderer {
     stars,
     flightState,
     systemLabel,
+    showRadar = true,
+    showSafeZoneRing = true,
     showTargetLock,
     playerBankAngle,
     enemyBankAngles,
+    starfieldAnchor,
     cameraOverride,
     radarInsetTop,
     radarInsetRight
@@ -314,9 +325,9 @@ export class TravelSceneRenderer {
       disposeObject(child);
     }
 
-    this.buildStarfield(stars, combatState, flightState);
-    this.buildWorld(combatState, playerBankAngle, enemyBankAngles);
-    this.buildOverlay(combatState, systemLabel, showTargetLock, radarInsetTop, radarInsetRight);
+    this.buildStarfield(stars, combatState, flightState, starfieldAnchor);
+    this.buildWorld(combatState, playerBankAngle, enemyBankAngles, showSafeZoneRing);
+    this.buildOverlay(combatState, systemLabel, showTargetLock, showRadar, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
 
     this.renderer.clear(true, true, true);
@@ -334,7 +345,13 @@ export class TravelSceneRenderer {
     this.renderer.dispose();
   }
 
-  private buildStarfield(stars: StarPoint[], combatState: TravelCombatState, flightState: FlightPhase) {
+  private buildStarfield(
+    stars: StarPoint[],
+    combatState: TravelCombatState,
+    flightState: FlightPhase,
+    starfieldAnchor?: TravelSceneRenderArgs['starfieldAnchor']
+  ) {
+    const starfieldPlayer = starfieldAnchor ?? combatState.player;
     const buckets = bucketStarsByParallax(stars);
     buckets.forEach((bucket, bucketIndex) => {
       if (bucket.length === 0) {
@@ -344,13 +361,13 @@ export class TravelSceneRenderer {
       if (flightState === 'HYPERSPACE' || flightState === 'JUMPING') {
         const positions: number[] = [];
         for (const star of bucket) {
-          const screen = getWrappedStarScreenPosition(star, combatState.player, this.width, this.height, layer.parallax);
+          const screen = getWrappedStarScreenPosition(star, starfieldPlayer, this.width, this.height, layer.parallax);
           positions.push(
             screen.x,
             screen.y,
             STARFIELD_Z,
-            screen.x - combatState.player.vx * layer.streakScale * 2.4,
-            screen.y - combatState.player.vy * layer.streakScale * 2.4,
+            screen.x - starfieldPlayer.vx * layer.streakScale * 2.4,
+            screen.y - starfieldPlayer.vy * layer.streakScale * 2.4,
             STARFIELD_Z
           );
         }
@@ -364,7 +381,7 @@ export class TravelSceneRenderer {
 
       const positions: number[] = [];
       for (const star of bucket) {
-        const screen = getWrappedStarScreenPosition(star, combatState.player, this.width, this.height, layer.parallax);
+        const screen = getWrappedStarScreenPosition(star, starfieldPlayer, this.width, this.height, layer.parallax);
         positions.push(screen.x, screen.y, STARFIELD_Z);
       }
       const geometry = new BufferGeometry();
@@ -385,7 +402,8 @@ export class TravelSceneRenderer {
   private buildWorld(
     combatState: TravelCombatState,
     playerBankAngle: number,
-    enemyBankAngles: ReadonlyMap<number, number>
+    enemyBankAngles: ReadonlyMap<number, number>,
+    showSafeZoneRing: boolean
   ) {
     if (combatState.station) {
       const station = createStationObject();
@@ -400,9 +418,11 @@ export class TravelSceneRenderer {
       stationAnchor.add(station);
       this.worldGroup.add(stationAnchor);
 
-      const safeZone = createCircleLoop(combatState.station.safeZoneRadius, 96, combatState.encounter.safeZone ? CGA_GREEN : CGA_RED, true);
-      safeZone.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z - 1);
-      this.worldGroup.add(safeZone);
+      if (showSafeZoneRing) {
+        const safeZone = createCircleLoop(combatState.station.safeZoneRadius, 96, combatState.encounter.safeZone ? CGA_GREEN : CGA_RED, true);
+        safeZone.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z - 1);
+        this.worldGroup.add(safeZone);
+      }
     }
 
     for (const enemy of combatState.enemies) {
@@ -473,6 +493,7 @@ export class TravelSceneRenderer {
     combatState: TravelCombatState,
     systemLabel: string,
     showTargetLock: boolean,
+    showRadar: boolean,
     radarInsetTop: number,
     radarInsetRight: number
   ) {
@@ -489,7 +510,9 @@ export class TravelSceneRenderer {
       }
     }
 
-    this.buildRadar(combatState, systemLabel, radarInsetTop, radarInsetRight);
+    if (showRadar) {
+      this.buildRadar(combatState, systemLabel, radarInsetTop, radarInsetRight);
+    }
   }
 
   private buildEnemyHealthBar(enemy: TravelCombatState['enemies'][number], screenX: number, screenY: number) {
