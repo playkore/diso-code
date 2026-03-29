@@ -41,6 +41,10 @@ interface TravelSceneRenderArgs {
   showTargetLock: boolean;
   playerBankAngle: number;
   enemyBankAngles: ReadonlyMap<number, number>;
+  cameraOverride?: {
+    position: { x: number; y: number; z: number };
+    lookAt: { x: number; y: number; z: number };
+  };
   radarInsetTop: number;
   radarInsetRight: number;
 }
@@ -279,11 +283,13 @@ export class TravelSceneRenderer {
     this.flashMesh.position.set(this.width / 2, this.height / 2, 0);
   }
 
-  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, playerBankAngle, enemyBankAngles, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
+  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, playerBankAngle, enemyBankAngles, cameraOverride, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
     const cameraDistance = getPerspectiveCameraDistance(this.height, CAMERA_FOV_DEGREES);
-    this.worldCamera.position.set(combatState.player.x, toSceneY(combatState.player.y), cameraDistance);
+    const cameraPosition = cameraOverride?.position ?? { x: combatState.player.x, y: combatState.player.y, z: cameraDistance };
+    const cameraLookAt = cameraOverride?.lookAt ?? { x: combatState.player.x, y: combatState.player.y, z: 0 };
+    this.worldCamera.position.set(cameraPosition.x, toSceneY(cameraPosition.y), cameraPosition.z);
     this.worldCamera.up.set(0, 1, 0);
-    this.worldCamera.lookAt(combatState.player.x, toSceneY(combatState.player.y), 0);
+    this.worldCamera.lookAt(cameraLookAt.x, toSceneY(cameraLookAt.y), cameraLookAt.z);
     this.worldCamera.updateProjectionMatrix();
 
     clearGroup(this.starGroup);

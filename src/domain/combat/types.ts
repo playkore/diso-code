@@ -30,7 +30,7 @@ import type { LaserMountPosition } from '../shipCatalog';
  * - `HYPERSPACE`: inter-system tunnel transition
  * - `GAMEOVER`: destruction/reset state
  */
-export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'HYPERSPACE' | 'GAMEOVER';
+export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'HYPERSPACE' | 'DOCKING_ANIMATION' | 'GAMEOVER';
 
 /**
  * Stable identifier for every NPC ship archetype used in encounter space.

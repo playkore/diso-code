@@ -26,8 +26,9 @@ import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
+import { getStationDockDirection } from '../../domain/combat/station/stationGeometry';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
-import { createShipBankState, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
+import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -100,10 +101,22 @@ interface EcmUiState {
   visible: boolean;
 }
 
+interface DockingAnimationState {
+  elapsedMs: number;
+  dockSystemName: string;
+  spendJumpFuel: boolean;
+}
+
 const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
+const DOCKING_ANIMATION_DURATION_MS = 1100;
+const DOCKING_ANIMATION_FORWARD_SPEED = 3.4;
+const DOCKING_CAMERA_FOLLOW_DISTANCE = 18;
+const DOCKING_CAMERA_SIDE_OFFSET = 6;
+const DOCKING_CAMERA_HEIGHT_FACTOR = 0.72;
+const DOCKING_CAMERA_LOOKAHEAD = 8;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
@@ -437,6 +450,7 @@ export function useTravelSession(
     let playerDestructionTimerMs = 0;
     let playerDestructionPulseTimerMs = 0;
     let respawnReady = false;
+    let dockingAnimationState: DockingAnimationState | null = null;
     let playerBankState = createShipBankState();
     let enemyBankStates = new Map<number, ShipBankState>();
     const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
@@ -526,6 +540,21 @@ export function useTravelSession(
       navigate('/', { replace: true });
     };
 
+    const startDockingAnimation = (dockSystemName: string, spendJumpFuel: boolean) => {
+      dockingAnimationState = {
+        elapsedMs: 0,
+        dockSystemName,
+        spendJumpFuel
+      };
+      flightState = 'DOCKING_ANIMATION';
+      autoDockActive = false;
+      autoDockWaitLatched = false;
+      combatState.player.vx = 0;
+      combatState.player.vy = 0;
+      showMessage('DOCKING', DOCKING_ANIMATION_DURATION_MS);
+      updateHud();
+    };
+
     const startLocalJump = () => {
       if (flightState === 'HYPERSPACE' || flightState === 'GAMEOVER') {
         return;
@@ -600,6 +629,7 @@ export function useTravelSession(
       flightState = 'READY';
       autoDockActive = false;
       autoDockWaitLatched = false;
+      dockingAnimationState = null;
       playerDestructionTimerMs = 0;
       playerDestructionPulseTimerMs = 0;
       respawnReady = false;
@@ -662,6 +692,82 @@ export function useTravelSession(
         pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
         if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
           publishPerfSnapshot(timestamp);
+        }
+        animationFrameId = window.requestAnimationFrame(loop);
+        return;
+      }
+
+      if (flightState === 'DOCKING_ANIMATION' && dockingAnimationState && combatState.station) {
+        const animationProgress = Math.min(1, dockingAnimationState.elapsedMs / DOCKING_ANIMATION_DURATION_MS);
+        // Advance station rotation first so camera framing uses the same dock
+        // orientation that the renderer will show on this exact frame.
+        combatState.station.angle += combatState.station.rotSpeed * dt;
+        const dockDirection = getStationDockDirection(combatState.station);
+        const inwardDirection = {
+          x: -dockDirection.x,
+          y: -dockDirection.y
+        };
+        const lateralDirection = {
+          // World rendering mirrors gameplay Y through `toSceneY(...)`, so the
+          // visually consistent "camera on the ship's right" offset uses the
+          // mirrored 2D perpendicular rather than the raw gameplay-space one.
+          x: inwardDirection.y,
+          y: -inwardDirection.x
+        };
+        combatState.player.angle = Math.atan2(inwardDirection.y, inwardDirection.x);
+        combatState.player.x += inwardDirection.x * DOCKING_ANIMATION_FORWARD_SPEED * dt;
+        combatState.player.y += inwardDirection.y * DOCKING_ANIMATION_FORWARD_SPEED * dt;
+        playerBankState = createShipBankState();
+
+        const cameraBlend = animationProgress * animationProgress * (3 - 2 * animationProgress);
+        const baseCameraDistance = getPerspectiveCameraDistance(ch, 36);
+        // Docking readability matters more than a perfectly centered view. Keep
+        // the camera trailing behind the ship and slightly off-axis so the hull
+        // stays inside frame while the station mouth remains visible ahead.
+        const cameraPosition = {
+          x:
+            combatState.player.x -
+            inwardDirection.x * DOCKING_CAMERA_FOLLOW_DISTANCE +
+            lateralDirection.x * DOCKING_CAMERA_SIDE_OFFSET * cameraBlend,
+          y:
+            combatState.player.y -
+            inwardDirection.y * DOCKING_CAMERA_FOLLOW_DISTANCE +
+            lateralDirection.y * DOCKING_CAMERA_SIDE_OFFSET * cameraBlend,
+          z: baseCameraDistance * (1 - cameraBlend * (1 - DOCKING_CAMERA_HEIGHT_FACTOR))
+        };
+        const cameraLookAt = {
+          // Keep the ship near the visual center during docking. A small
+          // look-ahead preserves the sense of moving into the tunnel without
+          // pulling the whole frame toward the far side of the station.
+          x: combatState.player.x + inwardDirection.x * DOCKING_CAMERA_LOOKAHEAD * cameraBlend,
+          y: combatState.player.y + inwardDirection.y * DOCKING_CAMERA_LOOKAHEAD * cameraBlend,
+          z: 0
+        };
+
+        dockingAnimationState.elapsedMs += deltaMs;
+        updateHud();
+        travelSceneRenderer.renderFrame({
+          combatState,
+          stars,
+          flightState,
+          systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
+          showTargetLock: false,
+          playerBankAngle: 0,
+          enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+          cameraOverride: {
+            position: cameraPosition,
+            lookAt: cameraLookAt
+          },
+          radarInsetTop,
+          radarInsetRight
+        });
+        pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+        if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+          publishPerfSnapshot(timestamp);
+        }
+        if (dockingAnimationState.elapsedMs >= DOCKING_ANIMATION_DURATION_MS) {
+          completeDocking(dockingAnimationState.dockSystemName, dockingAnimationState.spendJumpFuel);
+          return;
         }
         animationFrameId = window.requestAnimationFrame(loop);
         return;
@@ -856,9 +962,12 @@ export function useTravelSession(
           showMessage('COLLISION WARNING', 1000);
         } else if (docking.isInDockingGap) {
           if (docking.canDock) {
-            autoDockActive = false;
-            autoDockWaitLatched = false;
-            completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
+            startDockingAnimation(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
+            pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+            if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+              publishPerfSnapshot(timestamp);
+            }
+            animationFrameId = window.requestAnimationFrame(loop);
             return;
           }
           if (!docking.isFacingHangar || docking.speed >= 3.6) {
