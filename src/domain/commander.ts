@@ -242,6 +242,25 @@ export function getMinimumLegalValue(cargo: Record<string, number>): number {
   return clampLegalValue(getCargoBadness(cargo));
 }
 
+/**
+ * DOS Elite gradually "forgets" crimes after each successful hyperspace jump,
+ * but active contraband still imposes a minimum legal pressure on arrival.
+ *
+ * This helper keeps both pieces of logic together so every arrival path
+ * applies the same rule, whether the player used the full travel screen or an
+ * instant-travel shortcut.
+ */
+export function getLegalValueAfterHyperspaceJump(
+  currentLegalValue: number,
+  cargo: Record<string, number>,
+  missionCargo: MissionCargoItem[]
+): number {
+  const decayedLegalValue = Math.trunc(clampLegalValue(currentLegalValue) / 2);
+  const cargoFloor = getMinimumLegalValue(cargo);
+  const missionCargoFloor = clampLegalValue(getMissionCargoLegalBadness(missionCargo));
+  return clampLegalValue(Math.max(decayedLegalValue, cargoFloor, missionCargoFloor));
+}
+
 function legacyLegalValue(status?: string): number {
   if (status === 'fugitive') {
     return 16;

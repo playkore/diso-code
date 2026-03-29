@@ -397,7 +397,7 @@ describe('travel combat weapons', () => {
     expect(state.player.combatReward).toBe(0);
   });
 
-  it('awards configured cash rewards for pirate, bounty hunter, and thargoid kills', () => {
+  it('awards classic blueprint bounties instead of role-based payouts', () => {
     const commander = createDefaultCommander();
     commander.installedEquipment.energy_bomb = true;
     const state = createCombatState([0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
@@ -434,6 +434,27 @@ describe('travel combat weapons', () => {
     }));
     state.enemies.push(createTestEnemy({
       id: 23,
+      blueprintId: 'fer-de-lance',
+      label: 'Fer-de-Lance',
+      x: 115,
+      energy: 8,
+      maxEnergy: 160,
+      laserPower: 2,
+      missiles: 2,
+      targetableArea: 260,
+      laserRange: 340,
+      topSpeed: 6.7,
+      acceleration: 0.12,
+      turnRate: 0.06,
+      roles: { bountyHunter: true },
+      aggression: 42,
+      baseAggression: 42,
+      fireCooldown: 999,
+      missileCooldown: 999,
+      isFiringLaser: false
+    }));
+    state.enemies.push(createTestEnemy({
+      id: 24,
       blueprintId: 'thargoid',
       label: 'Thargoid',
       behavior: 'thargoid',
@@ -458,10 +479,11 @@ describe('travel combat weapons', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0, triggerEnergyBomb: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
 
     expect(state.enemies).toHaveLength(0);
-    expect(state.player.tallyKills).toBe(3);
-    expect(state.player.combatReward).toBe(710);
-    expect(state.messages.some((message) => message.text === 'MAMBA DESTROYED: 6.0 Cr')).toBe(true);
-    expect(state.messages.some((message) => message.text === 'ASP MK II DESTROYED: 15.0 Cr')).toBe(true);
+    expect(state.player.tallyKills).toBe(4);
+    expect(state.player.combatReward).toBe(850);
+    expect(state.messages.some((message) => message.text === 'MAMBA DESTROYED: 15.0 Cr')).toBe(true);
+    expect(state.messages.some((message) => message.text === 'ASP MK II DESTROYED: 20.0 Cr')).toBe(true);
+    expect(state.messages.some((message) => message.text === 'FER-DE-LANCE DESTROYED: 0.0 Cr')).toBe(true);
     expect(state.messages.some((message) => message.text === 'THARGOID DESTROYED: 50.0 Cr')).toBe(true);
   });
 

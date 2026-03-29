@@ -43,7 +43,8 @@ describe('outfitting store flows', () => {
       travelSession: null,
       ui: {
         ...state.ui,
-        activeTab: 'market'
+        activeTab: 'market',
+        instantTravelEnabled: false
       }
     }));
   });
@@ -141,14 +142,13 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.legalValue).toBe(0);
   });
 
-  it('preserves legal value across a successful jump', () => {
+  it('halves legal value across a successful jump when no contraband floor applies', () => {
     useGameStore.setState((state) => ({
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
         currentSystem: 'Lave',
-        legalValue: 20,
-        cargo: { slaves: 10 }
+        legalValue: 20
       }),
       universe: { ...state.universe, currentSystem: 'Lave' }
     }));
@@ -156,7 +156,60 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
     expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().commander.legalValue).toBe(10);
+  });
+
+  it('does not decay legal value when the player only redocks at the origin', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Lave',
+        legalValue: 20
+      }),
+      universe: { ...state.universe, currentSystem: 'Lave' }
+    }));
+
+    expect(useGameStore.getState().beginTravel('Lave')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Lave', spendJumpFuel: false });
     expect(useGameStore.getState().commander.legalValue).toBe(20);
+  });
+
+  it('keeps contraband as a minimum legal floor after a successful jump', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Lave',
+        legalValue: 2,
+        cargo: { narcotics: 2, firearms: 1 }
+      }),
+      universe: { ...state.universe, currentSystem: 'Lave' }
+    }));
+
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+    expect(useGameStore.getState().commander.legalValue).toBe(5);
+  });
+
+  it('applies the same legal decay rule in instant-travel mode', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Lave',
+        legalValue: 20
+      }),
+      universe: { ...state.universe, currentSystem: 'Lave' },
+      ui: {
+        ...state.ui,
+        instantTravelEnabled: true
+      }
+    }));
+
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(false);
+    expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().commander.legalValue).toBe(10);
   });
 
   it('credits combat rewards immediately through the travel slice helper', () => {

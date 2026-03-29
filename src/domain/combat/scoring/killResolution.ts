@@ -3,41 +3,39 @@ import { pushMessage, spawnParticles } from '../state';
 import type { BlueprintId, CombatEnemy, TravelCombatState } from '../types';
 
 /**
- * Explicit pirate rewards for blueprint ids that currently exist in the game.
+ * Classic Elite stores bounty directly on the ship blueprint rather than
+ * deriving it from a coarse role such as "pirate" or "bounty hunter".
  *
- * Requested entries that do not exist in this codebase, such as `anaconda`,
- * are intentionally left out so the table documents the live roster rather
- * than implying support for absent ship types.
+ * The travel prototype mirrors that model using tenths of a credit so the HUD
+ * formatter can render values without introducing floating-point drift. Entries
+ * omitted here intentionally fall back to zero because the original roster also
+ * contains hostile or pirate-tagged ships with no cash reward.
  */
-const PIRATE_KILL_REWARDS: Partial<Record<BlueprintId, number>> = {
+const SHIP_KILL_REWARDS: Partial<Record<BlueprintId, number>> = {
+  sidewinder: 50,
   adder: 40,
-  mamba: 60,
-  krait: 80,
-  gecko: 90,
-  'cobra-mk1': 70,
-  'cobra-mk3-pirate': 120,
-  'python-pirate': 200
+  gecko: 55,
+  'cobra-mk1': 75,
+  worm: 0,
+  krait: 100,
+  mamba: 150,
+  'cobra-mk3-pirate': 175,
+  'asp-mk2': 200,
+  'python-pirate': 200,
+  'fer-de-lance': 0,
+  constrictor: 0,
+  thargoid: 500,
+  thargon: 50
 };
 
 function getKillReward(enemy: CombatEnemy) {
-  if (enemy.blueprintId === 'thargoid') {
-    return 500;
-  }
   if (enemy.roles.cop || enemy.blueprintId === 'viper') {
     return 0;
   }
   if (enemy.roles.trader || enemy.roles.innocent) {
     return 0;
   }
-  if (enemy.blueprintId === 'asp-mk2') {
-    // The requested table treats Asp as a pirate reward even though this
-    // codebase currently models Asp Mk II as a bounty hunter blueprint.
-    return 150;
-  }
-  if (enemy.roles.bountyHunter) {
-    return 100;
-  }
-  return PIRATE_KILL_REWARDS[enemy.blueprintId] ?? 0;
+  return SHIP_KILL_REWARDS[enemy.blueprintId] ?? 0;
 }
 
 /**

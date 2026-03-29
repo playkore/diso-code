@@ -1,4 +1,4 @@
-import { createDefaultCommander, normalizeCommanderState, type CommanderState } from '../domain/commander';
+import { createDefaultCommander, getLegalValueAfterHyperspaceJump, normalizeCommanderState, type CommanderState } from '../domain/commander';
 import { encodeCommanderBinary256 } from '../domain/commanderPersistence';
 import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/gamePersistence';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
@@ -190,7 +190,11 @@ export function createDockedState(
  */
 export function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
   const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName, state.universe.galaxyIndex));
-  const nextState = createDockedState(state, systemName, {
+  const arrivalCommander = normalizeCommanderState({
+    ...state.commander,
+    legalValue: getLegalValueAfterHyperspaceJump(state.commander.legalValue, state.commander.cargo, state.commander.missionCargo)
+  });
+  const nextState = createDockedState({ ...state, commander: arrivalCommander }, systemName, {
     spendJumpFuel: true,
     title: `Docked at ${systemName}`,
     body: '',
