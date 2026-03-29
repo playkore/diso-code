@@ -25,7 +25,7 @@ import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
-import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
+import { createAutoDockState, stepAutoDockState, type AutoDockState } from '../../domain/combat/station/autoDock';
 import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
@@ -447,14 +447,13 @@ export function useTravelSession(
     let jumpCompleted = false;
     let creditedCombatReward = 0;
     let autoDockActive = false;
-    let autoDockWaitLatched = false;
+    let autoDockState: AutoDockState | null = null;
     let playerDestructionTimerMs = 0;
     let playerDestructionPulseTimerMs = 0;
     let respawnReady = false;
     let dockingAnimationState: DockingAnimationState | null = null;
     let playerBankState = createShipBankState();
     let enemyBankStates = new Map<number, ShipBankState>();
-    const AUTO_DOCK_WAIT_RELEASE_DISTANCE = 18;
 
     const syncAutoDockUi = () => {
       setAutoDockState({
@@ -549,7 +548,7 @@ export function useTravelSession(
       };
       flightState = 'DOCKING_ANIMATION';
       autoDockActive = false;
-      autoDockWaitLatched = false;
+      autoDockState = null;
       combatState.player.vx = 0;
       combatState.player.vy = 0;
       showMessage('DOCKING', DOCKING_ANIMATION_DURATION_MS);
@@ -629,7 +628,7 @@ export function useTravelSession(
       jumpCompleted = false;
       flightState = 'READY';
       autoDockActive = false;
-      autoDockWaitLatched = false;
+      autoDockState = null;
       dockingAnimationState = null;
       playerDestructionTimerMs = 0;
       playerDestructionPulseTimerMs = 0;
@@ -802,12 +801,12 @@ export function useTravelSession(
       const manualSteeringRequested = Math.abs(liveInput.turn) > 0.08 || liveInput.thrust > 0.08;
       if (autoDockActive && manualSteeringRequested) {
         autoDockActive = false;
-        autoDockWaitLatched = false;
+        autoDockState = null;
         showMessage('AUTO-DOCK CANCELLED', 900);
       }
       if (autoDockActive && (!canAutoDock(combatState) || flightState === 'HYPERSPACE' || flightState === 'JUMPING')) {
         autoDockActive = false;
-        autoDockWaitLatched = false;
+        autoDockState = null;
         showMessage('AUTO-DOCK CANCELLED', 900);
       }
 
@@ -819,7 +818,7 @@ export function useTravelSession(
 
       if (liveInput.autoDock && autoDockRef.current.enabled && !autoDockActive && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
         autoDockActive = true;
-        autoDockWaitLatched = false;
+        autoDockState = createAutoDockState();
         showMessage('AUTO-DOCK ENGAGED', 900);
       }
 
@@ -845,28 +844,36 @@ export function useTravelSession(
         }
       }
 
-      let autoDockCommand = autoDockActive && combatState.station ? getAutoDockCommand(combatState.station, combatState.player) : null;
-      if (autoDockCommand?.mode === 'wait') {
-        autoDockWaitLatched = true;
-      } else if (
-        autoDockWaitLatched &&
-        autoDockCommand &&
-        !autoDockCommand.debug.doorInFront &&
-        Math.abs(autoDockCommand.debug.stageRadiusError) <= AUTO_DOCK_WAIT_RELEASE_DISTANCE
-      ) {
-        // Once the ship has parked at the wall, keep it in wait mode until the
-        // door arrives instead of bouncing back into approach on tiny drift.
-        autoDockCommand = {
-          ...autoDockCommand,
-          mode: 'wait',
-          thrust: 0
-        };
-      } else if (
-        autoDockWaitLatched &&
-        autoDockCommand &&
-        Math.abs(autoDockCommand.debug.stageRadiusError) > AUTO_DOCK_WAIT_RELEASE_DISTANCE
-      ) {
-        autoDockWaitLatched = false;
+      let autoDockCommand = null;
+      if (autoDockActive && combatState.station && autoDockState) {
+        const autoDockStep = stepAutoDockState(autoDockState, combatState.station, combatState.player);
+        autoDockState = autoDockStep.state;
+        autoDockCommand = autoDockStep.command;
+        console.log('[auto-dock-debug]', {
+          phase: autoDockStep.state.phase,
+          mode: autoDockStep.command.mode,
+          stationAngle: Number(combatState.station.angle.toFixed(3)),
+          slotAngle: Number(autoDockStep.command.debug.currentSlotAngle.toFixed(3)),
+          targetOrbitAngle: autoDockStep.command.debug.targetOrbitAngle === undefined
+            ? null
+            : Number(autoDockStep.command.debug.targetOrbitAngle.toFixed(3)),
+          leadAngle: autoDockStep.command.debug.leadAngle === undefined
+            ? null
+            : Number(autoDockStep.command.debug.leadAngle.toFixed(3)),
+          orbitRadius: autoDockStep.command.debug.orbitRadius === undefined
+            ? null
+            : Number(autoDockStep.command.debug.orbitRadius.toFixed(1)),
+          playerAngle: Number(combatState.player.angle.toFixed(3)),
+          playerX: Number(combatState.player.x.toFixed(1)),
+          playerY: Number(combatState.player.y.toFixed(1)),
+          vx: Number(combatState.player.vx.toFixed(2)),
+          vy: Number(combatState.player.vy.toFixed(2)),
+          turn: Number(autoDockStep.command.turn.toFixed(3)),
+          thrust: autoDockStep.command.thrust,
+          slotOffset: Number(autoDockStep.command.debug.slotOffset.toFixed(1)),
+          stageRadiusError: Number(autoDockStep.command.debug.stageRadiusError.toFixed(1)),
+          doorInFront: autoDockStep.command.debug.doorInFront
+        });
       }
 
       const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING'
@@ -919,7 +926,7 @@ export function useTravelSession(
 
       if (result.autoDocked) {
         autoDockActive = false;
-        autoDockWaitLatched = false;
+        autoDockState = null;
         completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
         return;
       }
@@ -966,7 +973,7 @@ export function useTravelSession(
           combatState.player.vx *= -1.5;
           combatState.player.vy *= -1.5;
           autoDockActive = false;
-          autoDockWaitLatched = false;
+          autoDockState = null;
           showMessage('COLLISION WARNING', 1000);
         } else if (docking.isInDockingGap) {
           if (docking.canDock) {
@@ -986,7 +993,7 @@ export function useTravelSession(
 
       if (result.playerDestroyed) {
         autoDockActive = false;
-        autoDockWaitLatched = false;
+        autoDockState = null;
         flightState = 'GAMEOVER';
         playerDestructionTimerMs = PLAYER_DESTRUCTION_ANIMATION_MS;
         respawnReady = false;
