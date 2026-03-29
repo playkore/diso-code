@@ -229,13 +229,13 @@ describe('outfitting store flows', () => {
         economy: 6
       }
     }));
-    useGameStore.getState().setActiveTab('missions');
+    useGameStore.getState().setActiveTab('save-load');
 
     const persistedRaw = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
     expect(persistedRaw).toBeTruthy();
 
     const restoredSession = loadPersistedDockedSession();
-    expect(restoredSession?.activeTab).toBe('missions');
+    expect(restoredSession?.activeTab).toBe('save-load');
     expect(restoredSession?.restoredState.commander.currentSystem).toBe('Diso');
     expect(restoredSession?.restoredState.commander.cash).toBe(4242);
   });

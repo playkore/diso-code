@@ -1,7 +1,6 @@
 import type { CommanderState as DomainCommanderState } from '../domain/commander';
+import type { MissionTravelContext } from '../domain/missionContext';
 import type { DockedMarketSession, MarketCommodity } from '../domain/market';
-import type { MissionMessage, MissionOffer, MissionTravelContext } from '../domain/missions';
-import type { ScenarioMissionPanel, ScenarioToast } from '../domain/scenarios';
 
 export interface UniverseState {
   galaxyIndex: number;
@@ -27,11 +26,6 @@ export interface UiMessage {
   body: string;
 }
 
-export interface MissionsState {
-  availableContracts: MissionOffer[];
-  activeMissionMessages: MissionMessage[];
-}
-
 export interface TravelState {
   originSystem: string;
   destinationSystem: string;
@@ -40,17 +34,6 @@ export interface TravelState {
   fuelUnits: number;
   primaryObjectiveText: string;
   missionContext: MissionTravelContext;
-}
-
-/**
- * Scenario state is stored separately from the classic mission log because
- * scenarios act more like opt-in game modes than dockside contracts.
- */
-export interface ScenarioState {
-  activePluginId: string | null;
-  runtimeState: unknown | null;
-  missionPanel: ScenarioMissionPanel | null;
-  lastToast?: ScenarioToast;
 }
 
 export interface UiState {
@@ -68,5 +51,4 @@ export type AppTab =
   | 'inventory'
   | 'system-data'
   | 'star-map'
-  | 'missions'
   | 'save-load';

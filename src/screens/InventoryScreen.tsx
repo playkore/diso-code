@@ -10,7 +10,7 @@ export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
   const galaxyIndex = useGameStore((state) => state.universe.galaxyIndex);
   const buyFuel = useGameStore((state) => state.buyFuel);
-  const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
+  const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(commander.fuel));
   const installedEquipment = getInstalledEquipmentList(commander);
   const ratingProgress = getDosCombatRatingProgress(commander.combatRatingScore);
@@ -58,20 +58,6 @@ export function InventoryScreen() {
           {commander.missilesInstalled} / {commander.missileCapacity}
         </dd>
       </dl>
-      <section className="subpanel">
-        <p className="dialog-kicker">Mission Cargo</p>
-        {commander.missionCargo.length ? (
-          <ul className="chip-list">
-            {commander.missionCargo.map((item) => (
-              <li key={`${item.missionId}:${item.key}`}>
-                {item.name} x{item.amount}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">No mission-specific cargo aboard.</p>
-        )}
-      </section>
       <section className="subpanel">
         <p className="dialog-kicker">Laser Mounts</p>
         <ul className="chip-list">

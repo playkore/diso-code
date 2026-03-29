@@ -142,21 +142,23 @@ function spawnBenignTrader(state: TravelCombatState, random: RandomSource) {
 }
 
 function spawnMissionTarget(state: TravelCombatState, random: RandomSource) {
-  const effect = state.missionContext.activeEffects.find((entry) => entry.missionTargetSystem);
-  if (!effect?.missionTargetBlueprintId || !effect.missionTargetRole) {
+  if (state.missionContext.missionTargetSystems.length === 0) {
     return;
   }
-  spawnEnemyFromBlueprint(state, effect.missionTargetBlueprintId as never, random, {
+  // The travel layer no longer owns bespoke contract definitions, so the
+  // encounter system falls back to one canonical "named target" spawn when a
+  // scripted route marks the current system as a mission target.
+  spawnEnemyFromBlueprint(state, 'constrictor', random, {
     missionTag: {
       missionId: 'mission-target',
-      templateId: 'named_pirate_hunt',
-      role: effect.missionTargetRole
+      templateId: 'canonical-target',
+      role: 'target'
     },
     aggression: 56,
     baseAggression: 56
   });
   state.missionSpawnBudget += 1;
-  pushMessage(state, `TARGET CONTACT: ${getCombatBlueprint(effect.missionTargetBlueprintId as never).label.toUpperCase()}`);
+  pushMessage(state, `TARGET CONTACT: ${getCombatBlueprint('constrictor').label.toUpperCase()}`);
 }
 
 function spawnBlockadeWave(state: TravelCombatState, random: RandomSource) {

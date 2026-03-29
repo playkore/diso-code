@@ -10,7 +10,6 @@ export const TAB_ROUTE_MAP: Record<AppTab, string> = {
   inventory: '/inventory',
   'system-data': '/system-data',
   'star-map': '/star-map',
-  missions: '/missions',
   'save-load': '/save-load'
 };
 

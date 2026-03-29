@@ -1,5 +1,5 @@
 import type { InstalledEquipmentState, LaserMountState, LegalStatus } from '../commander';
-import type { MissionEvent, MissionTemplateId, MissionTravelContext } from '../missions';
+import type { MissionTravelContext } from '../missionContext';
 import type { LaserMountPosition } from '../shipCatalog';
 
 /**
@@ -186,7 +186,7 @@ export interface CombatEnemy {
   lifetime: number;
   missionTag?: {
     missionId: string;
-    templateId: MissionTemplateId;
+    templateId: string;
     role: 'target' | 'escort' | 'ambusher' | 'blockade' | 'scan-hostile';
   };
 }
@@ -355,7 +355,7 @@ export interface TravelCombatState {
   pendingMissionMessages: string[];
   missionSpawnBudget: number;
   messages: CombatMessage[];
-  missionEvents: MissionEvent[];
+  missionEvents: Array<{ type: string; [key: string]: unknown }>;
   salvageCargo: Record<string, number>;
   salvageFuel: number;
   lastPlayerArc: LaserMountPosition;

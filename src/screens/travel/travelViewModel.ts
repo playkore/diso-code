@@ -1,4 +1,5 @@
 import { getLegalStatus, type CommanderState } from '../../domain/commander';
+import type { MissionTravelContext } from '../../domain/missionContext';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
 import type { LaserMountPosition } from '../../domain/shipCatalog';
@@ -81,7 +82,7 @@ export function getHudState(
 export function createCombatInit(
   commander: CommanderState,
   originSystem: { government: number; techLevel: number },
-  missionContext: import('../../domain/missions').MissionTravelContext
+  missionContext: MissionTravelContext
 ) {
   return {
     legalValue: Math.max(commander.legalValue, 0),

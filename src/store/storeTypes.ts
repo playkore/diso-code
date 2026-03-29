@@ -1,9 +1,7 @@
 import type { StateCreator } from 'zustand';
-import type { MissionEvent } from '../domain/missions';
-import type { GameEvent, PersistedScenarioState, ScenarioToast } from '../domain/scenarios';
 import type { EquipmentId, LaserId, LaserMountPosition } from '../domain/shipCatalog';
 import type { GameSnapshot } from '../domain/gamePersistence';
-import type { AppTab, CommanderState, MarketState, MissionsState, ScenarioState, TravelState, UiState, UniverseState } from './types';
+import type { AppTab, CommanderState, MarketState, TravelState, UiState, UniverseState } from './types';
 
 /**
  * Store contract overview
@@ -40,16 +38,12 @@ export interface TravelCompletionReport {
   spendJumpFuel?: boolean;
   legalValue?: number;
   tallyDelta?: number;
-  missionEvents?: MissionEvent[];
   cargo?: Record<string, number>;
-  missionCargoDelta?: CommanderState['missionCargo'];
   fuelDelta?: number;
   rewardDelta?: number;
   choicePrompts?: string[];
   installedEquipment?: CommanderState['installedEquipment'];
   missilesInstalled?: number;
-  scenarioRuntimeState?: PersistedScenarioState;
-  scenarioLastToast?: ScenarioToast;
 }
 
 /**
@@ -59,7 +53,6 @@ export interface TravelCompletionReport {
  * - `universe`: star-system position and economy context
  * - `commander`: player progression, cargo, equipment and money
  * - `market`: current docked market session
- * - `missions`: current docked mission log
  * - `travelSession`: active route being flown, if any
  * - `ui`: lightweight UI preferences and recent messages
  * - `saveStates`: loaded save slots
@@ -69,15 +62,12 @@ export interface TravelCompletionReport {
  * - travel lifecycle
  * - trading
  * - outfitting
- * - mission triggers
  * - save/load/new game
  */
 export interface GameStore {
   universe: UniverseState;
   commander: CommanderState;
   market: MarketState;
-  missions: MissionsState;
-  scenario: ScenarioState;
   travelSession: TravelState | null;
   ui: UiState;
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
@@ -97,13 +87,6 @@ export interface GameStore {
   buyLaser: (mount: LaserMountPosition, laserId: LaserId) => void;
   buyMissile: () => void;
   useGalacticHyperdrive: () => void;
-  acceptMission: (offerId: string) => void;
-  declineMission: (offerId: string) => void;
-  resolveMissionChoice: (missionId: string, choiceId: string) => void;
-  dismissMissionMessage: (messageId: string) => void;
-  startScenario: (pluginId?: string) => void;
-  dispatchGameEvent: (event: GameEvent) => void;
-  clearScenarioToast: () => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
   startNewGame: () => void;

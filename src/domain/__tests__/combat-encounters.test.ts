@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type { MissionTravelContext } from '../missionContext';
 import { createDeterministicRandomSource, getAvailablePackHunters, getBlueprintAvailability, getCombatBlueprint, selectBlueprintFile, stepTravelCombat } from '../travelCombat';
-import type { MissionTravelContext } from '../missions';
 import { createCombatState } from './combatTestUtils';
 
 const EMPTY_MISSION_CONTEXT: MissionTravelContext = {
   effectiveDestinationSystem: 'Lave',
   primaryObjectiveText: 'Travel to Lave.',
-  activeEffects: [],
   pirateSpawnMultiplier: 1,
   policeHostile: false,
   policeSuppressed: false,
   blockadeAtDestination: false,
-  missionTargetSystems: [],
-  missionMessages: []
+  missionTargetSystems: []
 };
 
 describe('travel combat encounters', () => {

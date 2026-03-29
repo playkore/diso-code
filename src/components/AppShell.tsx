@@ -81,16 +81,6 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     )
   },
   {
-    tab: 'missions',
-    label: 'Missions',
-    to: TAB_ROUTE_MAP.missions,
-    icon: (
-      <NavIcon>
-        <path d="M12 4.5l2.2 4.6l5.1.7l-3.7 3.6l.9 5.1L12 16.1L7.5 18.5l.9-5.1l-3.7-3.6l5.1-.7z" />
-      </NavIcon>
-    )
-  },
-  {
     tab: 'save-load',
     label: 'Save/Load',
     to: TAB_ROUTE_MAP['save-load'],
@@ -109,15 +99,8 @@ export function AppShell() {
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
-  const missionMessages = useGameStore((state) => state.missions.activeMissionMessages);
   const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
-  const latestMessage = missionMessages[0];
-  const notice = latestMessage
-    ? { title: latestMessage.title, body: latestMessage.body }
-    : latestUiEvent
-      ? { title: latestUiEvent.title, body: latestUiEvent.body }
-      : null;
-  const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
+  const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
   const isDebugBackgroundRoute = location.pathname === '/debug/backgrounds';
 
@@ -154,10 +137,10 @@ export function AppShell() {
             <dd>{universe.currentSystem}</dd>
           </div>
         </dl>
-        {notice ? (
+        {latestUiEvent ? (
           <div className="mission-notice" role="status" aria-live="polite">
-            <strong>{notice.title}</strong>
-            <span>{notice.body}</span>
+            <strong>{latestUiEvent.title}</strong>
+            <span>{latestUiEvent.body}</span>
           </div>
         ) : null}
       </header>

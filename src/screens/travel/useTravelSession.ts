@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getSystemByName, getSystemHeading } from '../../domain/galaxyCatalog';
 import type { CommanderState } from '../../domain/commander';
-import { dispatchScenarioEvent, getScenarioFlightOverlay, type PersistedScenarioState, type ScenarioFlightOverlay, type ScenarioToast } from '../../domain/scenarios';
 import { clampAngle } from '../../domain/combat/state';
 import {
   assessDockingApproach,
@@ -21,7 +20,6 @@ import {
   type FlightPhase
 } from '../../domain/travelCombat';
 import type { TravelState } from '../../store/types';
-import type { ScenarioState } from '../../store/types';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
@@ -81,7 +79,6 @@ interface TravelRefs {
  */
 interface CombatCommanderSnapshot {
   cargo: CommanderState['cargo'];
-  missionCargo: CommanderState['missionCargo'];
   legalValue: CommanderState['legalValue'];
   galaxyIndex: number;
   energyBanks: CommanderState['energyBanks'];
@@ -151,7 +148,6 @@ interface PerfAccumulator {
 }
 
 const JOYSTICK_TARGET_TURN_ANGLE = 0.12;
-const SCENARIO_MESSAGE_DURATION_MS = 1800;
 
 function pushPerfSample(samples: number[], value: number) {
   samples.push(value);
@@ -201,8 +197,6 @@ export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
   commander: CombatCommanderSnapshot,
-  scenario: ScenarioState,
-  clearScenarioToast: () => void,
   grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: Parameters<ReturnType<typeof import('../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
@@ -462,40 +456,6 @@ export function useTravelSession(
     let playerBankState = createShipBankState();
     let enemyBankStates = new Map<number, ShipBankState>();
     let elapsedFlightMs = 0;
-    let scenarioSnapshot: PersistedScenarioState = {
-      activePluginId: scenario.activePluginId,
-      runtimeState: scenario.runtimeState
-    };
-    let scenarioLastToast: ScenarioToast | undefined = scenario.lastToast;
-    let scenarioOverlay: ScenarioFlightOverlay = { entities: [] };
-
-    const applyScenarioEvent = (event: import('../../domain/scenarios').GameEvent) => {
-      if (!scenarioSnapshot.activePluginId) {
-        return;
-      }
-      const result = dispatchScenarioEvent(scenarioSnapshot, event, { currentSystem: session.originSystem });
-      scenarioSnapshot = result.snapshot;
-      if (result.toast) {
-        scenarioLastToast = result.toast;
-      }
-      if (result.travelMessage) {
-        showMessage(result.travelMessage, SCENARIO_MESSAGE_DURATION_MS);
-      }
-    };
-
-    const updateScenarioOverlay = (systemName: string) => {
-      scenarioOverlay = getScenarioFlightOverlay(scenarioSnapshot, {
-        currentSystem: systemName,
-        player: {
-          x: combatState.player.x,
-          y: combatState.player.y,
-          angle: combatState.player.angle
-        },
-        station: combatState.station ? { x: combatState.station.x, y: combatState.station.y } : undefined,
-        phase: flightState
-      });
-    };
-
     const syncAutoDockUi = () => {
       setAutoDockState({
         visible: combatState.playerLoadout.installedEquipment.docking_computer,
@@ -565,20 +525,17 @@ export function useTravelSession(
 
     // All successful exits funnel through this helper so the store receives the
     // same snapshot shape whether docking happens manually or via auto-dock.
-    const completeDocking = (dockSystemName: string, spendJumpFuel: boolean, missionEvents = [...combatState.missionEvents]) => {
+    const completeDocking = (dockSystemName: string, spendJumpFuel: boolean) => {
       const snapshot = getPlayerCombatSnapshot(combatState);
       completeTravel({
         dockSystemName,
         spendJumpFuel,
         legalValue: combatState.legalValue,
         tallyDelta: combatState.player.tallyKills,
-        missionEvents,
         cargo: snapshot.cargo,
         fuelDelta: snapshot.fuel,
         installedEquipment: snapshot.installedEquipment,
-        missilesInstalled: snapshot.missilesInstalled,
-        scenarioRuntimeState: scenarioSnapshot,
-        scenarioLastToast: scenarioLastToast
+        missilesInstalled: snapshot.missilesInstalled
       });
       navigate('/', { replace: true });
     };
@@ -679,16 +636,10 @@ export function useTravelSession(
       playerBankState = createShipBankState();
       enemyBankStates = new Map();
       elapsedFlightMs = 0;
-      scenarioSnapshot = {
-        activePluginId: scenario.activePluginId,
-        runtimeState: scenario.runtimeState
-      };
-      scenarioLastToast = scenario.lastToast;
       showMessage(
         hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
         2400
       );
-      updateScenarioOverlay(session.originSystem);
       updateHud();
       resetInput();
     };
@@ -731,7 +682,6 @@ export function useTravelSession(
         }
         travelSceneRenderer.renderFrame({
           combatState,
-          scenarioOverlay,
           stars,
           flightState,
           systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
@@ -807,7 +757,6 @@ export function useTravelSession(
         updateHud();
         travelSceneRenderer.renderFrame({
           combatState,
-          scenarioOverlay,
           stars,
           flightState,
           systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
@@ -988,31 +937,9 @@ export function useTravelSession(
           enterArrivalSpace(combatState, random);
           jumpCompleted = true;
           flightState = 'ARRIVED';
-          applyScenarioEvent({
-            type: 'travel:arrived-in-system',
-            systemName: session.destinationSystem
-          });
           showMessage(`SYSTEM REACHED: ${session.destinationSystem.toUpperCase()}`, 1800);
         }
       }
-
-      const scenarioSystemName = jumpCompleted ? session.destinationSystem : session.originSystem;
-      applyScenarioEvent({
-        type: 'flight:tick',
-        dt,
-        elapsedMs: elapsedFlightMs,
-        systemName: scenarioSystemName,
-        phase: flightState
-      });
-      applyScenarioEvent({
-        type: 'flight:player-moved',
-        systemName: scenarioSystemName,
-        x: combatState.player.x,
-        y: combatState.player.y,
-        angle: combatState.player.angle,
-        phase: flightState
-      });
-      updateScenarioOverlay(scenarioSystemName);
 
       if (combatState.station && flightState !== 'HYPERSPACE') {
         // Manual docking is resolved outside the combat step so the hook can
@@ -1060,13 +987,10 @@ export function useTravelSession(
           spendJumpFuel: jumpCompleted,
           legalValue: combatState.legalValue,
           tallyDelta: combatState.player.tallyKills,
-          missionEvents: combatState.missionEvents,
           cargo: snapshot.cargo,
           fuelDelta: snapshot.fuel,
           installedEquipment: snapshot.installedEquipment,
-          missilesInstalled: snapshot.missilesInstalled,
-          scenarioRuntimeState: scenarioSnapshot,
-          scenarioLastToast: scenarioLastToast
+          missilesInstalled: snapshot.missilesInstalled
         });
         navigate('/', { replace: true });
         return;
@@ -1118,7 +1042,6 @@ export function useTravelSession(
         showTargetLock: Boolean(combatState.playerTargetLock),
         playerBankAngle: playerBankState.visualAngle,
         enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
-        scenarioOverlay,
         radarInsetTop,
         radarInsetRight
       });
@@ -1141,15 +1064,7 @@ export function useTravelSession(
       travelSceneRenderer.dispose();
       resetInput();
     };
-  }, [clearScenarioToast, commander, completeTravel, inputRef, joyActiveRef, jumpPointerIdRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, scenario.activePluginId, scenario.lastToast, scenario.runtimeState, session]);
-
-  useEffect(() => {
-    if (!scenario.lastToast) {
-      return;
-    }
-    setMessageState(scenario.lastToast.body);
-    clearScenarioToast();
-  }, [clearScenarioToast, scenario.lastToast]);
+  }, [commander, completeTravel, inputRef, joyActiveRef, jumpPointerIdRef, keysRef, navigate, refs.canvasRef, refs.viewportRef, resetInput, session]);
 
   return {
     hud,

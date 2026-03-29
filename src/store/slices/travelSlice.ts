@@ -1,11 +1,10 @@
 import { normalizeCommanderState } from '../../domain/commander';
-import { createScenarioState, createDockedState, createArrivalState } from '../gameStateFactory';
-import { dispatchScenarioEvent } from '../../domain/scenarios';
-import { applyMissionEvent, evaluateDockingMissionState, getMissionCargoForActiveMissions, getMissionInbox, getMissionTravelContext, settleCompletedMissions } from '../../domain/missions';
+import { createDefaultMissionTravelContext } from '../../domain/missionContext';
 import { getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../../domain/fuel';
 import { getSystemDistance } from '../../domain/galaxyCatalog';
 import { formatCredits } from '../../utils/money';
 import { formatLightYears } from '../../utils/distance';
+import { createArrivalState, createDockedState } from '../gameStateFactory';
 import { createUiMessage, withUiMessage } from '../uiMessages';
 import type { GameSlice, GameStore } from '../storeTypes';
 
@@ -19,7 +18,7 @@ import type { GameSlice, GameStore } from '../storeTypes';
  * It answers:
  * - can the player start a jump?
  * - should the route open the real-time flight screen or instant-arrive?
- * - how do salvage, fuel, legal changes and mission events get merged back?
+ * - how do salvage, fuel, and legal changes get merged back?
  */
 export const createTravelSlice: GameSlice<
   Pick<GameStore, 'grantDebugCredits' | 'grantCombatCredits' | 'beginTravel' | 'cancelTravel' | 'completeTravel' | 'dockAtSystem'>
@@ -41,6 +40,7 @@ export const createTravelSlice: GameSlice<
         ui: withUiMessage(state.ui, createUiMessage('success', 'Debug credits added', `${formatCredits(credits)} credited for debugging.`))
       };
     }),
+
   /**
    * Credits live combat rewards immediately so the travel HUD balance updates
    * as soon as the player destroys an eligible ship.
@@ -58,6 +58,7 @@ export const createTravelSlice: GameSlice<
         }
       };
     }),
+
   /**
    * Starts travel to a nearby system if the commander has enough fuel.
    *
@@ -84,8 +85,6 @@ export const createTravelSlice: GameSlice<
       });
       return false;
     }
-    // Instant-travel mode skips the real-time flight screen entirely and
-    // immediately performs the same docked arrival transition.
     if (state.ui.instantTravelEnabled) {
       const nextState = createArrivalState(state, systemName);
       if (!nextState) {
@@ -95,32 +94,24 @@ export const createTravelSlice: GameSlice<
       return false;
     }
 
-      const missionContext = getMissionTravelContext(state.commander.activeMissions, {
-        originSystem: state.universe.currentSystem,
-        destinationSystem: systemName
-      });
-      set({
-        commander: state.commander,
-        travelSession: {
-          originSystem: state.universe.currentSystem,
-          destinationSystem: systemName,
-          effectiveDestinationSystem: missionContext.effectiveDestinationSystem,
-          fuelCost: jumpFuelCost,
-          fuelUnits: jumpFuelUnits,
-          // Undocking reuses the same travel session contract as hyperspace,
-          // but it should present as a local launch rather than a destination jump.
-          primaryObjectiveText: isUndocking ? `Undock from ${state.universe.currentSystem}.` : missionContext.primaryObjectiveText,
-          missionContext
-        }
-      });
-      get().dispatchGameEvent({
-        type: 'travel:session-started',
+    const missionContext = createDefaultMissionTravelContext(systemName);
+    set({
+      commander: state.commander,
+      travelSession: {
         originSystem: state.universe.currentSystem,
         destinationSystem: systemName,
-        effectiveDestinationSystem: missionContext.effectiveDestinationSystem
-      });
+        effectiveDestinationSystem: missionContext.effectiveDestinationSystem,
+        fuelCost: jumpFuelCost,
+        fuelUnits: jumpFuelUnits,
+        // Undocking reuses the same travel session contract as hyperspace,
+        // but it should present as a local launch rather than a destination jump.
+        primaryObjectiveText: isUndocking ? `Undock from ${state.universe.currentSystem}.` : missionContext.primaryObjectiveText,
+        missionContext
+      }
+    });
     return true;
   },
+
   /**
    * Clears the in-progress route without applying any arrival effects.
    */
@@ -133,7 +124,7 @@ export const createTravelSlice: GameSlice<
    * - where the player ended up
    * - whether hyperspace fuel should be spent
    * - combat salvage / rescue effects
-   * - legal/tally/mission changes
+   * - legal and tally deltas
    *
    * This function converts that report into the normal docked game state.
    */
@@ -143,25 +134,14 @@ export const createTravelSlice: GameSlice<
         return state;
       }
 
-      // Rescue clears existing cargo before applying any explicitly preserved
-      // salvage from the combat snapshot.
       const mergedCargo = report?.outcome === 'rescued' ? {} : { ...state.commander.cargo };
       for (const [commodityKey, amount] of Object.entries(report?.cargo ?? {})) {
         mergedCargo[commodityKey] = (mergedCargo[commodityKey] ?? 0) + Math.max(0, Math.trunc(amount));
       }
       const insurancePenalty = report?.outcome === 'rescued' ? Math.min(state.commander.cash, Math.max(250, Math.trunc(state.commander.cash * 0.1))) : 0;
-      let missionCargo = report?.missionCargoDelta ?? state.commander.missionCargo;
-      let scenarioSnapshot =
-        report?.scenarioRuntimeState ?? {
-          activePluginId: state.scenario.activePluginId,
-          runtimeState: state.scenario.runtimeState
-        };
-      let scenarioToast = report?.scenarioLastToast ?? state.scenario.lastToast;
-
       const dockSystemName = report?.dockSystemName ?? state.travelSession.effectiveDestinationSystem;
       const spendJumpFuel = report?.spendJumpFuel ?? dockSystemName === state.travelSession.destinationSystem;
-      // First, merge all direct commander deltas from the travel report.
-      let commander = normalizeCommanderState({
+      const commander = normalizeCommanderState({
         ...state.commander,
         // Live combat rewards already hit commander cash during flight, so
         // travel completion only needs to settle rescue-side penalties here.
@@ -170,20 +150,11 @@ export const createTravelSlice: GameSlice<
         tally: state.commander.tally + (report?.tallyDelta ?? 0),
         combatRatingScore: state.commander.combatRatingScore + (report?.tallyDelta ?? 0),
         cargo: mergedCargo,
-        missionCargo,
         fuel: state.commander.fuel + (report?.fuelDelta ?? 0),
         installedEquipment: report?.installedEquipment ?? state.commander.installedEquipment,
         missilesInstalled: report?.missilesInstalled ?? state.commander.missilesInstalled
       });
-      let activeMissions = state.commander.activeMissions;
-      if (report?.missionEvents?.length) {
-        activeMissions = report.missionEvents.reduce((missions, event) => applyMissionEvent(missions, event), activeMissions);
-      }
 
-      // Finally choose the appropriate docked transition:
-      // - rescue recovery
-      // - normal destination arrival
-      // - origin re-dock without fuel spend
       const nextState =
         report?.outcome === 'rescued'
           ? createDockedState({ ...state, commander }, dockSystemName, {
@@ -207,37 +178,12 @@ export const createTravelSlice: GameSlice<
           ui: withUiMessage(state.ui, createUiMessage('error', 'Travel failed', 'The hyperspace solution collapsed before arrival.'))
         };
       }
-      const dockingMissionEvents = evaluateDockingMissionState(activeMissions, { currentSystem: dockSystemName });
-      if (dockingMissionEvents.length) {
-        activeMissions = dockingMissionEvents.reduce((missions, event) => applyMissionEvent(missions, event), activeMissions);
-      }
-      if (scenarioSnapshot.activePluginId) {
-        const arrivedResult = dispatchScenarioEvent(scenarioSnapshot, { type: 'travel:arrived-in-system', systemName: dockSystemName }, { currentSystem: dockSystemName });
-        scenarioSnapshot = arrivedResult.snapshot;
-        scenarioToast = arrivedResult.toast ?? scenarioToast;
-        const dockedResult = dispatchScenarioEvent(scenarioSnapshot, { type: 'system:docked', systemName: dockSystemName }, { currentSystem: dockSystemName });
-        scenarioSnapshot = dockedResult.snapshot;
-        scenarioToast = dockedResult.toast ?? scenarioToast;
-      }
-      const settlement = settleCompletedMissions(activeMissions, state.commander.completedMissions);
-      missionCargo = getMissionCargoForActiveMissions(settlement.activeMissions);
       return {
         ...nextState,
         commander: normalizeCommanderState({
           ...nextState.commander,
-          cash: nextState.commander.cash + (report?.rewardDelta ?? 0) + settlement.cashDelta,
-          activeMissions: settlement.activeMissions,
-          completedMissions: settlement.completedMissions,
-          missionCargo
+          cash: nextState.commander.cash + (report?.rewardDelta ?? 0)
         }),
-        missions: {
-          ...nextState.missions,
-          activeMissionMessages: getMissionInbox(settlement.activeMissions, { currentSystem: dockSystemName })
-        },
-        scenario: {
-          ...createScenarioState(scenarioSnapshot, dockSystemName),
-          lastToast: scenarioToast
-        },
         travelSession: null
       };
     }),

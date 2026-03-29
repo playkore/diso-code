@@ -5,7 +5,6 @@ import { getRouteForTab } from '../../appRoutes';
 import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/travelCombat';
 import type { LaserMountPosition } from '../../domain/shipCatalog';
 import { useGameStore } from '../../store/useGameStore';
-import type { ScenarioState } from '../../store/types';
 import { formatLightYears } from '../../utils/distance';
 import { formatCredits } from '../../utils/money';
 import { TravelPerfOverlay } from './TravelPerfOverlay';
@@ -16,12 +15,9 @@ export function TravelScreen() {
   const session = useGameStore((state) => state.travelSession);
   const commanderCash = useGameStore((state) => state.commander.cash);
   const commanderFuel = useGameStore((state) => state.commander.fuel);
-  const scenario = useGameStore((state) => state.scenario) as ScenarioState;
-  const clearScenarioToast = useGameStore((state) => state.clearScenarioToast);
   const combatCommander = useGameStore(
     (state) => ({
       cargo: state.commander.cargo,
-      missionCargo: state.commander.missionCargo,
       legalValue: state.commander.legalValue,
       galaxyIndex: state.universe.galaxyIndex,
       energyBanks: state.commander.energyBanks,
@@ -39,7 +35,7 @@ export function TravelScreen() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  const travel = useTravelSession({ canvasRef, viewportRef }, session, combatCommander, scenario, clearScenarioToast, grantCombatCredits, completeTravel, navigate);
+  const travel = useTravelSession({ canvasRef, viewportRef }, session, combatCommander, grantCombatCredits, completeTravel, navigate);
   const handleRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
     travel.recordReactCommit(actualDuration);
   };

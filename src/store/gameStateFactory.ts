@@ -4,13 +4,11 @@ import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/ga
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { getGalaxySystems, getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../domain/market';
-import { createScenarioSnapshot, getScenarioMissionPanel, type PersistedScenarioState } from '../domain/scenarios';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
 import { createUiMessage, withUiMessage } from './uiMessages';
-import { createInitialMissionState } from './slices/missionSlice';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
-import type { AppTab, MarketState, MissionsState, ScenarioState } from './types';
+import type { AppTab, MarketState } from './types';
 
 /**
  * Store factory helpers
@@ -22,7 +20,6 @@ import type { AppTab, MarketState, MissionsState, ScenarioState } from './types'
  *
  * Responsibilities:
  * - build docked market state for a system
- * - derive mission log state after docking
  * - create the initial game state
  * - transition into a docked state after travel
  * - snapshot / restore save payloads
@@ -70,16 +67,6 @@ export function refreshItems(session: DockedMarketSession): MarketState {
 }
 
 /**
- * Docking is the canonical moment when mission logs are refreshed.
- */
-export function updateMissionLog(commander: CommanderState): MissionsState {
-  return {
-    availableContracts: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem, 0), 3124).availableContracts,
-    activeMissionMessages: []
-  };
-}
-
-/**
  * Used for arrival messaging so the UI can highlight an immediate market hook.
  */
 export function getCheapestCommodity(session: DockedMarketSession) {
@@ -94,7 +81,6 @@ export function createInitialGameState(commander: CommanderState) {
   const galaxyIndex = 0;
   const system = getSystemByName(normalizedCommander.currentSystem, galaxyIndex);
   const economy = system?.data.economy ?? 5;
-  const scenarioSnapshot = createScenarioSnapshot({ currentSystem: normalizedCommander.currentSystem });
 
   return {
     universe: {
@@ -106,24 +92,18 @@ export function createInitialGameState(commander: CommanderState) {
       marketFluctuation: 0
     },
     commander: normalizedCommander,
-    market: createMarketState(normalizedCommander.currentSystem, economy, 0),
-    missions: updateMissionLog(normalizedCommander),
-    scenario: createScenarioState(scenarioSnapshot, normalizedCommander.currentSystem)
+    market: createMarketState(normalizedCommander.currentSystem, economy, 0)
   };
 }
 
 /**
  * Reduces live store state to the subset that belongs in a save file.
  */
-export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'scenario'>): GameSnapshot {
+export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market'>): GameSnapshot {
   return {
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session,
-    scenario: {
-      activePluginId: state.scenario.activePluginId,
-      runtimeState: state.scenario.runtimeState
-    }
+    marketSession: state.market.session
   };
 }
 
@@ -176,10 +156,6 @@ export function createDockedState(
     },
     commander: nextCommander,
     market: nextMarket,
-    missions: {
-      ...createInitialMissionState(systemName, getNearbySystemNames(systemName, state.universe.galaxyIndex), state.universe.stardate + (options.stardateDelta ?? 1)),
-      activeMissionMessages: []
-    },
     ui: withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
   };
 }
@@ -192,7 +168,7 @@ export function createArrivalState(state: Pick<GameStore, 'universe' | 'commande
   const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName, state.universe.galaxyIndex));
   const arrivalCommander = normalizeCommanderState({
     ...state.commander,
-    legalValue: getLegalValueAfterHyperspaceJump(state.commander.legalValue, state.commander.cargo, state.commander.missionCargo)
+    legalValue: getLegalValueAfterHyperspaceJump(state.commander.legalValue, state.commander.cargo)
   });
   const nextState = createDockedState({ ...state, commander: arrivalCommander }, systemName, {
     spendJumpFuel: true,
@@ -221,7 +197,7 @@ export function createArrivalState(state: Pick<GameStore, 'universe' | 'commande
  * switches to the next generated galaxy, rebuilds the docked market context,
  * and consumes the installed drive without invoking the in-flight travel loop.
  */
-export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander' | 'universe' | 'ui' | 'scenario'>) {
+export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander' | 'universe' | 'ui'>) {
   const nextGalaxyIndex = (state.universe.galaxyIndex + 1) % 8;
   const currentSystem = getSystemByName(state.universe.currentSystem, state.universe.galaxyIndex);
   const nextGalaxySystems = getGalaxySystems(nextGalaxyIndex);
@@ -254,17 +230,6 @@ export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander'
       marketFluctuation: fluctuation
     },
     market: createMarketState(destinationSystem.data.name, destinationSystem.data.economy, fluctuation),
-    missions: {
-      ...createInitialMissionState(destinationSystem.data.name, nearbySystems, state.universe.stardate),
-      activeMissionMessages: []
-    },
-    scenario: createScenarioState(
-      {
-        activePluginId: state.scenario.activePluginId,
-        runtimeState: state.scenario.runtimeState
-      },
-      destinationSystem.data.name
-    ),
     ui: withUiMessage(
       state.ui,
       createUiMessage(
@@ -281,7 +246,6 @@ export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander'
  */
 export function restoreSnapshot(snapshot: GameSnapshot) {
   const commander = normalizeCommanderState(snapshot.commander);
-  const scenarioSnapshot = snapshot.scenario ?? createScenarioSnapshot({ currentSystem: commander.currentSystem });
   return {
     commander,
     universe: {
@@ -290,27 +254,7 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
       galaxyIndex: snapshot.universe.galaxyIndex ?? 0,
       nearbySystems: getNearbySystemNames(commander.currentSystem, snapshot.universe.galaxyIndex ?? 0)
     },
-    market: refreshItems(snapshot.marketSession),
-    missions: createInitialMissionState(
-      commander.currentSystem,
-      getNearbySystemNames(commander.currentSystem, snapshot.universe.galaxyIndex ?? 0),
-      snapshot.universe.stardate
-    ),
-    scenario: createScenarioState(scenarioSnapshot, commander.currentSystem)
-  };
-}
-
-/**
- * Rebuilds the UI-facing scenario projection from the persisted runtime state.
- *
- * Save files store only the plugin id and opaque runtime data. This helper is
- * the single place that recreates the mission-panel view after boot or load.
- */
-export function createScenarioState(snapshot: PersistedScenarioState, currentSystem: string): ScenarioState {
-  return {
-    activePluginId: snapshot.activePluginId,
-    runtimeState: snapshot.runtimeState,
-    missionPanel: getScenarioMissionPanel(snapshot, { currentSystem })
+    market: refreshItems(snapshot.marketSession)
   };
 }
 
@@ -324,7 +268,6 @@ function isAppTab(value: unknown): value is AppTab {
     value === 'inventory' ||
     value === 'system-data' ||
     value === 'star-map' ||
-    value === 'missions' ||
     value === 'save-load'
   );
 }
@@ -336,7 +279,7 @@ function isAppTab(value: unknown): value is AppTab {
  * because the flight runtime is an in-memory simulation rather than a stable
  * snapshot format.
  */
-export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'scenario' | 'ui'>) {
+export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'ui'>) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }

@@ -109,13 +109,11 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
     missionContext: {
       effectiveDestinationSystem: 'Lave',
       primaryObjectiveText: 'Travel to Lave.',
-      activeEffects: [],
       pirateSpawnMultiplier: 1,
       policeHostile: false,
       policeSuppressed: false,
       blockadeAtDestination: false,
-      missionTargetSystems: [],
-      missionMessages: []
+      missionTargetSystems: []
     },
     witchspace: false,
     pendingMissionMessages: [],

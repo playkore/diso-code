@@ -5,7 +5,6 @@ import { BackgroundDebugScreen } from './screens/BackgroundDebugScreen';
 import { EquipmentScreen } from './screens/EquipmentScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
 import { MarketScreen } from './screens/MarketScreen';
-import { MissionsScreen } from './screens/MissionsScreen';
 import { SaveLoadScreen } from './screens/SaveLoadScreen';
 import { SystemDataScreen } from './screens/SystemDataScreen';
 import { StarMapScreen } from './screens/StarMapScreen';
@@ -24,7 +23,6 @@ const router = createBrowserRouter([
       { path: 'star-map', element: <StarMapScreen /> },
       { path: 'travel', element: <TravelScreen /> },
       { path: 'debug/backgrounds', element: <BackgroundDebugScreen /> },
-      { path: 'missions', element: <MissionsScreen /> },
       { path: 'save-load', element: <SaveLoadScreen /> },
       { path: '*', element: <Navigate to="/" replace /> }
     ]

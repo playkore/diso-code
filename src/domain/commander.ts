@@ -1,4 +1,3 @@
-import type { MissionCargoItem, MissionHistoryEntry, MissionInstance } from './missions';
 import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, type ShipType } from './shipCatalog';
 
 /**
@@ -54,9 +53,6 @@ export interface CommanderState {
   combatRatingScore: number;
   rating: CombatRating;
   currentSystem: string;
-  activeMissions: MissionInstance[];
-  completedMissions: MissionHistoryEntry[];
-  missionCargo: MissionCargoItem[];
 }
 
 export const PLAYER_STARTING_ENERGY_BANKS = 1;
@@ -113,10 +109,7 @@ export function createDefaultCommander(): CommanderState {
     // legacy tally field.
     combatRatingScore: 0,
     rating: getDosCombatRating(0),
-    currentSystem: 'Lave',
-    activeMissions: [],
-    completedMissions: [],
-    missionCargo: []
+    currentSystem: 'Lave'
   };
 }
 
@@ -124,17 +117,8 @@ export function cargoUsedTonnes(cargo: Record<string, number>): number {
   return Object.values(cargo).reduce((sum, amount) => sum + Math.max(0, Math.trunc(amount)), 0);
 }
 
-/**
- * Mission cargo can reserve hold space independently of normal market goods.
- * The tonnage is explicit per item so documents can consume 0 t while a rescue
- * payload or decoy crates use real hold capacity.
- */
-export function missionCargoUsedTonnes(missionCargo: MissionCargoItem[]): number {
-  return missionCargo.reduce((sum, item) => sum + Math.max(0, Math.trunc(item.amount)) * Math.max(0, item.tonnagePerUnit), 0);
-}
-
-export function totalCargoUsedTonnes(cargo: Record<string, number>, missionCargo: MissionCargoItem[]): number {
-  return cargoUsedTonnes(cargo) + missionCargoUsedTonnes(missionCargo);
+export function totalCargoUsedTonnes(cargo: Record<string, number>): number {
+  return cargoUsedTonnes(cargo);
 }
 
 export function clampLegalValue(value: number): number {
@@ -231,13 +215,6 @@ export function getCargoBadness(cargo: Record<string, number>): number {
   return (slaves + narcotics) * 2 + firearms;
 }
 
-export function getMissionCargoLegalBadness(missionCargo: MissionCargoItem[]): number {
-  return missionCargo.reduce(
-    (sum, item) => sum + Math.max(0, Math.trunc(item.amount)) * Math.max(0, Math.trunc(item.legalBadnessPerUnit)),
-    0
-  );
-}
-
 export function getMinimumLegalValue(cargo: Record<string, number>): number {
   return clampLegalValue(getCargoBadness(cargo));
 }
@@ -252,13 +229,11 @@ export function getMinimumLegalValue(cargo: Record<string, number>): number {
  */
 export function getLegalValueAfterHyperspaceJump(
   currentLegalValue: number,
-  cargo: Record<string, number>,
-  missionCargo: MissionCargoItem[]
+  cargo: Record<string, number>
 ): number {
   const decayedLegalValue = Math.trunc(clampLegalValue(currentLegalValue) / 2);
   const cargoFloor = getMinimumLegalValue(cargo);
-  const missionCargoFloor = clampLegalValue(getMissionCargoLegalBadness(missionCargo));
-  return clampLegalValue(Math.max(decayedLegalValue, cargoFloor, missionCargoFloor));
+  return clampLegalValue(Math.max(decayedLegalValue, cargoFloor));
 }
 
 function legacyLegalValue(status?: string): number {
@@ -375,9 +350,6 @@ export function normalizeCommanderState(
     // Persisted rating strings are compatibility baggage only; Elite Plus
     // recalculates the visible rank from its dedicated combat score.
     rating: getDosCombatRating(combatRatingScore),
-    currentSystem: commander.currentSystem ?? 'Lave',
-    activeMissions: commander.activeMissions ?? [],
-    completedMissions: commander.completedMissions ?? [],
-    missionCargo: commander.missionCargo ?? []
+    currentSystem: commander.currentSystem ?? 'Lave'
   };
 }
