@@ -715,6 +715,12 @@ button:disabled {
   gap: 0.45rem;
 }
 
+.star-map__action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
 .star-map__hint {
   color: var(--cga-yellow);
   margin: 0;

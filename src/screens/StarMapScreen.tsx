@@ -57,7 +57,6 @@ export function StarMapScreen() {
   return (
     <section className="screen">
       <h2>Short-range Chart</h2>
-      <p className="muted">Galaxy {universe.galaxyIndex + 1}</p>
       <div className="star-map" role="img" aria-label={`Map of stars around ${universe.currentSystem}`}>
         <svg viewBox="-110 -110 220 220" aria-hidden="true">
           {/* The inner ring reflects current jump fuel, while the outer ring shows the ship's theoretical maximum range. */}
@@ -85,16 +84,6 @@ export function StarMapScreen() {
       </div>
       <div className="star-map__actions">
         <p>
-          Fuel: <strong>{formatLightYears(currentFuel)}</strong>
-          {' / '}
-          <strong>{formatLightYears(MAX_FUEL)}</strong>
-        </p>
-        <button type="button" disabled={missingFuelUnits < 1} onClick={() => buyFuel(missingFuelUnits)}>
-          Fill Fuel to Full
-        </button>
-      </div>
-      <div className="star-map__actions">
-        <p>
           {showingCurrentSystem ? (
             <>
               Current system: <strong>{detailsSystemName}</strong>
@@ -112,18 +101,22 @@ export function StarMapScreen() {
             Fuel after jump: <strong>{fuelAfterJump !== null ? formatLightYears(fuelAfterJump) : 'Unknown'}</strong>
           </p>
         ) : null}
-        <p className="star-map__hint">Use Galaxy Chart to choose distant systems and Data on System to inspect planetary details.</p>
-        <button
-          type="button"
-          disabled={!showingCurrentSystem && !selectedPoint?.inRange}
-          onClick={() => {
-            if (beginTravel(detailsSystemName)) {
-              navigate('/travel');
-            }
-          }}
-        >
-          {showingCurrentSystem ? 'Undock' : `Travel to ${detailsSystemName}`}
-        </button>
+        <div className="star-map__action-row">
+          <button type="button" disabled={missingFuelUnits < 1} onClick={() => buyFuel(missingFuelUnits)}>
+            Fill Fuel
+          </button>
+          <button
+            type="button"
+            disabled={!showingCurrentSystem && !selectedPoint?.inRange}
+            onClick={() => {
+              if (beginTravel(detailsSystemName)) {
+                navigate('/travel');
+              }
+            }}
+          >
+            {showingCurrentSystem ? 'Undock' : `Travel to ${detailsSystemName}`}
+          </button>
+        </div>
       </div>
     </section>
   );
