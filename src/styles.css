@@ -263,6 +263,34 @@ main {
   color: var(--cga-yellow);
 }
 
+.rating-progress {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.rating-progress__label {
+  font-weight: 700;
+}
+
+.rating-progress__track {
+  display: block;
+  width: min(100%, 14rem);
+  height: 0.55rem;
+  border: 2px solid var(--cga-yellow);
+  background: var(--cga-black);
+}
+
+.rating-progress__fill {
+  display: block;
+  height: 100%;
+  background: var(--cga-red);
+}
+
+.rating-progress__meta {
+  color: var(--cga-yellow);
+  font-size: 0.78rem;
+}
+
 .chip-list {
   grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
 }

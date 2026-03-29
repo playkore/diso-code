@@ -25,6 +25,11 @@ export type CombatRating =
   | 'Deadly'
   | 'Elite';
 
+interface CombatRatingThreshold {
+  minimumScore: number;
+  label: CombatRating;
+}
+
 export type LaserMountState = Record<LaserMountPosition, LaserId | null>;
 export type InstalledEquipmentState = Record<EquipmentId, boolean>;
 
@@ -136,6 +141,18 @@ export function clampLegalValue(value: number): number {
   return Math.max(0, Math.min(255, Math.trunc(value)));
 }
 
+const DOS_COMBAT_RATING_THRESHOLDS: CombatRatingThreshold[] = [
+  { minimumScore: 0, label: 'Harmless' },
+  { minimumScore: 2, label: 'Mostly Harmless' },
+  { minimumScore: 4, label: 'Poor' },
+  { minimumScore: 9, label: 'Average' },
+  { minimumScore: 20, label: 'Above Average' },
+  { minimumScore: 35, label: 'Competent' },
+  { minimumScore: 90, label: 'Dangerous' },
+  { minimumScore: 155, label: 'Deadly' },
+  { minimumScore: 1000, label: 'Elite' }
+];
+
 /**
  * Maps DOS Elite Plus rating-score thresholds onto the classic rank labels.
  *
@@ -144,31 +161,47 @@ export function clampLegalValue(value: number): number {
  */
 export function getDosCombatRating(score: number): CombatRating {
   const normalizedScore = Math.max(0, Math.trunc(score));
-  if (normalizedScore >= 1000) {
-    return 'Elite';
-  }
-  if (normalizedScore >= 155) {
-    return 'Deadly';
-  }
-  if (normalizedScore >= 90) {
-    return 'Dangerous';
-  }
-  if (normalizedScore >= 35) {
-    return 'Competent';
-  }
-  if (normalizedScore >= 20) {
-    return 'Above Average';
-  }
-  if (normalizedScore >= 9) {
-    return 'Average';
-  }
-  if (normalizedScore >= 4) {
-    return 'Poor';
-  }
-  if (normalizedScore >= 2) {
-    return 'Mostly Harmless';
+  for (let index = DOS_COMBAT_RATING_THRESHOLDS.length - 1; index >= 0; index -= 1) {
+    if (normalizedScore >= DOS_COMBAT_RATING_THRESHOLDS[index].minimumScore) {
+      return DOS_COMBAT_RATING_THRESHOLDS[index].label;
+    }
   }
   return 'Harmless';
+}
+
+/**
+ * Returns the current DOS rating band and normalized progress within that band.
+ *
+ * The status screen uses this to show how far the commander is from the next
+ * Elite Plus rank without duplicating threshold math in the UI layer.
+ */
+export function getDosCombatRatingProgress(score: number) {
+  const normalizedScore = Math.max(0, Math.trunc(score));
+  let currentIndex = 0;
+  for (let index = DOS_COMBAT_RATING_THRESHOLDS.length - 1; index >= 0; index -= 1) {
+    if (normalizedScore >= DOS_COMBAT_RATING_THRESHOLDS[index].minimumScore) {
+      currentIndex = index;
+      break;
+    }
+  }
+  const current = DOS_COMBAT_RATING_THRESHOLDS[Math.max(0, currentIndex)] ?? DOS_COMBAT_RATING_THRESHOLDS[0];
+  const next = DOS_COMBAT_RATING_THRESHOLDS[currentIndex + 1] ?? null;
+  if (!next) {
+    return {
+      current: current.label,
+      next: null,
+      progressRatio: 1,
+      remainingScore: 0
+    };
+  }
+  const bandSize = Math.max(1, next.minimumScore - current.minimumScore);
+  const progressRatio = Math.max(0, Math.min(1, (normalizedScore - current.minimumScore) / bandSize));
+  return {
+    current: current.label,
+    next: next.label,
+    progressRatio,
+    remainingScore: Math.max(0, next.minimumScore - normalizedScore)
+  };
 }
 
 /**
