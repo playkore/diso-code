@@ -394,7 +394,7 @@ describe('travel combat weapons', () => {
 
     expect(state.enemies).toHaveLength(0);
     expect(state.player.tallyKills).toBe(1);
-    expect(state.player.combatReward).toBe(0);
+    expect(state.player.combatReward).toBe(50);
   });
 
   it('awards classic blueprint bounties instead of role-based payouts', () => {
