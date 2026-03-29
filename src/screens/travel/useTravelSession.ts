@@ -26,7 +26,7 @@ import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { getAutoDockCommand } from '../../domain/combat/station/autoDock';
-import { getStationDockDirection } from '../../domain/combat/station/stationGeometry';
+import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 
@@ -113,10 +113,11 @@ const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
 const PLAYER_DESTRUCTION_PULSE_MS = 180;
 const DOCKING_ANIMATION_DURATION_MS = 1100;
 const DOCKING_ANIMATION_FORWARD_SPEED = 3.4;
-const DOCKING_CAMERA_FOLLOW_DISTANCE = 18;
+const DOCKING_CAMERA_FOLLOW_DISTANCE = 13;
 const DOCKING_CAMERA_SIDE_OFFSET = 6;
-const DOCKING_CAMERA_HEIGHT_FACTOR = 0.72;
+const DOCKING_CAMERA_HEIGHT_FACTOR = 0.58;
 const DOCKING_CAMERA_LOOKAHEAD = 8;
+const DOCKING_CAMERA_MOUTH_FOCUS = 0.78;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
 const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
@@ -721,6 +722,7 @@ export function useTravelSession(
 
         const cameraBlend = animationProgress * animationProgress * (3 - 2 * animationProgress);
         const baseCameraDistance = getPerspectiveCameraDistance(ch, 36);
+        const dockMouth = getStationDockMouthPoint(combatState.station);
         // Docking readability matters more than a perfectly centered view. Keep
         // the camera trailing behind the ship and slightly off-axis so the hull
         // stays inside frame while the station mouth remains visible ahead.
@@ -736,11 +738,17 @@ export function useTravelSession(
           z: baseCameraDistance * (1 - cameraBlend * (1 - DOCKING_CAMERA_HEIGHT_FACTOR))
         };
         const cameraLookAt = {
-          // Keep the ship near the visual center during docking. A small
-          // look-ahead preserves the sense of moving into the tunnel without
-          // pulling the whole frame toward the far side of the station.
-          x: combatState.player.x + inwardDirection.x * DOCKING_CAMERA_LOOKAHEAD * cameraBlend,
-          y: combatState.player.y + inwardDirection.y * DOCKING_CAMERA_LOOKAHEAD * cameraBlend,
+          // Focus the shot on the tunnel mouth instead of the station center.
+          // Blending from the ship toward the mouth keeps entry readable while
+          // still letting the player hull anchor the composition.
+          x:
+            combatState.player.x +
+            inwardDirection.x * DOCKING_CAMERA_LOOKAHEAD * (1 - cameraBlend) +
+            (dockMouth.x - combatState.player.x) * DOCKING_CAMERA_MOUTH_FOCUS * cameraBlend,
+          y:
+            combatState.player.y +
+            inwardDirection.y * DOCKING_CAMERA_LOOKAHEAD * (1 - cameraBlend) +
+            (dockMouth.y - combatState.player.y) * DOCKING_CAMERA_MOUTH_FOCUS * cameraBlend,
           z: 0
         };
 
