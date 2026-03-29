@@ -72,11 +72,12 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     to: TAB_ROUTE_MAP['short-range-chart'],
     icon: (
       <NavIcon>
-        <circle cx="6.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
-        <circle cx="17.5" cy="7" r="1" fill="currentColor" stroke="none" />
-        <circle cx="14.5" cy="16.5" r="1.4" fill="currentColor" stroke="none" />
-        <path d="M7.6 8.3l8.8-1" />
-        <path d="M16.9 7.9l-1.7 7.1" />
+        <circle cx="12" cy="12" r="7" />
+        <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" />
+        <path d="M12 6.8v2.2" />
+        <path d="M12 15v2.2" />
+        <path d="M6.8 12h2.2" />
+        <path d="M15 12h2.2" />
       </NavIcon>
     )
   },
