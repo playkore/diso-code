@@ -13,6 +13,7 @@ import { getJumpFuelCost, getJumpFuelUnits, getRefuelCost } from '../fuel';
 import { loadGameJson, serializeGameJson } from '../gamePersistence';
 import { acceptMissionOffer, applyMissionEvent, generateMissionOffers, getMissionInbox, settleCompletedMissions } from '../missions';
 import { createDockedMarketSession } from '../market';
+import { createScenarioSnapshot } from '../scenarios';
 import { PLAYER_SHIP } from '../shipCatalog';
 
 describe('missions and commander persistence', () => {
@@ -87,13 +88,15 @@ describe('missions and commander persistence', () => {
           economy: 5,
           marketFluctuation: 0
         },
-        marketSession: createDockedMarketSession('Lave', 5, 0)
+        marketSession: createDockedMarketSession('Lave', 5, 0),
+        scenario: createScenarioSnapshot({ currentSystem: 'Lave' })
       },
       '2026-03-15T00:00:00.000Z'
     );
     const save = loadGameJson(json);
     expect(save.snapshot.commander.currentSystem).toBe('Lave');
     expect(save.snapshot.universe.stardate).toBe(3124);
+    expect(save.snapshot.scenario?.activePluginId).toBe('secret-packages-20');
     expect(save.savedAt).toBe('2026-03-15T00:00:00.000Z');
   });
 

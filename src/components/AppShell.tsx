@@ -110,7 +110,13 @@ export function AppShell() {
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const missionMessages = useGameStore((state) => state.missions.activeMissionMessages);
+  const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
   const latestMessage = missionMessages[0];
+  const notice = latestMessage
+    ? { title: latestMessage.title, body: latestMessage.body }
+    : latestUiEvent
+      ? { title: latestUiEvent.title, body: latestUiEvent.body }
+      : null;
   const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
   const isTravelRoute = location.pathname === '/travel';
   const isDebugBackgroundRoute = location.pathname === '/debug/backgrounds';
@@ -148,10 +154,10 @@ export function AppShell() {
             <dd>{universe.currentSystem}</dd>
           </div>
         </dl>
-        {latestMessage ? (
+        {notice ? (
           <div className="mission-notice" role="status" aria-live="polite">
-            <strong>{latestMessage.title}</strong>
-            <span>{latestMessage.body}</span>
+            <strong>{notice.title}</strong>
+            <span>{notice.body}</span>
           </div>
         ) : null}
       </header>

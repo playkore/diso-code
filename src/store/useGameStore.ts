@@ -13,6 +13,7 @@ import {
 import { createMissionSlice } from './slices/missionSlice';
 import { createOutfittingSlice } from './slices/outfittingSlice';
 import { createSaveLoadSlice } from './slices/saveLoadSlice';
+import { createScenarioSlice } from './slices/scenarioSlice';
 import { createTradeSlice } from './slices/tradeSlice';
 import { createTravelSlice } from './slices/travelSlice';
 import type { GameStore } from './storeTypes';
@@ -25,7 +26,7 @@ export type { GameStore, SaveSlotId, SaveState, TravelCompletionReport } from '.
  * refresh-restorable session. Activity log chatter is intentionally excluded so
  * notification spam does not trigger extra writes.
  */
-function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'travelSession' | 'ui'>) {
+function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'scenario' | 'travelSession' | 'ui'>) {
   if (state.travelSession) {
     return null;
   }
@@ -33,7 +34,11 @@ function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'univers
     activeTab: state.ui.activeTab,
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session
+    marketSession: state.market.session,
+    scenario: {
+      activePluginId: state.scenario.activePluginId,
+      runtimeState: state.scenario.runtimeState
+    }
   });
 }
 
@@ -76,6 +81,7 @@ export const useGameStore = create<GameStore>((set, get, api) => {
     commander: bootState.commander,
     market: bootState.market,
     missions: bootState.missions,
+    scenario: bootState.scenario,
     travelSession: null,
     saveStates: persistedSaveStates,
     ui: {
@@ -124,6 +130,7 @@ export const useGameStore = create<GameStore>((set, get, api) => {
     ...createTradeSlice(set, get, api),
     ...createOutfittingSlice(set, get, api),
     ...createMissionSlice(set, get, api),
+    ...createScenarioSlice(set, get, api),
     ...createSaveLoadSlice(set, get, api)
   };
 });

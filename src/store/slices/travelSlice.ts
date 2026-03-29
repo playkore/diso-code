@@ -1,10 +1,11 @@
 import { applyLegalFloor, normalizeCommanderState } from '../../domain/commander';
+import { createScenarioState, createDockedState, createArrivalState } from '../gameStateFactory';
+import { dispatchScenarioEvent } from '../../domain/scenarios';
 import { applyMissionEvent, evaluateDockingMissionState, getMissionCargoForActiveMissions, getMissionInbox, getMissionTravelContext, settleCompletedMissions } from '../../domain/missions';
 import { getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../../domain/fuel';
 import { getSystemDistance } from '../../domain/galaxyCatalog';
 import { formatCredits } from '../../utils/money';
 import { formatLightYears } from '../../utils/distance';
-import { createArrivalState, createDockedState } from '../gameStateFactory';
 import { createUiMessage, withUiMessage } from '../uiMessages';
 import type { GameSlice, GameStore } from '../storeTypes';
 
@@ -116,6 +117,12 @@ export const createTravelSlice: GameSlice<
           missionContext
         }
       });
+      get().dispatchGameEvent({
+        type: 'travel:session-started',
+        originSystem: state.universe.currentSystem,
+        destinationSystem: systemName,
+        effectiveDestinationSystem: missionContext.effectiveDestinationSystem
+      });
     return true;
   },
   /**
@@ -148,6 +155,12 @@ export const createTravelSlice: GameSlice<
       }
       const insurancePenalty = report?.outcome === 'rescued' ? Math.min(state.commander.cash, Math.max(250, Math.trunc(state.commander.cash * 0.1))) : 0;
       let missionCargo = report?.missionCargoDelta ?? state.commander.missionCargo;
+      let scenarioSnapshot =
+        report?.scenarioRuntimeState ?? {
+          activePluginId: state.scenario.activePluginId,
+          runtimeState: state.scenario.runtimeState
+        };
+      let scenarioToast = report?.scenarioLastToast ?? state.scenario.lastToast;
 
       // First, merge all direct commander deltas from the travel report.
       let commander = normalizeCommanderState({
@@ -201,6 +214,14 @@ export const createTravelSlice: GameSlice<
       if (dockingMissionEvents.length) {
         activeMissions = dockingMissionEvents.reduce((missions, event) => applyMissionEvent(missions, event), activeMissions);
       }
+      if (scenarioSnapshot.activePluginId) {
+        const arrivedResult = dispatchScenarioEvent(scenarioSnapshot, { type: 'travel:arrived-in-system', systemName: dockSystemName }, { currentSystem: dockSystemName });
+        scenarioSnapshot = arrivedResult.snapshot;
+        scenarioToast = arrivedResult.toast ?? scenarioToast;
+        const dockedResult = dispatchScenarioEvent(scenarioSnapshot, { type: 'system:docked', systemName: dockSystemName }, { currentSystem: dockSystemName });
+        scenarioSnapshot = dockedResult.snapshot;
+        scenarioToast = dockedResult.toast ?? scenarioToast;
+      }
       const settlement = settleCompletedMissions(activeMissions, state.commander.completedMissions);
       missionCargo = getMissionCargoForActiveMissions(settlement.activeMissions);
       return {
@@ -215,6 +236,10 @@ export const createTravelSlice: GameSlice<
         missions: {
           ...nextState.missions,
           activeMissionMessages: getMissionInbox(settlement.activeMissions, { currentSystem: dockSystemName })
+        },
+        scenario: {
+          ...createScenarioState(scenarioSnapshot, dockSystemName),
+          lastToast: scenarioToast
         },
         travelSession: null
       };

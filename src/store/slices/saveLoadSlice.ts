@@ -27,11 +27,11 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
     if (!saveState) {
       return;
     }
-    const restoredState = restoreSnapshot(saveState.snapshot);
-    set((current) => ({
-      ...restoredState,
-      // Travel sessions are intentionally transient and cannot survive a restore
-      // because their mutable runtime state only exists in memory.
+      const restoredState = restoreSnapshot(saveState.snapshot);
+      set((current) => ({
+        ...restoredState,
+        // Travel sessions are intentionally transient and cannot survive a restore
+        // because their mutable runtime state only exists in memory.
       travelSession: null,
       saveStates: state.saveStates,
       ui: withUiMessage(

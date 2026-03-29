@@ -11,6 +11,7 @@ export function MissionsScreen() {
   const activeMissionMessages = useGameStore((state) => state.missions.activeMissionMessages);
   const activeMissions = useGameStore((state) => state.commander.activeMissions);
   const completedMissions = useGameStore((state) => state.commander.completedMissions);
+  const scenarioPanel = useGameStore((state) => state.scenario.missionPanel);
   const acceptMission = useGameStore((state) => state.acceptMission);
   const declineMission = useGameStore((state) => state.declineMission);
   const resolveMissionChoice = useGameStore((state) => state.resolveMissionChoice);
@@ -56,6 +57,25 @@ export function MissionsScreen() {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="subpanel">
+        <p className="dialog-kicker">Scenario</p>
+        {scenarioPanel ? (
+          <ul className="card-list">
+            <li className="mission-card">
+              <strong>{scenarioPanel.title}</strong>
+              <span className="status">{scenarioPanel.status}</span>
+              <span>{scenarioPanel.progressLabel}</span>
+              <span>{scenarioPanel.summary}</span>
+              {scenarioPanel.detailLines.map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </li>
+          </ul>
+        ) : (
+          <p>No active scenario.</p>
+        )}
       </section>
 
       <section className="subpanel">

@@ -23,6 +23,7 @@ import {
   Vector3,
   WebGLRenderer
 } from 'three';
+import type { ScenarioFlightOverlay } from '../../domain/scenarios';
 import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type FlightPhase, type TravelCombatState } from '../../domain/travelCombat';
 import { getStationRenderScale } from '../../domain/combat/station/stationGeometry';
 import type { LineShape } from './background/types';
@@ -35,6 +36,7 @@ import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDist
 
 interface TravelSceneRenderArgs {
   combatState: TravelCombatState;
+  scenarioOverlay: ScenarioFlightOverlay;
   stars: StarPoint[];
   flightState: FlightPhase;
   systemLabel: string;
@@ -161,6 +163,42 @@ function createCircleLoop(radius: number, segments: number, color: string, dashe
   return circle;
 }
 
+function createPackageObject(spinPhase: number) {
+  const group = new Group();
+  group.add(
+    createLineShapeObject(
+      [
+        {
+          points: [
+            [0, -8],
+            [8, 0],
+            [0, 8],
+            [-8, 0]
+          ],
+          closed: true
+        },
+        {
+          points: [
+            [-5, 0],
+            [5, 0]
+          ],
+          closed: false
+        },
+        {
+          points: [
+            [0, -5],
+            [0, 5]
+          ],
+          closed: false
+        }
+      ],
+      CGA_YELLOW
+    )
+  );
+  group.rotation.z = -spinPhase;
+  return group;
+}
+
 function createSegmentObject(startX: number, startY: number, endX: number, endY: number, color: string, z = 0) {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute([startX, toSceneY(startY), z, endX, toSceneY(endY), z], 3));
@@ -283,7 +321,19 @@ export class TravelSceneRenderer {
     this.flashMesh.position.set(this.width / 2, this.height / 2, 0);
   }
 
-  renderFrame({ combatState, stars, flightState, systemLabel, showTargetLock, playerBankAngle, enemyBankAngles, cameraOverride, radarInsetTop, radarInsetRight }: TravelSceneRenderArgs) {
+  renderFrame({
+    combatState,
+    scenarioOverlay,
+    stars,
+    flightState,
+    systemLabel,
+    showTargetLock,
+    playerBankAngle,
+    enemyBankAngles,
+    cameraOverride,
+    radarInsetTop,
+    radarInsetRight
+  }: TravelSceneRenderArgs) {
     const cameraDistance = getPerspectiveCameraDistance(this.height, CAMERA_FOV_DEGREES);
     const cameraPosition = cameraOverride?.position ?? { x: combatState.player.x, y: combatState.player.y, z: cameraDistance };
     const cameraLookAt = cameraOverride?.lookAt ?? { x: combatState.player.x, y: combatState.player.y, z: 0 };
@@ -304,8 +354,8 @@ export class TravelSceneRenderer {
     }
 
     this.buildStarfield(stars, combatState, flightState);
-    this.buildWorld(combatState, playerBankAngle, enemyBankAngles);
-    this.buildOverlay(combatState, systemLabel, showTargetLock, radarInsetTop, radarInsetRight);
+    this.buildWorld(combatState, scenarioOverlay, playerBankAngle, enemyBankAngles);
+    this.buildOverlay(combatState, scenarioOverlay, systemLabel, showTargetLock, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
 
     this.renderer.clear(true, true, true);
@@ -371,7 +421,12 @@ export class TravelSceneRenderer {
     });
   }
 
-  private buildWorld(combatState: TravelCombatState, playerBankAngle: number, enemyBankAngles: ReadonlyMap<number, number>) {
+  private buildWorld(
+    combatState: TravelCombatState,
+    scenarioOverlay: ScenarioFlightOverlay,
+    playerBankAngle: number,
+    enemyBankAngles: ReadonlyMap<number, number>
+  ) {
     if (combatState.station) {
       const station = createStationObject();
       const stationAnchor = new Group();
@@ -452,10 +507,23 @@ export class TravelSceneRenderer {
       quad.position.set(particle.x, toSceneY(particle.y), PARTICLE_Z);
       this.worldGroup.add(quad);
     }
+
+    for (const entity of scenarioOverlay.entities) {
+      if (entity.kind !== 'package' || entity.collected) {
+        continue;
+      }
+      const packageObject = createPackageObject(entity.spinPhase);
+      const packageAnchor = new Group();
+      packageAnchor.position.set(entity.x, toSceneY(entity.y), SHIP_Z + 8);
+      packageAnchor.rotation.z = -entity.heading;
+      packageAnchor.add(packageObject);
+      this.worldGroup.add(packageAnchor);
+    }
   }
 
   private buildOverlay(
     combatState: TravelCombatState,
+    scenarioOverlay: ScenarioFlightOverlay,
     systemLabel: string,
     showTargetLock: boolean,
     radarInsetTop: number,
@@ -474,7 +542,7 @@ export class TravelSceneRenderer {
       }
     }
 
-    this.buildRadar(combatState, systemLabel, radarInsetTop, radarInsetRight);
+    this.buildRadar(combatState, scenarioOverlay, systemLabel, radarInsetTop, radarInsetRight);
   }
 
   private buildEnemyHealthBar(enemy: TravelCombatState['enemies'][number], screenX: number, screenY: number) {
@@ -574,7 +642,13 @@ export class TravelSceneRenderer {
     );
   }
 
-  private buildRadar(combatState: TravelCombatState, systemLabel: string, radarInsetTop: number, radarInsetRight: number) {
+  private buildRadar(
+    combatState: TravelCombatState,
+    scenarioOverlay: ScenarioFlightOverlay,
+    systemLabel: string,
+    radarInsetTop: number,
+    radarInsetRight: number
+  ) {
     const radarSize = Math.min(156, Math.max(120, Math.round(Math.min(this.width, this.height) * 0.24)));
     const radarX = this.width - radarInsetRight - radarSize;
     const radarY = radarInsetTop;
@@ -643,6 +717,30 @@ export class TravelSceneRenderer {
       const blip = createCircleLoop(2.5, 12, getEnemyColor(enemy.roles, enemy.missionTag), false, false);
       blip.position.set(radarCenterX + Math.cos(angle) * radarDistance, radarCenterY + Math.sin(angle) * radarDistance, 0);
       this.overlayGroup.add(blip);
+    }
+
+    if (scenarioOverlay.directionHint?.active) {
+      const hintAngle = combatState.player.angle + scenarioOverlay.directionHint.angleRelativeToPlayer;
+      const hintRadius = radarRadius - 10;
+      const baseX = radarCenterX + Math.cos(hintAngle) * hintRadius;
+      const baseY = radarCenterY + Math.sin(hintAngle) * hintRadius;
+      const wingAngle = Math.PI / 8;
+      this.overlayGroup.add(
+        createLineShapeObject(
+          [
+            {
+              points: [
+                [baseX, baseY],
+                [baseX - Math.cos(hintAngle - wingAngle) * 7, baseY - Math.sin(hintAngle - wingAngle) * 7],
+                [baseX - Math.cos(hintAngle + wingAngle) * 7, baseY - Math.sin(hintAngle + wingAngle) * 7]
+              ],
+              closed: true
+            }
+          ],
+          CGA_YELLOW,
+          false
+        )
+      );
     }
   }
 

@@ -4,12 +4,13 @@ import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/ga
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
 import { getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../domain/market';
+import { createScenarioSnapshot, getScenarioMissionPanel, type PersistedScenarioState } from '../domain/scenarios';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
 import { createUiMessage, withUiMessage } from './uiMessages';
 import { createInitialMissionState } from './slices/missionSlice';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
-import type { AppTab, MarketState, MissionsState } from './types';
+import type { AppTab, MarketState, MissionsState, ScenarioState } from './types';
 
 /**
  * Store factory helpers
@@ -92,6 +93,7 @@ export function createInitialGameState(commander: CommanderState) {
   const normalizedCommander = normalizeCommanderState(commander);
   const system = getSystemByName(normalizedCommander.currentSystem);
   const economy = system?.data.economy ?? 5;
+  const scenarioSnapshot = createScenarioSnapshot({ currentSystem: normalizedCommander.currentSystem });
 
   return {
     universe: {
@@ -103,18 +105,23 @@ export function createInitialGameState(commander: CommanderState) {
     },
     commander: normalizedCommander,
     market: createMarketState(normalizedCommander.currentSystem, economy, 0),
-    missions: updateMissionLog(normalizedCommander)
+    missions: updateMissionLog(normalizedCommander),
+    scenario: createScenarioState(scenarioSnapshot, normalizedCommander.currentSystem)
   };
 }
 
 /**
  * Reduces live store state to the subset that belongs in a save file.
  */
-export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market'>): GameSnapshot {
+export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'scenario'>): GameSnapshot {
   return {
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session
+    marketSession: state.market.session,
+    scenario: {
+      activePluginId: state.scenario.activePluginId,
+      runtimeState: state.scenario.runtimeState
+    }
   };
 }
 
@@ -209,6 +216,7 @@ export function createArrivalState(state: Pick<GameStore, 'universe' | 'commande
  */
 export function restoreSnapshot(snapshot: GameSnapshot) {
   const commander = normalizeCommanderState(snapshot.commander);
+  const scenarioSnapshot = snapshot.scenario ?? createScenarioSnapshot({ currentSystem: commander.currentSystem });
   return {
     commander,
     universe: {
@@ -217,7 +225,22 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
       nearbySystems: getNearbySystemNames(commander.currentSystem)
     },
     market: refreshItems(snapshot.marketSession),
-    missions: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem), snapshot.universe.stardate)
+    missions: createInitialMissionState(commander.currentSystem, getNearbySystemNames(commander.currentSystem), snapshot.universe.stardate),
+    scenario: createScenarioState(scenarioSnapshot, commander.currentSystem)
+  };
+}
+
+/**
+ * Rebuilds the UI-facing scenario projection from the persisted runtime state.
+ *
+ * Save files store only the plugin id and opaque runtime data. This helper is
+ * the single place that recreates the mission-panel view after boot or load.
+ */
+export function createScenarioState(snapshot: PersistedScenarioState, currentSystem: string): ScenarioState {
+  return {
+    activePluginId: snapshot.activePluginId,
+    runtimeState: snapshot.runtimeState,
+    missionPanel: getScenarioMissionPanel(snapshot, { currentSystem })
   };
 }
 
@@ -243,7 +266,7 @@ function isAppTab(value: unknown): value is AppTab {
  * because the flight runtime is an in-memory simulation rather than a stable
  * snapshot format.
  */
-export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'ui'>) {
+export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'scenario' | 'ui'>) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }

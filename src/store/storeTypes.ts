@@ -1,8 +1,9 @@
 import type { StateCreator } from 'zustand';
 import type { MissionEvent } from '../domain/missions';
+import type { GameEvent, PersistedScenarioState, ScenarioToast } from '../domain/scenarios';
 import type { EquipmentId, LaserId, LaserMountPosition } from '../domain/shipCatalog';
 import type { GameSnapshot } from '../domain/gamePersistence';
-import type { AppTab, CommanderState, MarketState, MissionsState, TravelState, UiState, UniverseState } from './types';
+import type { AppTab, CommanderState, MarketState, MissionsState, ScenarioState, TravelState, UiState, UniverseState } from './types';
 
 /**
  * Store contract overview
@@ -47,6 +48,8 @@ export interface TravelCompletionReport {
   choicePrompts?: string[];
   installedEquipment?: CommanderState['installedEquipment'];
   missilesInstalled?: number;
+  scenarioRuntimeState?: PersistedScenarioState;
+  scenarioLastToast?: ScenarioToast;
 }
 
 /**
@@ -74,6 +77,7 @@ export interface GameStore {
   commander: CommanderState;
   market: MarketState;
   missions: MissionsState;
+  scenario: ScenarioState;
   travelSession: TravelState | null;
   ui: UiState;
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
@@ -96,6 +100,9 @@ export interface GameStore {
   declineMission: (offerId: string) => void;
   resolveMissionChoice: (missionId: string, choiceId: string) => void;
   dismissMissionMessage: (messageId: string) => void;
+  startScenario: (pluginId?: string) => void;
+  dispatchGameEvent: (event: GameEvent) => void;
+  clearScenarioToast: () => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
   startNewGame: () => void;

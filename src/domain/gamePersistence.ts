@@ -1,5 +1,6 @@
 import type { CommanderState } from './commander';
 import type { DockedMarketSession } from './market';
+import type { PersistedScenarioState } from './scenarios';
 import type { UniverseState } from '../store/types';
 
 export const GAME_SAVE_SCHEMA_VERSION = 2;
@@ -8,6 +9,7 @@ export interface GameSnapshot {
   commander: CommanderState;
   universe: UniverseState;
   marketSession: DockedMarketSession;
+  scenario?: PersistedScenarioState;
 }
 
 export interface GameSaveFile {
