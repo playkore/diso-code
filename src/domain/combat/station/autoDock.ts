@@ -16,6 +16,10 @@ export interface AutoDockState {
   orbitRadius?: number;
 }
 
+export interface AutoDockTuning {
+  turnLeadTicks?: number;
+}
+
 /**
  * Frame-local steering output for the docking computer.
  *
@@ -162,7 +166,8 @@ export function createAutoDockState(): AutoDockState {
 export function stepAutoDockState(
   state: AutoDockState,
   station: CombatStation,
-  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>
+  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>,
+  tuning: AutoDockTuning = {}
 ): AutoDockStep {
   const corridor = getCorridorMetrics(station, player);
   const tunnelHalfWidth = getStationTunnelHalfWidth(station);
@@ -188,7 +193,8 @@ export function stepAutoDockState(
     : { x: -outwardDirection.y, y: outwardDirection.x };
   const currentSpeed = Math.hypot(player.vx, player.vy);
   const inwardTravelTime = Math.max(0, orbitRadius - mouthRadius) / AUTO_DOCK_INWARD_SPEED;
-  const leadAngle = Math.abs(station.rotSpeed) * (inwardTravelTime + AUTO_DOCK_TURN_LEAD_TICKS);
+  const turnLeadTicks = tuning.turnLeadTicks ?? AUTO_DOCK_TURN_LEAD_TICKS;
+  const leadAngle = Math.abs(station.rotSpeed) * (inwardTravelTime + turnLeadTicks);
   // The inward burn preserves the ship's current polar angle while the door
   // continues rotating. Add a small turn-in allowance so the commit starts a
   // little early and the ship enters near the middle of the opening instead

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDeterministicRandomSource, stepTravelCombat } from '../travelCombat';
+import { stepStationTraffic } from '../combat/ai/stationTrafficAi';
+import { getStationDockMouthPoint } from '../combat/station/stationGeometry';
 import { createCombatState, createTestEnemy } from './combatTestUtils';
 
 describe('travel combat civilian AI', () => {
@@ -9,6 +11,8 @@ describe('travel combat civilian AI', () => {
     // This test exercises docking behavior, not ambient encounter spawning.
     state.encounter.rareTimer = -10_000;
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    const dockMouth = getStationDockMouthPoint(state.station);
+    const orbitRadius = Math.hypot(dockMouth.x - state.station.x, dockMouth.y - state.station.y) + 56;
     state.player.x = 220;
     state.player.y = 250;
     state.enemies.push(createTestEnemy({
@@ -16,11 +20,11 @@ describe('travel combat civilian AI', () => {
       blueprintId: 'cobra-mk3-trader',
       label: 'Cobra Trader',
       behavior: 'stationTraffic',
-      x: 210,
-      y: 250,
+      x: state.station.x + orbitRadius,
+      y: state.station.y,
       vx: 0,
       vy: 0,
-      angle: 0,
+      angle: Math.PI,
       energy: 130,
       maxEnergy: 130,
       laserPower: 1,
@@ -37,9 +41,36 @@ describe('travel combat civilian AI', () => {
       missileCooldown: 999,
       isFiringLaser: false
     }));
-    for (let index = 0; index < 1000 && state.enemies.length > 0; index += 1) {
+    for (let index = 0; index < 1200 && state.enemies.some((enemy) => enemy.id === 10); index += 1) {
       stepTravelCombat(state, { thrust: 0, turn: 0 }, 4, 'JUMPING', {}, rng);
     }
-    expect(state.enemies).toHaveLength(0);
+    expect(state.enemies.some((enemy) => enemy.id === 10)).toBe(false);
+  });
+
+  it('keeps station-traffic docking phase between frames', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0.005, safeZoneRadius: 360 };
+    const enemy = createTestEnemy({
+      behavior: 'stationTraffic',
+      x: 210,
+      y: 250,
+      vx: 0,
+      vy: 0,
+      angle: 0,
+      topSpeed: 5.4,
+      acceleration: 0.08,
+      turnRate: 0.04,
+      roles: { trader: true, innocent: true, docking: true, hostile: false },
+      aggression: 10,
+      baseAggression: 10
+    });
+
+    stepStationTraffic(enemy, station, 4);
+    const phaseAfterFirstTick = enemy.autoDockPhase;
+    const radiusAfterFirstTick = enemy.autoDockOrbitRadius;
+    stepStationTraffic(enemy, station, 4);
+
+    expect(phaseAfterFirstTick).toBeDefined();
+    expect(enemy.autoDockPhase).toBe(phaseAfterFirstTick);
+    expect(enemy.autoDockOrbitRadius).toBe(radiusAfterFirstTick);
   });
 });
