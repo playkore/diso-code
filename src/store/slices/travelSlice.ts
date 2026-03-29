@@ -90,7 +90,14 @@ export const createTravelSlice: GameSlice<
       if (!nextState) {
         return false;
       }
-      set({ ...nextState, travelSession: null });
+      set({
+        ...nextState,
+        ui: {
+          ...nextState.ui,
+          selectedChartSystem: null
+        },
+        travelSession: null
+      });
       return false;
     }
 
@@ -184,6 +191,10 @@ export const createTravelSlice: GameSlice<
           ...nextState.commander,
           cash: nextState.commander.cash + (report?.rewardDelta ?? 0)
         }),
+        ui: {
+          ...nextState.ui,
+          selectedChartSystem: null
+        },
         travelSession: null
       };
     }),
@@ -197,6 +208,13 @@ export const createTravelSlice: GameSlice<
       if (!nextState) {
         return state;
       }
-      return { ...nextState, travelSession: null };
+      return {
+        ...nextState,
+        ui: {
+          ...nextState.ui,
+          selectedChartSystem: null
+        },
+        travelSession: null
+      };
     })
 });

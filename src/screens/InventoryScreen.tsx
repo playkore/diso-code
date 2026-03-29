@@ -1,7 +1,4 @@
 import { getDosCombatRatingProgress, getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
-import { MAX_FUEL, getFuelUnits } from '../domain/fuel';
-import { getInstalledEquipmentList } from '../domain/outfitting';
-import { LASER_CATALOG } from '../domain/shipCatalog';
 import { useGameStore } from '../store/useGameStore';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
@@ -9,19 +6,12 @@ import { formatLightYears } from '../utils/distance';
 export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
   const galaxyIndex = useGameStore((state) => state.universe.galaxyIndex);
-  const buyFuel = useGameStore((state) => state.buyFuel);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
-  const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(commander.fuel));
-  const installedEquipment = getInstalledEquipmentList(commander);
   const ratingProgress = getDosCombatRatingProgress(commander.combatRatingScore);
-  const laserEntries = Object.entries(commander.laserMounts).map(([mount, laserId]) => ({
-    mount,
-    name: laserId ? LASER_CATALOG[laserId].name : 'Empty'
-  }));
 
   return (
     <section className="screen">
-      <h2>Inventory / Status</h2>
+      <h2>Status</h2>
       <dl className="detail-grid">
         <dt>Commander</dt>
         <dd>{commander.name}</dd>
@@ -58,36 +48,6 @@ export function InventoryScreen() {
           {commander.missilesInstalled} / {commander.missileCapacity}
         </dd>
       </dl>
-      <section className="subpanel">
-        <p className="dialog-kicker">Laser Mounts</p>
-        <ul className="chip-list">
-          {laserEntries.map((entry) => (
-            <li key={entry.mount}>
-              {entry.mount}: {entry.name}
-            </li>
-          ))}
-        </ul>
-      </section>
-      <section className="subpanel">
-        <p className="dialog-kicker">Installed Equipment</p>
-        {installedEquipment.length ? (
-          <ul className="chip-list">
-            {installedEquipment.map((name) => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">No optional systems installed.</p>
-        )}
-      </section>
-      <div className="fuel-actions">
-        <button type="button" onClick={() => buyFuel(1)} disabled={missingFuelUnits < 1}>
-          Buy 0.1 LY
-        </button>
-        <button type="button" onClick={() => buyFuel(missingFuelUnits)} disabled={missingFuelUnits < 1}>
-          Fill Tank
-        </button>
-      </div>
     </section>
   );
 }

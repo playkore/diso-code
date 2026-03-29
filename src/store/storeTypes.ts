@@ -72,6 +72,7 @@ export interface GameStore {
   ui: UiState;
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
+  setSelectedChartSystem: (systemName: string | null) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
   setShowTravelPerfOverlay: (enabled: boolean) => void;
   grantDebugCredits: (amount: number) => void;

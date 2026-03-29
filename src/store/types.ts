@@ -38,6 +38,7 @@ export interface TravelState {
 
 export interface UiState {
   activeTab: AppTab;
+  selectedChartSystem: string | null;
   compactMode: boolean;
   instantTravelEnabled: boolean;
   showTravelPerfOverlay: boolean;
@@ -48,7 +49,7 @@ export interface UiState {
 export type AppTab =
   | 'market'
   | 'equipment'
-  | 'inventory'
+  | 'status'
   | 'system-data'
-  | 'star-map'
-  | 'save-load';
+  | 'short-range-chart'
+  | 'galaxy-chart';

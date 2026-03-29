@@ -229,15 +229,25 @@ describe('outfitting store flows', () => {
         economy: 6
       }
     }));
-    useGameStore.getState().setActiveTab('save-load');
+    useGameStore.getState().setActiveTab('galaxy-chart');
 
     const persistedRaw = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
     expect(persistedRaw).toBeTruthy();
 
     const restoredSession = loadPersistedDockedSession();
-    expect(restoredSession?.activeTab).toBe('save-load');
+    expect(restoredSession?.activeTab).toBe('galaxy-chart');
     expect(restoredSession?.restoredState.commander.currentSystem).toBe('Diso');
     expect(restoredSession?.restoredState.commander.cash).toBe(4242);
+  });
+
+  it('stores selected chart systems separately from the current system and clears them after travel', () => {
+    useGameStore.getState().setSelectedChartSystem('Leesti');
+    expect(useGameStore.getState().ui.selectedChartSystem).toBe('Leesti');
+
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+
+    expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
   });
 
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {

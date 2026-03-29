@@ -7,10 +7,10 @@ import type { AppTab } from './store/types';
 export const TAB_ROUTE_MAP: Record<AppTab, string> = {
   market: '/',
   equipment: '/equipment',
-  inventory: '/inventory',
+  status: '/status',
   'system-data': '/system-data',
-  'star-map': '/star-map',
-  'save-load': '/save-load'
+  'short-range-chart': '/short-range-chart',
+  'galaxy-chart': '/galaxy-chart'
 };
 
 export function getRouteForTab(tab: AppTab): string {

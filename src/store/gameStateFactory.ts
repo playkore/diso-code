@@ -265,10 +265,10 @@ function isAppTab(value: unknown): value is AppTab {
   return (
     value === 'market' ||
     value === 'equipment' ||
-    value === 'inventory' ||
+    value === 'status' ||
     value === 'system-data' ||
-    value === 'star-map' ||
-    value === 'save-load'
+    value === 'short-range-chart' ||
+    value === 'galaxy-chart'
   );
 }
 

@@ -98,6 +98,36 @@ header {
   border: 2px solid var(--cga-yellow);
 }
 
+.app-shell__header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.app-shell__utility-link {
+  display: inline-grid;
+  place-items: center;
+  min-width: 4.25rem;
+  min-height: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 2px solid var(--cga-yellow);
+  border-radius: 0.6rem;
+  color: var(--cga-yellow);
+  text-decoration: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  background: var(--cga-black);
+}
+
+.app-shell__utility-link:hover,
+.app-shell__utility-link:focus-visible {
+  outline: none;
+  background: var(--cga-yellow);
+  color: var(--cga-black);
+}
+
 .hud-grid {
   margin: 0;
   display: grid;
@@ -673,6 +703,10 @@ button:disabled {
 
 .star-map__galaxy-star.is-current {
   fill: var(--cga-red);
+}
+
+.star-map__galaxy-star.is-selected {
+  fill: var(--cga-green);
 }
 
 .star-map__actions {

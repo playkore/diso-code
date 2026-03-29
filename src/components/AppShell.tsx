@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../appRoutes';
 import { totalCargoUsedTonnes } from '../domain/commander';
@@ -29,7 +29,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
   },
   {
     tab: 'equipment',
-    label: 'Equipment',
+    label: 'Equip',
     to: TAB_ROUTE_MAP.equipment,
     icon: (
       <NavIcon>
@@ -42,9 +42,9 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     )
   },
   {
-    tab: 'inventory',
-    label: 'Inventory',
-    to: TAB_ROUTE_MAP.inventory,
+    tab: 'status',
+    label: 'Status',
+    to: TAB_ROUTE_MAP.status,
     icon: (
       <NavIcon>
         <rect x="7" y="4.5" width="10" height="15" rx="1.5" />
@@ -67,9 +67,9 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     )
   },
   {
-    tab: 'star-map',
-    label: 'Star Map',
-    to: TAB_ROUTE_MAP['star-map'],
+    tab: 'short-range-chart',
+    label: 'Short',
+    to: TAB_ROUTE_MAP['short-range-chart'],
     icon: (
       <NavIcon>
         <circle cx="6.5" cy="8" r="1.2" fill="currentColor" stroke="none" />
@@ -81,14 +81,15 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     )
   },
   {
-    tab: 'save-load',
-    label: 'Save/Load',
-    to: TAB_ROUTE_MAP['save-load'],
+    tab: 'galaxy-chart',
+    label: 'Galaxy',
+    to: TAB_ROUTE_MAP['galaxy-chart'],
     icon: (
       <NavIcon>
-        <path d="M6 5h9l3 3v11H6z" />
-        <path d="M9 5v5h6V5" />
-        <path d="M9 16h6" />
+        <circle cx="12" cy="12" r="7.5" />
+        <circle cx="9" cy="10" r="0.9" fill="currentColor" stroke="none" />
+        <circle cx="15.5" cy="9" r="0.9" fill="currentColor" stroke="none" />
+        <circle cx="13.5" cy="15" r="1" fill="currentColor" stroke="none" />
       </NavIcon>
     )
   }
@@ -121,22 +122,29 @@ export function AppShell() {
       <header>
         {/* The header surfaces docked-state information only. Travel HUD data is
             rendered by the travel screen itself to avoid duplicated status bars. */}
-        <dl className="hud-grid" aria-label="Commander status">
-          <div>
-            <dt>Credits</dt>
-            <dd>{formatCredits(commander.cash)}</dd>
-          </div>
-          <div>
-            <dt>Cargo</dt>
-            <dd>
-              {cargoUsed} / {commander.cargoCapacity} t
-            </dd>
-          </div>
-          <div>
-            <dt>System</dt>
-            <dd>{universe.currentSystem}</dd>
-          </div>
-        </dl>
+        <div className="app-shell__header-row">
+          <dl className="hud-grid" aria-label="Commander status">
+            <div>
+              <dt>Credits</dt>
+              <dd>{formatCredits(commander.cash)}</dd>
+            </div>
+            <div>
+              <dt>Cargo</dt>
+              <dd>
+                {cargoUsed} / {commander.cargoCapacity} t
+              </dd>
+            </div>
+            <div>
+              <dt>System</dt>
+              <dd>{universe.currentSystem}</dd>
+            </div>
+          </dl>
+          {/* Save/load remains accessible while no longer pretending to be a
+              canonical station mode in the primary navigation strip. */}
+          <Link className="app-shell__utility-link" to="/save-load" aria-label="Open save and load utilities" title="Save / Load">
+            SAVE
+          </Link>
+        </div>
         {latestUiEvent ? (
           <div className="mission-notice" role="status" aria-live="polite">
             <strong>{latestUiEvent.title}</strong>

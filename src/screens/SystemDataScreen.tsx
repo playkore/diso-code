@@ -4,7 +4,9 @@ import { useGameStore } from '../store/useGameStore';
 
 export function SystemDataScreen() {
   const universe = useGameStore((state) => state.universe);
-  const system = getSystemByName(universe.currentSystem, universe.galaxyIndex)?.data;
+  const selectedChartSystem = useGameStore((state) => state.ui.selectedChartSystem);
+  const systemName = selectedChartSystem ?? universe.currentSystem;
+  const system = getSystemByName(systemName, universe.galaxyIndex)?.data;
 
   if (!system) {
     return (
@@ -23,6 +25,9 @@ export function SystemDataScreen() {
   return (
     <section className="screen">
       <h2>Data on System</h2>
+      <p className="muted">
+        {selectedChartSystem ? `Selected from charts: ${system.name}` : `Current system: ${system.name}`}
+      </p>
       <dl className="detail-grid">
         <dt>Galaxy</dt>
         <dd>{universe.galaxyIndex + 1}</dd>

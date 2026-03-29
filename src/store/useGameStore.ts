@@ -76,6 +76,7 @@ export const useGameStore = create<GameStore>((set, get, api) => {
     saveStates: persistedSaveStates,
     ui: {
       activeTab: persistedDockedSession?.activeTab ?? 'market',
+      selectedChartSystem: null,
       compactMode: true,
       instantTravelEnabled,
       showTravelPerfOverlay,
@@ -85,6 +86,13 @@ export const useGameStore = create<GameStore>((set, get, api) => {
     // Small UI-only helpers stay here rather than in their own slice because
     // they are stateless wrappers around `set`.
     setActiveTab: (tab) => set((state) => ({ ui: { ...state.ui, activeTab: tab } })),
+    setSelectedChartSystem: (systemName) =>
+      set((state) => ({
+        ui: {
+          ...state.ui,
+          selectedChartSystem: systemName
+        }
+      })),
     setInstantTravelEnabled: (enabled) =>
       set((state) => {
         persistInstantTravelEnabled(enabled);

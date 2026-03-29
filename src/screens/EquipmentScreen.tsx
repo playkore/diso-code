@@ -2,11 +2,10 @@ import { getSystemByName } from '../domain/galaxyCatalog';
 import {
   canBuyMissile,
   getAvailableEquipmentForSystem,
-  getInstalledEquipmentList,
   isMissileAvailableAtTechLevel,
   getLaserOffersForSystem
 } from '../domain/outfitting';
-import { LASER_CATALOG, MISSILE_CATALOG, PLAYER_SHIP, type LaserMountPosition } from '../domain/shipCatalog';
+import { LASER_CATALOG, MISSILE_CATALOG, type LaserMountPosition } from '../domain/shipCatalog';
 import { useGameStore } from '../store/useGameStore';
 import { formatCredits } from '../utils/money';
 import { formatLightYears } from '../utils/distance';
@@ -23,53 +22,16 @@ export function EquipmentScreen() {
   const useGalacticHyperdrive = useGameStore((state) => state.useGalacticHyperdrive);
   const techLevel = getSystemByName(currentSystem, galaxyIndex)?.data.techLevel ?? 0;
   const equipmentOffers = getAvailableEquipmentForSystem(techLevel, commander);
-  const installedEquipment = getInstalledEquipmentList(commander);
   const missileState = canBuyMissile(commander, techLevel);
   const missileVisible = isMissileAvailableAtTechLevel(techLevel);
 
   return (
     <section className="screen">
-      <h2>Equipment Market</h2>
+      <h2>Equip Ship</h2>
       <p className="muted">
-        Galaxy {galaxyIndex + 1} · {currentSystem} tech level {techLevel}
+        Galaxy {galaxyIndex + 1} · {currentSystem} tech level {techLevel} · Cash {formatCredits(commander.cash)} · Fuel {formatLightYears(commander.fuel)} · Missiles{' '}
+        {commander.missilesInstalled}/{commander.missileCapacity}
       </p>
-
-      <section className="subpanel">
-        {/* Ship summary gives context for purchase constraints such as fuel, rack capacity, and installed gear. */}
-        <p className="dialog-kicker">Ship</p>
-        <dl className="detail-grid">
-          <dt>Hull</dt>
-          <dd>{PLAYER_SHIP.name}</dd>
-          <dt>Manufacturer</dt>
-          <dd>{PLAYER_SHIP.manufacturer}</dd>
-          <dt>Fuel Tank</dt>
-          <dd>{formatLightYears(commander.fuel)} / {formatLightYears(commander.maxFuel)}</dd>
-          <dt>Cargo Bay</dt>
-          <dd>
-            {commander.cargoCapacity} / {commander.maxCargoCapacity} t
-          </dd>
-          <dt>Energy Banks</dt>
-          <dd>
-            {commander.energyBanks} x {commander.energyPerBank}
-          </dd>
-          <dt>Missiles</dt>
-          <dd>
-            {commander.missilesInstalled} / {commander.missileCapacity}
-          </dd>
-        </dl>
-        {installedEquipment.length ? (
-          <ul className="chip-list">
-            {installedEquipment.map((name) => (
-              <li key={name}>{name}</li>
-            ))}
-          </ul>
-        ) : null}
-        {commander.installedEquipment.galactic_hyperdrive ? (
-          <button type="button" onClick={() => useGalacticHyperdrive()}>
-            Use Galactic Hyperdrive
-          </button>
-        ) : null}
-      </section>
 
       <section className="subpanel">
         {/* Weapons are split from general equipment because lasers are priced per mount and missiles use rack capacity. */}
@@ -119,7 +81,14 @@ export function EquipmentScreen() {
 
       <section className="subpanel">
         {/* General equipment offers are prefiltered by the outfitting domain helpers for this tech level. */}
-        <p className="dialog-kicker">Equipment Market</p>
+        <div className="section-heading">
+          <p className="dialog-kicker">Equipment Market</p>
+          {commander.installedEquipment.galactic_hyperdrive ? (
+            <button type="button" onClick={() => useGalacticHyperdrive()}>
+              Use Galactic Hyperdrive
+            </button>
+          ) : null}
+        </div>
         <ul className="card-list">
           {equipmentOffers.map((equipment) => (
             <li key={equipment.id} className="card-row market-row">

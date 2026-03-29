@@ -27,15 +27,15 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
     if (!saveState) {
       return;
     }
-      const restoredState = restoreSnapshot(saveState.snapshot);
-      set((current) => ({
-        ...restoredState,
-        // Travel sessions are intentionally transient and cannot survive a restore
-        // because their mutable runtime state only exists in memory.
+    const restoredState = restoreSnapshot(saveState.snapshot);
+    set((current) => ({
+      ...restoredState,
+      // Travel sessions are intentionally transient and cannot survive a restore
+      // because their mutable runtime state only exists in memory.
       travelSession: null,
       saveStates: state.saveStates,
       ui: withUiMessage(
-        current.ui,
+        { ...current.ui, activeTab: 'market', selectedChartSystem: null },
         createUiMessage('info', `Slot ${slotId} loaded`, `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`)
       )
     }));
@@ -47,7 +47,10 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
       ...freshState,
       // A new game always returns to the docked market tab with no active trip.
       travelSession: null,
-      ui: withUiMessage({ ...state.ui, activeTab: 'market' }, createUiMessage('info', 'New game started', 'Fresh commander created. Save when you want to overwrite Slot 1.'))
+      ui: withUiMessage(
+        { ...state.ui, activeTab: 'market', selectedChartSystem: null },
+        createUiMessage('info', 'New game started', 'Fresh commander created. Save when you want to overwrite Slot 1.')
+      )
     }));
   }
 });

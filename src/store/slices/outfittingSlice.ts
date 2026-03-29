@@ -104,6 +104,12 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           ui: withUiMessage(state.ui, createUiMessage('error', 'Galactic jump failed', 'The navigation computer could not resolve a valid destination system.'))
         };
       }
-      return nextState;
+      return {
+        ...nextState,
+        ui: {
+          ...nextState.ui,
+          selectedChartSystem: null
+        }
+      };
     })
 });

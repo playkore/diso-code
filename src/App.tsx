@@ -3,6 +3,7 @@ import { AppShell } from './components/AppShell';
 import { MobileFullscreenGate } from './components/MobileFullscreenGate';
 import { BackgroundDebugScreen } from './screens/BackgroundDebugScreen';
 import { EquipmentScreen } from './screens/EquipmentScreen';
+import { GalaxyChartScreen } from './screens/GalaxyChartScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
 import { MarketScreen } from './screens/MarketScreen';
 import { SaveLoadScreen } from './screens/SaveLoadScreen';
@@ -17,10 +18,13 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <MarketScreen /> },
       { path: 'equipment', element: <EquipmentScreen /> },
-      { path: 'inventory', element: <InventoryScreen /> },
-      { path: 'galaxy', element: <Navigate to="/star-map" replace /> },
+      { path: 'status', element: <InventoryScreen /> },
+      { path: 'inventory', element: <Navigate to="/status" replace /> },
+      { path: 'galaxy', element: <Navigate to="/galaxy-chart" replace /> },
       { path: 'system-data', element: <SystemDataScreen /> },
-      { path: 'star-map', element: <StarMapScreen /> },
+      { path: 'short-range-chart', element: <StarMapScreen /> },
+      { path: 'star-map', element: <Navigate to="/short-range-chart" replace /> },
+      { path: 'galaxy-chart', element: <GalaxyChartScreen /> },
       { path: 'travel', element: <TravelScreen /> },
       { path: 'debug/backgrounds', element: <BackgroundDebugScreen /> },
       { path: 'save-load', element: <SaveLoadScreen /> },
