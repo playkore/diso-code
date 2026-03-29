@@ -1,4 +1,4 @@
-import { applyLegalFloor, createDefaultCommander, normalizeCommanderState, type CommanderState } from '../domain/commander';
+import { createDefaultCommander, normalizeCommanderState, type CommanderState } from '../domain/commander';
 import { encodeCommanderBinary256 } from '../domain/commanderPersistence';
 import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/gamePersistence';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
@@ -156,7 +156,6 @@ export function createDockedState(
   if (options.spendJumpFuel) {
     nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
   }
-  nextCommander.legalValue = applyLegalFloor(nextCommander.legalValue, nextCommander.cargo, nextCommander.missionCargo);
   const nextSystem = getSystemByName(systemName);
   const nextEconomy = nextSystem?.data.economy ?? state.universe.economy;
   const fluctuation = (state.universe.stardate + systemName.length) & 0xff;

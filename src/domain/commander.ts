@@ -9,10 +9,21 @@ import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, t
  * That function is the authority for:
  * - default values for missing fields
  * - migration from legacy `legalStatus` and `equipment` shapes
- * - minimum legal-value enforcement based on illegal cargo
+ * - canonical BBC 1984 derivation of rating from TALLY
+ * - preservation of the stored FIST byte while docked
  * - equipment-derived capacity defaults such as the cargo bay upgrade
  */
 export type LegalStatus = 'clean' | 'offender' | 'fugitive';
+export type CombatRating =
+  | 'Harmless'
+  | 'Mostly Harmless'
+  | 'Poor'
+  | 'Average'
+  | 'Above Average'
+  | 'Competent'
+  | 'Dangerous'
+  | 'Deadly'
+  | 'Elite';
 
 export type LaserMountState = Record<LaserMountPosition, LaserId | null>;
 export type InstalledEquipmentState = Record<EquipmentId, boolean>;
@@ -35,7 +46,7 @@ export interface CommanderState {
   laserMounts: LaserMountState;
   installedEquipment: InstalledEquipmentState;
   tally: number;
-  rating: string;
+  rating: CombatRating;
   currentSystem: string;
   activeMissions: MissionInstance[];
   completedMissions: MissionHistoryEntry[];
@@ -90,7 +101,10 @@ export function createDefaultCommander(): CommanderState {
     laserMounts: createDefaultLaserMounts(),
     installedEquipment: createInstalledEquipmentState(),
     tally: 0,
-    rating: 'Harmless',
+    // BBC Micro Elite stores TALLY as an integer kill counter, so the visible
+    // combat rating is always derived from thresholds rather than persisted as
+    // independent progression state.
+    rating: getCombatRating(0),
     currentSystem: 'Lave',
     activeMissions: [],
     completedMissions: [],
@@ -117,6 +131,41 @@ export function totalCargoUsedTonnes(cargo: Record<string, number>, missionCargo
 
 export function clampLegalValue(value: number): number {
   return Math.max(0, Math.min(255, Math.trunc(value)));
+}
+
+/**
+ * Maps the BBC Micro 1984 TALLY thresholds onto the classic rank labels.
+ *
+ * In this ruleset every destroyed ship contributes exactly one kill, so rank
+ * progression is a pure function of the integer tally value.
+ */
+export function getCombatRating(tally: number): CombatRating {
+  const normalizedTally = Math.max(0, Math.trunc(tally));
+  if (normalizedTally >= 0x1900) {
+    return 'Elite';
+  }
+  if (normalizedTally >= 0x0a00) {
+    return 'Deadly';
+  }
+  if (normalizedTally >= 0x0200) {
+    return 'Dangerous';
+  }
+  if (normalizedTally >= 0x0080) {
+    return 'Competent';
+  }
+  if (normalizedTally >= 0x0040) {
+    return 'Above Average';
+  }
+  if (normalizedTally >= 0x0020) {
+    return 'Average';
+  }
+  if (normalizedTally >= 0x0010) {
+    return 'Poor';
+  }
+  if (normalizedTally >= 0x0008) {
+    return 'Mostly Harmless';
+  }
+  return 'Harmless';
 }
 
 export function getLegalStatus(legalValue: number): LegalStatus {
@@ -150,8 +199,21 @@ export function getMinimumLegalValue(cargo: Record<string, number>): number {
   return clampLegalValue(getCargoBadness(cargo));
 }
 
-export function applyLegalFloor(legalValue: number, cargo: Record<string, number>, missionCargo: MissionCargoItem[] = []): number {
+/**
+ * BBC Elite only forces contraband badness onto FIST when the commander
+ * launches. While cargo remains aboard, the legal byte itself still represents
+ * the current real status rather than a permanent cargo-derived maximum.
+ */
+export function applyLaunchLegalFloor(legalValue: number, cargo: Record<string, number>, missionCargo: MissionCargoItem[] = []): number {
   return Math.max(clampLegalValue(legalValue), clampLegalValue(getCargoBadness(cargo) + getMissionCargoLegalBadness(missionCargo)));
+}
+
+/**
+ * After a successful hyperspace jump, BBC Elite cools FIST by shifting it
+ * right one bit. This halves the legal pressure before the next launch.
+ */
+export function coolLegalValueAfterHyperspace(legalValue: number): number {
+  return clampLegalValue(legalValue) >> 1;
 }
 
 function legacyLegalValue(status?: string): number {
@@ -216,16 +278,16 @@ function mapLegacyEquipment(legacyEquipment: string[]): EquipmentId[] {
 }
 
 export function normalizeCommanderState(
-  commander: CommanderState | (Partial<CommanderState> & { legalStatus?: string; equipment?: string[]; missionTP?: number; missionVariant?: string })
+  commander:
+    | CommanderState
+    | (Partial<CommanderState> & { legalStatus?: string; equipment?: string[]; missionTP?: number; missionVariant?: string; rating?: string })
 ): CommanderState {
-  // Legacy saves may only carry a status label, but modern flows treat the
-  // numeric legal value as the source of truth because cargo can raise it.
+  // Legacy saves may only carry a status label, but BBC-style flows treat the
+  // numeric FIST byte as the only source of truth while docked. Contraband can
+  // temporarily floor it at launch, but normalization must not re-apply that.
   const legacyStatus = 'legalStatus' in commander ? commander.legalStatus : undefined;
-  const legalValue = applyLegalFloor(
-    typeof commander.legalValue === 'number' ? commander.legalValue : legacyLegalValue(legacyStatus),
-    commander.cargo ?? {},
-    commander.missionCargo ?? []
-  );
+  const tally = Math.max(0, Math.trunc(commander.tally ?? 0));
+  const legalValue = clampLegalValue(typeof commander.legalValue === 'number' ? commander.legalValue : legacyLegalValue(legacyStatus));
   const legacyEquipment = 'equipment' in commander && Array.isArray(commander.equipment) ? commander.equipment : [];
   // New equipment ids can appear after an old save was written, so the
   // normalized commander always merges persisted flags onto a full default map.
@@ -260,8 +322,10 @@ export function normalizeCommanderState(
       ...commander.laserMounts
     },
     installedEquipment,
-    tally: commander.tally ?? 0,
-    rating: commander.rating ?? 'Harmless',
+    tally,
+    // Persisted rating strings are compatibility baggage only; the canonical
+    // BBC status screen always derives rank directly from TALLY.
+    rating: getCombatRating(tally),
     currentSystem: commander.currentSystem ?? 'Lave',
     activeMissions: commander.activeMissions ?? [],
     completedMissions: commander.completedMissions ?? [],

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { getSystemByName, getSystemHeading } from '../../domain/galaxyCatalog';
-import { applyLegalFloor, type CommanderState } from '../../domain/commander';
+import { applyLaunchLegalFloor, type CommanderState } from '../../domain/commander';
 import { dispatchScenarioEvent, getScenarioFlightOverlay, type PersistedScenarioState, type ScenarioFlightOverlay, type ScenarioToast } from '../../domain/scenarios';
 import { clampAngle } from '../../domain/combat/state';
 import {
@@ -81,6 +81,7 @@ interface TravelRefs {
  */
 interface CombatCommanderSnapshot {
   cargo: CommanderState['cargo'];
+  missionCargo: CommanderState['missionCargo'];
   legalValue: CommanderState['legalValue'];
   energyBanks: CommanderState['energyBanks'];
   energyPerBank: CommanderState['energyPerBank'];
@@ -416,7 +417,9 @@ export function useTravelSession(
     const random = createMathRandomSource();
     const combatState = createTravelCombatState(
       {
-        legalValue: applyLegalFloor(commander.legalValue, commander.cargo),
+        // The live flight session starts from launch-time FIST, including the
+        // temporary contraband floor that BBC Elite applies when leaving dock.
+        legalValue: applyLaunchLegalFloor(commander.legalValue, commander.cargo, commander.missionCargo),
         government: originSystem.government,
         techLevel: originSystem.techLevel,
         missionContext: session.missionContext,
@@ -649,7 +652,7 @@ export function useTravelSession(
     const resetPrototype = () => {
       const fresh = createTravelCombatState(
         {
-          legalValue: applyLegalFloor(commander.legalValue, commander.cargo),
+          legalValue: applyLaunchLegalFloor(commander.legalValue, commander.cargo, commander.missionCargo),
           government: originSystem.government,
           techLevel: originSystem.techLevel,
           missionContext: session.missionContext,

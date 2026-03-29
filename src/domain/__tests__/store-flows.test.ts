@@ -123,6 +123,41 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.fuel).toBe(expectedFuel);
   });
 
+  it('applies contraband legal pressure at launch only', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Lave',
+        legalValue: 0,
+        cargo: { narcotics: 2, firearms: 1 }
+      }),
+      universe: { ...state.universe, currentSystem: 'Lave' }
+    }));
+
+    expect(useGameStore.getState().commander.legalValue).toBe(0);
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    expect(useGameStore.getState().commander.legalValue).toBe(5);
+  });
+
+  it('cools legal value after a successful jump without reapplying cargo badness while docked', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Lave',
+        legalValue: 0,
+        cargo: { slaves: 10 }
+      }),
+      universe: { ...state.universe, currentSystem: 'Lave' }
+    }));
+
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+    expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().commander.legalValue).toBe(10);
+  });
+
   it('credits combat rewards immediately through the travel slice helper', () => {
     const startingCash = useGameStore.getState().commander.cash;
     useGameStore.getState().grantCombatCredits(710);

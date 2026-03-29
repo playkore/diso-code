@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyLegalFloor,
+  applyLaunchLegalFloor,
+  coolLegalValueAfterHyperspace,
   createDefaultCommander,
+  getCombatRating,
   getCargoBadness,
   getLegalStatus,
   getMissionCargoLegalBadness,
@@ -30,7 +32,41 @@ describe('missions and commander persistence', () => {
     ];
     expect(missionCargoUsedTonnes(missionCargo)).toBe(0);
     expect(getMissionCargoLegalBadness(missionCargo)).toBe(2);
-    expect(applyLegalFloor(0, {}, missionCargo)).toBe(2);
+    expect(applyLaunchLegalFloor(0, {}, missionCargo)).toBe(2);
+  });
+
+  it('maps BBC 1984 tally thresholds to combat ratings', () => {
+    expect(getCombatRating(0)).toBe('Harmless');
+    expect(getCombatRating(7)).toBe('Harmless');
+    expect(getCombatRating(8)).toBe('Mostly Harmless');
+    expect(getCombatRating(15)).toBe('Mostly Harmless');
+    expect(getCombatRating(16)).toBe('Poor');
+    expect(getCombatRating(31)).toBe('Poor');
+    expect(getCombatRating(32)).toBe('Average');
+    expect(getCombatRating(63)).toBe('Average');
+    expect(getCombatRating(64)).toBe('Above Average');
+    expect(getCombatRating(127)).toBe('Above Average');
+    expect(getCombatRating(128)).toBe('Competent');
+    expect(getCombatRating(511)).toBe('Competent');
+    expect(getCombatRating(512)).toBe('Dangerous');
+    expect(getCombatRating(2559)).toBe('Dangerous');
+    expect(getCombatRating(2560)).toBe('Deadly');
+    expect(getCombatRating(6399)).toBe('Deadly');
+    expect(getCombatRating(6400)).toBe('Elite');
+  });
+
+  it('recomputes rating from tally during normalization', () => {
+    const commander = normalizeCommanderState({
+      ...createDefaultCommander(),
+      tally: 128,
+      rating: 'Harmless'
+    });
+    expect(commander.rating).toBe('Competent');
+  });
+
+  it('cools legal value after hyperspace without reapplying cargo pressure', () => {
+    expect(coolLegalValueAfterHyperspace(50)).toBe(25);
+    expect(coolLegalValueAfterHyperspace(51)).toBe(25);
   });
 
   it('accepts offers and generates inbox messages from mission state', () => {
@@ -53,6 +89,8 @@ describe('missions and commander persistence', () => {
   it('round-trips commander through JSON and binary saves', () => {
     const commander = createDefaultCommander();
     commander.cash = 2222;
+    commander.tally = 512;
+    commander.rating = 'Harmless';
     commander.installedEquipment.ecm = true;
     commander.installedEquipment.shield_generator = true;
     commander.installedEquipment.energy_box_2 = true;
@@ -68,12 +106,14 @@ describe('missions and commander persistence', () => {
     expect(fromJson.cash).toBe(2222);
     expect(fromJson.installedEquipment.ecm).toBe(true);
     expect(fromJson.installedEquipment.shield_generator).toBe(true);
+    expect(fromJson.rating).toBe('Dangerous');
     expect(fromJson.activeMissions).toHaveLength(1);
     expect(fromBinary.activeMissions).toEqual([]);
     expect(fromBinary.missionCargo).toEqual([]);
     expect(fromBinary.laserMounts.rear).toBe('beam_laser');
     expect(fromBinary.energyBanks).toBe(2);
     expect(fromBinary.installedEquipment.shield_generator).toBe(true);
+    expect(fromBinary.rating).toBe('Dangerous');
   });
 
   it('round-trips a full game snapshot through save slot JSON', () => {

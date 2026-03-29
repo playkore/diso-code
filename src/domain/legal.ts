@@ -1,6 +1,7 @@
 export {
-  applyLegalFloor,
+  applyLaunchLegalFloor,
   clampLegalValue,
+  coolLegalValueAfterHyperspace,
   getCargoBadness,
   getLegalStatus,
   getMinimumLegalValue

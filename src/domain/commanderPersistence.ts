@@ -137,7 +137,6 @@ function fromCompactPayload(payload: CompactCommanderPayload): CommanderState {
     },
     installedEquipment: decodeInstalledEquipmentBits(payload[14]),
     tally: payload[15],
-    rating: payload[16],
     currentSystem: payload[17]
   });
 }

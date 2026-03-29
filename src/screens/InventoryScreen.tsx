@@ -1,4 +1,4 @@
-import { getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
+import { getCombatRating, getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
 import { MAX_FUEL, getFuelUnits } from '../domain/fuel';
 import { getInstalledEquipmentList } from '../domain/outfitting';
 import { LASER_CATALOG } from '../domain/shipCatalog';
@@ -12,6 +12,7 @@ export function InventoryScreen() {
   const cargoUsed = totalCargoUsedTonnes(commander.cargo, commander.missionCargo);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(commander.fuel));
   const installedEquipment = getInstalledEquipmentList(commander);
+  const rating = getCombatRating(commander.tally);
   const laserEntries = Object.entries(commander.laserMounts).map(([mount, laserId]) => ({
     mount,
     name: laserId ? LASER_CATALOG[laserId].name : 'Empty'
@@ -30,7 +31,7 @@ export function InventoryScreen() {
         <dt>Legal</dt>
         <dd>{getLegalStatus(commander.legalValue)} ({commander.legalValue})</dd>
         <dt>Rating</dt>
-        <dd>{commander.rating}</dd>
+        <dd>{rating}</dd>
         <dt>Tally</dt>
         <dd>{commander.tally}</dd>
         <dt>Ship</dt>

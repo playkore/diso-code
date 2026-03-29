@@ -24,11 +24,10 @@ export function canEnemyLaserHitByCnt(cnt: number): boolean {
 }
 
 export function applyEnemyHostility(state: TravelCombatState, enemy: CombatEnemy) {
-  // Bounty hunters and station cops can become hostile without changing their
-  // base role definitions, so hostility is recalculated every frame.
-  if (enemy.roles.bountyHunter && state.legalValue >= 40) {
-    enemy.roles.hostile = true;
-  }
+  // BBC Micro Elite does not use the later "bounty hunters turn hostile at
+  // FIST 40" rule, so this pass only re-evaluates aggression that can change
+  // within the current encounter, such as safe-zone suppression and station
+  // defense escalation.
   if (enemy.roles.pirate && enemy.roles.hostile && state.encounter.safeZone) {
     enemy.aggression = 0;
   } else {

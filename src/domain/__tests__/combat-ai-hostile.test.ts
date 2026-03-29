@@ -4,7 +4,7 @@ import { createDeterministicRandomSource, stepTravelCombat } from '../travelComb
 import { createCombatState, createTestEnemy } from './combatTestUtils';
 
 describe('travel combat hostile AI', () => {
-  it('turns bounty hunters hostile at FIST 40 and suppresses pirate aggression in safe zones', () => {
+  it('keeps bounty hunters neutral while suppressing pirate aggression in safe zones', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0], { legalValue: 40, government: 7, techLevel: 12 });
     state.enemies.push(createTestEnemy({
@@ -38,7 +38,7 @@ describe('travel combat hostile AI', () => {
       isFiringLaser: false
     }));
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'ARRIVED', {}, rng);
-    expect(state.enemies[0].roles.hostile).toBe(true);
+    expect(state.enemies[0].roles.hostile).not.toBe(true);
     expect(state.enemies[1].aggression).toBe(0);
   });
 

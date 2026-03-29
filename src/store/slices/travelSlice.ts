@@ -1,4 +1,4 @@
-import { applyLegalFloor, normalizeCommanderState } from '../../domain/commander';
+import { applyLaunchLegalFloor, coolLegalValueAfterHyperspace, normalizeCommanderState } from '../../domain/commander';
 import { createScenarioState, createDockedState, createArrivalState } from '../gameStateFactory';
 import { dispatchScenarioEvent } from '../../domain/scenarios';
 import { applyMissionEvent, evaluateDockingMissionState, getMissionCargoForActiveMissions, getMissionInbox, getMissionTravelContext, settleCompletedMissions } from '../../domain/missions';
@@ -84,10 +84,25 @@ export const createTravelSlice: GameSlice<
       });
       return false;
     }
+    const launchedCommander = {
+      ...state.commander,
+      // Launch is the point where contraband temporarily floors the BBC
+      // FIST byte; while docked we preserve the raw stored legal value.
+      legalValue: applyLaunchLegalFloor(state.commander.legalValue, state.commander.cargo, state.commander.missionCargo)
+    };
     // Instant-travel mode skips the real-time flight screen entirely and
     // immediately performs the same docked arrival transition.
     if (state.ui.instantTravelEnabled) {
-      const nextState = createArrivalState(state, systemName);
+      const nextState = createArrivalState(
+        {
+          ...state,
+          commander: {
+            ...launchedCommander,
+            legalValue: coolLegalValueAfterHyperspace(launchedCommander.legalValue)
+          }
+        },
+        systemName
+      );
       if (!nextState) {
         return false;
       }
@@ -99,12 +114,8 @@ export const createTravelSlice: GameSlice<
         originSystem: state.universe.currentSystem,
         destinationSystem: systemName
       });
-      const commander = {
-        ...state.commander,
-        legalValue: applyLegalFloor(state.commander.legalValue, state.commander.cargo, state.commander.missionCargo)
-      };
       set({
-        commander,
+        commander: launchedCommander,
         travelSession: {
           originSystem: state.universe.currentSystem,
           destinationSystem: systemName,
@@ -162,13 +173,18 @@ export const createTravelSlice: GameSlice<
         };
       let scenarioToast = report?.scenarioLastToast ?? state.scenario.lastToast;
 
+      const dockSystemName = report?.dockSystemName ?? state.travelSession.effectiveDestinationSystem;
+      const spendJumpFuel = report?.spendJumpFuel ?? dockSystemName === state.travelSession.destinationSystem;
       // First, merge all direct commander deltas from the travel report.
+      const nextLegalValue =
+        report?.legalValue ??
+        (spendJumpFuel ? coolLegalValueAfterHyperspace(state.commander.legalValue) : state.commander.legalValue);
       let commander = normalizeCommanderState({
         ...state.commander,
         // Live combat rewards already hit commander cash during flight, so
         // travel completion only needs to settle rescue-side penalties here.
         cash: state.commander.cash - insurancePenalty,
-        legalValue: report?.legalValue ?? state.commander.legalValue,
+        legalValue: nextLegalValue,
         tally: state.commander.tally + (report?.tallyDelta ?? 0),
         cargo: mergedCargo,
         missionCargo,
@@ -181,8 +197,6 @@ export const createTravelSlice: GameSlice<
         activeMissions = report.missionEvents.reduce((missions, event) => applyMissionEvent(missions, event), activeMissions);
       }
 
-      const dockSystemName = report?.dockSystemName ?? state.travelSession.effectiveDestinationSystem;
-      const spendJumpFuel = report?.spendJumpFuel ?? dockSystemName === state.travelSession.destinationSystem;
       // Finally choose the appropriate docked transition:
       // - rescue recovery
       // - normal destination arrival

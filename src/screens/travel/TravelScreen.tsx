@@ -21,6 +21,7 @@ export function TravelScreen() {
   const combatCommander = useGameStore(
     (state) => ({
       cargo: state.commander.cargo,
+      missionCargo: state.commander.missionCargo,
       legalValue: state.commander.legalValue,
       energyBanks: state.commander.energyBanks,
       energyPerBank: state.commander.energyPerBank,
