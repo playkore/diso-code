@@ -849,31 +849,6 @@ export function useTravelSession(
         const autoDockStep = stepAutoDockState(autoDockState, combatState.station, combatState.player);
         autoDockState = autoDockStep.state;
         autoDockCommand = autoDockStep.command;
-        console.log('[auto-dock-debug]', {
-          phase: autoDockStep.state.phase,
-          mode: autoDockStep.command.mode,
-          stationAngle: Number(combatState.station.angle.toFixed(3)),
-          slotAngle: Number(autoDockStep.command.debug.currentSlotAngle.toFixed(3)),
-          targetOrbitAngle: autoDockStep.command.debug.targetOrbitAngle === undefined
-            ? null
-            : Number(autoDockStep.command.debug.targetOrbitAngle.toFixed(3)),
-          leadAngle: autoDockStep.command.debug.leadAngle === undefined
-            ? null
-            : Number(autoDockStep.command.debug.leadAngle.toFixed(3)),
-          orbitRadius: autoDockStep.command.debug.orbitRadius === undefined
-            ? null
-            : Number(autoDockStep.command.debug.orbitRadius.toFixed(1)),
-          playerAngle: Number(combatState.player.angle.toFixed(3)),
-          playerX: Number(combatState.player.x.toFixed(1)),
-          playerY: Number(combatState.player.y.toFixed(1)),
-          vx: Number(combatState.player.vx.toFixed(2)),
-          vy: Number(combatState.player.vy.toFixed(2)),
-          turn: Number(autoDockStep.command.turn.toFixed(3)),
-          thrust: autoDockStep.command.thrust,
-          slotOffset: Number(autoDockStep.command.debug.slotOffset.toFixed(1)),
-          stageRadiusError: Number(autoDockStep.command.debug.stageRadiusError.toFixed(1)),
-          doorInFront: autoDockStep.command.debug.doorInFront
-        });
       }
 
       const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING'

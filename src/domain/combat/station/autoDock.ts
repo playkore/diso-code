@@ -62,6 +62,7 @@ const AUTO_DOCK_ORBIT_RADIAL_GAIN = 0.06;
 const AUTO_DOCK_ORBIT_RADIAL_LIMIT = 0.75;
 const AUTO_DOCK_ORBIT_ANGLE_WINDOW = 0.14;
 const AUTO_DOCK_INWARD_SPEED = 2.6;
+const AUTO_DOCK_TURN_LEAD_TICKS = 8;
 const AUTO_DOCK_STOPPING_FACTOR = 70;
 const AUTO_DOCK_STOPPING_BUFFER = 8;
 const AUTO_DOCK_ALIGNMENT_WINDOW = 0.22;
@@ -187,10 +188,11 @@ export function stepAutoDockState(
     : { x: -outwardDirection.y, y: outwardDirection.x };
   const currentSpeed = Math.hypot(player.vx, player.vy);
   const inwardTravelTime = Math.max(0, orbitRadius - mouthRadius) / AUTO_DOCK_INWARD_SPEED;
-  const leadAngle = Math.abs(station.rotSpeed) * inwardTravelTime;
+  const leadAngle = Math.abs(station.rotSpeed) * (inwardTravelTime + AUTO_DOCK_TURN_LEAD_TICKS);
   // The inward burn preserves the ship's current polar angle while the door
-  // continues rotating. To meet the opening, the ship must start its radial
-  // run from the door's future angle, not from a lagging angle behind it.
+  // continues rotating. Add a small turn-in allowance so the commit starts a
+  // little early and the ship enters near the middle of the opening instead
+  // of grazing the trailing edge while it finishes rotating nose-in.
   const targetOrbitAngle = corridor.slotAngle + rotSign * leadAngle;
   const orbitAngleError = clampAngle(targetOrbitAngle - playerAngle);
   const doorInFront =
