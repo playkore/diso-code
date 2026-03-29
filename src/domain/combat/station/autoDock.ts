@@ -1,30 +1,32 @@
 import { clampAngle } from '../state';
 import type { CombatPlayer, CombatStation } from '../types';
-import { getStationDockDirection, getStationDockMouthPoint, getStationDockPoint, getStationTunnelHalfWidth } from './stationGeometry';
+import { getStationDockDirection, getStationDockMouthPoint, getStationTunnelHalfWidth } from './stationGeometry';
 
-export type AutoDockPhase = 'acquire-orbit' | 'orbit' | 'inward';
+export type AutoDockPhase = 'approach' | 'align' | 'wait' | 'inward';
 
 /**
- * Auto-dock now follows an explicit orbital interception plan:
- * 1. capture a circular holding orbit around the station at radius X
- * 2. move around that orbit opposite the station rotation
- * 3. compute when the rotating door will reach the ship's radial line
- * 4. burn straight inward toward the station center at that lead angle
+ * The docking computer now runs a lead-angle intercept instead of circling the
+ * station:
+ * 1. stop on a safe staging radius outside the hull
+ * 2. point the nose at the station center
+ * 3. estimate the inward travel time to the docking mouth
+ * 4. wait until the rotating slot reaches the required lead angle
+ * 5. burn straight toward the center and let the door rotate onto that line
  */
 export interface AutoDockState {
   phase: AutoDockPhase;
-  orbitRadius?: number;
+  stageRadius?: number;
 }
 
 export interface AutoDockTuning {
-  turnLeadTicks?: number;
+  leadTimeBias?: number;
 }
 
 /**
  * Frame-local steering output for the docking computer.
  *
- * `mode` is renderer/UI facing, while `phase` in `debug` describes the actual
- * state-machine branch used to generate this command.
+ * `mode` is renderer/UI facing, while `phase` in `debug` exposes the exact
+ * state-machine branch that produced the command.
  */
 export interface AutoDockCommand {
   turn: number;
@@ -47,9 +49,9 @@ export interface AutoDockCommand {
     radialSpeed: number;
     tangentialSpeed: number;
     stageRadiusError: number;
-    targetOrbitAngle?: number;
-    orbitRadius?: number;
     leadAngle?: number;
+    inwardTravelTime?: number;
+    noseError?: number;
   };
 }
 
@@ -58,18 +60,14 @@ export interface AutoDockStep {
   command: AutoDockCommand;
 }
 
-const AUTO_DOCK_ORBIT_MARGIN = 56;
-const AUTO_DOCK_ORBIT_RADIUS_BAND = 10;
-const AUTO_DOCK_ORBIT_SPEED = 0.95;
-const AUTO_DOCK_ORBIT_CAPTURE_SPEED = 0.55;
-const AUTO_DOCK_ORBIT_RADIAL_GAIN = 0.06;
-const AUTO_DOCK_ORBIT_RADIAL_LIMIT = 0.75;
-const AUTO_DOCK_ORBIT_ANGLE_WINDOW = 0.14;
+const AUTO_DOCK_STAGE_MARGIN = 56;
+const AUTO_DOCK_STAGE_RADIUS_BAND = 10;
+const AUTO_DOCK_CAPTURE_SPEED = 0.55;
 const AUTO_DOCK_INWARD_SPEED = 2.6;
-const AUTO_DOCK_TURN_LEAD_TICKS = 8;
 const AUTO_DOCK_STOPPING_FACTOR = 70;
 const AUTO_DOCK_STOPPING_BUFFER = 8;
-const AUTO_DOCK_ALIGNMENT_WINDOW = 0.22;
+const AUTO_DOCK_ALIGNMENT_WINDOW = 0.16;
+const AUTO_DOCK_WAIT_ANGLE_WINDOW = 0.14;
 
 function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
@@ -77,44 +75,6 @@ function clampUnit(value: number) {
 
 function getTargetTurn(currentAngle: number, desiredAngle: number) {
   return clampUnit(clampAngle(desiredAngle - currentAngle) / 0.12);
-}
-
-function createDebug(
-  phase: AutoDockPhase,
-  station: CombatStation,
-  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>,
-  targetPoint: { x: number; y: number },
-  slotAngle: number,
-  doorInFront: boolean,
-  extras: Partial<Pick<AutoDockCommand['debug'], 'targetOrbitAngle' | 'orbitRadius' | 'leadAngle'>> = {}
-): AutoDockCommand['debug'] {
-  const dockDirection = getStationDockDirection(station);
-  const offsetX = player.x - targetPoint.x;
-  const offsetY = player.y - targetPoint.y;
-  const distanceToTarget = Math.hypot(offsetX, offsetY);
-  const radialSpeed = -(player.vx * dockDirection.x + player.vy * dockDirection.y);
-  const tangentialSpeed = Math.abs(player.vx * -dockDirection.y + player.vy * dockDirection.x);
-  const slotOffset = (player.x - station.x) * -dockDirection.y + (player.y - station.y) * dockDirection.x;
-
-  return {
-    phase,
-    currentSlotAngle: slotAngle,
-    expectedSlotAngle: slotAngle,
-    playerRadialAngle: Math.atan2(player.y - station.y, player.x - station.x),
-    slotOffset,
-    projectedSlotOffset: slotOffset,
-    onStageRing: distanceToTarget <= AUTO_DOCK_ORBIT_RADIUS_BAND,
-    withinWaitBand: distanceToTarget <= AUTO_DOCK_ORBIT_RADIUS_BAND,
-    readyToWait: Math.hypot(player.vx, player.vy) <= AUTO_DOCK_ORBIT_CAPTURE_SPEED,
-    canEnterWait: distanceToTarget <= AUTO_DOCK_ORBIT_RADIUS_BAND,
-    doorInFront,
-    distanceFromStation: Math.hypot(player.x - station.x, player.y - station.y),
-    stageRadius: distanceToTarget,
-    radialSpeed,
-    tangentialSpeed,
-    stageRadiusError: distanceToTarget,
-    ...extras
-  };
 }
 
 function steerToTarget(
@@ -133,8 +93,7 @@ function steerToTarget(
 
   return {
     turn: getTargetTurn(player.angle, Math.atan2(deltaY, deltaX)),
-    thrust: distance > 1 && distance > stoppingDistance && forwardSpeed < speedLimit ? 1 : 0,
-    distance
+    thrust: distance > 1 && distance > stoppingDistance && forwardSpeed < speedLimit ? 1 : 0
   };
 }
 
@@ -159,8 +118,59 @@ function getCorridorMetrics(station: CombatStation, player: Pick<CombatPlayer, '
   };
 }
 
+function createDebug(
+  phase: AutoDockPhase,
+  station: CombatStation,
+  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>,
+  stageRadius: number,
+  corridor: ReturnType<typeof getCorridorMetrics>,
+  centerAlignment: number,
+  leadAngle: number,
+  inwardTravelTime: number
+): AutoDockCommand['debug'] {
+  const playerOffsetX = player.x - station.x;
+  const playerOffsetY = player.y - station.y;
+  const playerRadius = Math.hypot(playerOffsetX, playerOffsetY);
+  const playerAngle = Math.atan2(playerOffsetY, playerOffsetX);
+  const radialDirection = playerRadius > 1e-6
+    ? { x: playerOffsetX / playerRadius, y: playerOffsetY / playerRadius }
+    : { x: Math.cos(playerAngle), y: Math.sin(playerAngle) };
+  const radialSpeed = -(player.vx * radialDirection.x + player.vy * radialDirection.y);
+  const tangentialSpeed = Math.abs(player.vx * -radialDirection.y + player.vy * radialDirection.x);
+  const stageRadiusError = playerRadius - stageRadius;
+  const leadError = clampAngle((playerAngle - corridor.slotAngle) - leadAngle);
+
+  return {
+    phase,
+    currentSlotAngle: corridor.slotAngle,
+    expectedSlotAngle: corridor.slotAngle + leadAngle,
+    playerRadialAngle: playerAngle,
+    slotOffset: corridor.lateralOffset,
+    projectedSlotOffset: leadError,
+    onStageRing: Math.abs(stageRadiusError) <= AUTO_DOCK_STAGE_RADIUS_BAND,
+    withinWaitBand: Math.abs(leadError) <= AUTO_DOCK_WAIT_ANGLE_WINDOW,
+    readyToWait: Math.hypot(player.vx, player.vy) <= AUTO_DOCK_CAPTURE_SPEED,
+    canEnterWait:
+      Math.abs(stageRadiusError) <= AUTO_DOCK_STAGE_RADIUS_BAND &&
+      Math.abs(corridor.noseAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW &&
+      Math.hypot(player.vx, player.vy) <= AUTO_DOCK_CAPTURE_SPEED,
+    doorInFront:
+      Math.abs(corridor.lateralOffset) <= getStationTunnelHalfWidth(station) * 0.5 &&
+      corridor.axialOffset >= -8 &&
+      Math.abs(centerAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW,
+    distanceFromStation: playerRadius,
+    stageRadius,
+    radialSpeed,
+    tangentialSpeed,
+    stageRadiusError,
+    leadAngle,
+    inwardTravelTime,
+    noseError: centerAlignment
+  };
+}
+
 export function createAutoDockState(): AutoDockState {
-  return { phase: 'acquire-orbit' };
+  return { phase: 'approach' };
 }
 
 export function stepAutoDockState(
@@ -170,137 +180,103 @@ export function stepAutoDockState(
   tuning: AutoDockTuning = {}
 ): AutoDockStep {
   const corridor = getCorridorMetrics(station, player);
-  const tunnelHalfWidth = getStationTunnelHalfWidth(station);
   const dockMouth = getStationDockMouthPoint(station);
   const mouthRadius = Math.hypot(dockMouth.x - station.x, dockMouth.y - station.y);
-  const orbitRadius = state.orbitRadius ?? mouthRadius + AUTO_DOCK_ORBIT_MARGIN;
-  if (state.orbitRadius === undefined) {
-    state = { ...state, orbitRadius };
+  const stageRadius = state.stageRadius ?? mouthRadius + AUTO_DOCK_STAGE_MARGIN;
+  if (state.stageRadius === undefined) {
+    state = { ...state, stageRadius };
   }
+
   const playerOffsetX = player.x - station.x;
   const playerOffsetY = player.y - station.y;
   const playerRadius = Math.hypot(playerOffsetX, playerOffsetY);
   const playerAngle = Math.atan2(playerOffsetY, playerOffsetX);
-  const rotSign = station.rotSpeed >= 0 ? 1 : -1;
-  const outwardDirection = playerRadius > 1e-6
+  const currentSpeed = Math.hypot(player.vx, player.vy);
+  const radialDirection = playerRadius > 1e-6
     ? { x: playerOffsetX / playerRadius, y: playerOffsetY / playerRadius }
     : { x: Math.cos(playerAngle), y: Math.sin(playerAngle) };
-  // Orbiting must be tangent to the ship's own radius around the station, not
-  // tangent to the current door angle. Using the door axis here makes the
-  // ship drift across the hull instead of circling cleanly at radius X.
-  const oppositeTangentialDirection = rotSign >= 0
-    ? { x: outwardDirection.y, y: -outwardDirection.x }
-    : { x: -outwardDirection.y, y: outwardDirection.x };
-  const currentSpeed = Math.hypot(player.vx, player.vy);
-  const inwardTravelTime = Math.max(0, orbitRadius - mouthRadius) / AUTO_DOCK_INWARD_SPEED;
-  const turnLeadTicks = tuning.turnLeadTicks ?? AUTO_DOCK_TURN_LEAD_TICKS;
-  const leadAngle = Math.abs(station.rotSpeed) * (inwardTravelTime + turnLeadTicks);
-  // The inward burn preserves the ship's current polar angle while the door
-  // continues rotating. Add a small turn-in allowance so the commit starts a
-  // little early and the ship enters near the middle of the opening instead
-  // of grazing the trailing edge while it finishes rotating nose-in.
-  const targetOrbitAngle = corridor.slotAngle + rotSign * leadAngle;
-  const orbitAngleError = clampAngle(targetOrbitAngle - playerAngle);
-  const doorInFront =
-    Math.abs(corridor.lateralOffset) <= tunnelHalfWidth * 0.5 &&
-    corridor.axialOffset >= -8 &&
-    Math.abs(corridor.noseAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW;
+  const stageTarget = {
+    x: station.x + radialDirection.x * stageRadius,
+    y: station.y + radialDirection.y * stageRadius
+  };
+  const inwardHeading = Math.atan2(station.y - player.y, station.x - player.x);
+  const centerAlignment = clampAngle(player.angle - inwardHeading);
+  const inwardTravelDistance = Math.max(0, playerRadius - mouthRadius);
+  const inwardTravelTime = Math.max(0, inwardTravelDistance / AUTO_DOCK_INWARD_SPEED + (tuning.leadTimeBias ?? 0));
+  const leadAngle = station.rotSpeed * inwardTravelTime;
+  const leadError = clampAngle((playerAngle - corridor.slotAngle) - leadAngle);
+  const debug = createDebug(state.phase, station, player, stageRadius, corridor, centerAlignment, leadAngle, inwardTravelTime);
 
-  if (state.phase === 'inward') {
-    const dockPoint = getStationDockPoint(station);
-    const inwardSpeed = Math.max(0, -(player.vx * corridor.dockDirection.x + player.vy * corridor.dockDirection.y));
-    const shouldThrust =
-      Math.abs(corridor.noseAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW &&
-      inwardSpeed < AUTO_DOCK_INWARD_SPEED;
-
-    if (Math.abs(clampAngle(corridor.slotAngle - playerAngle)) > leadAngle + 0.3) {
-      state = { phase: 'orbit', orbitRadius };
-    } else {
-      return {
-        state,
-        command: {
-          turn: getTargetTurn(player.angle, Math.atan2(station.y - player.y, station.x - player.x)),
-          thrust: shouldThrust ? 1 : 0,
-          mode: 'dock',
-          debug: createDebug(state.phase, station, player, dockPoint, corridor.slotAngle, doorInFront, {
-            targetOrbitAngle,
-            orbitRadius,
-            leadAngle
-          })
-        }
-      };
-    }
-  }
-
-  if (state.phase === 'orbit') {
-    const radialCorrection = Math.max(
-      -AUTO_DOCK_ORBIT_RADIAL_LIMIT,
-      Math.min(AUTO_DOCK_ORBIT_RADIAL_LIMIT, (orbitRadius - playerRadius) * AUTO_DOCK_ORBIT_RADIAL_GAIN)
-    );
-    const desiredVelocity = {
-      x: oppositeTangentialDirection.x * AUTO_DOCK_ORBIT_SPEED + outwardDirection.x * radialCorrection,
-      y: oppositeTangentialDirection.y * AUTO_DOCK_ORBIT_SPEED + outwardDirection.y * radialCorrection
-    };
-    const desiredSpeed = Math.hypot(desiredVelocity.x, desiredVelocity.y);
-    const desiredHeading = desiredSpeed > 1e-6 ? Math.atan2(desiredVelocity.y, desiredVelocity.x) : player.angle;
-    const forwardSpeed = desiredSpeed > 1e-6 ? player.vx * (desiredVelocity.x / desiredSpeed) + player.vy * (desiredVelocity.y / desiredSpeed) : 0;
-
-    if (Math.abs(playerRadius - orbitRadius) <= AUTO_DOCK_ORBIT_RADIUS_BAND && Math.abs(orbitAngleError) <= AUTO_DOCK_ORBIT_ANGLE_WINDOW) {
-      state = { phase: 'inward', orbitRadius };
-      return stepAutoDockState(state, station, player);
+  if (state.phase === 'approach') {
+    const steering = steerToTarget(player, stageTarget, AUTO_DOCK_CAPTURE_SPEED);
+    if (Math.abs(playerRadius - stageRadius) <= AUTO_DOCK_STAGE_RADIUS_BAND && currentSpeed <= AUTO_DOCK_CAPTURE_SPEED) {
+      state = { phase: 'align', stageRadius };
+      return stepAutoDockState(state, station, player, tuning);
     }
 
     return {
       state,
-        command: {
-          turn: getTargetTurn(player.angle, desiredHeading),
-          thrust: forwardSpeed < desiredSpeed && currentSpeed < AUTO_DOCK_ORBIT_SPEED + 0.5 ? 1 : 0,
-          mode: 'approach',
-          debug: createDebug(
-          state.phase,
-          station,
-          player,
-            {
-              x: station.x + Math.cos(targetOrbitAngle) * orbitRadius,
-              y: station.y + Math.sin(targetOrbitAngle) * orbitRadius
-            },
-            corridor.slotAngle,
-            doorInFront,
-            {
-              targetOrbitAngle,
-              orbitRadius,
-              leadAngle
-            }
-          )
-        }
-      };
+      command: {
+        turn: steering.turn,
+        thrust: steering.thrust,
+        mode: 'approach',
+        debug
+      }
+    };
   }
 
-  const orbitTarget = {
-    // Orbit capture should only push the ship onto the desired radius. If this
-    // point itself rotates with the door, the ship ends up chasing a moving
-    // target and can cut inward into the station before ever reaching orbit.
-    x: station.x + outwardDirection.x * orbitRadius,
-    y: station.y + outwardDirection.y * orbitRadius
-  };
-  const steering = steerToTarget(player, orbitTarget, AUTO_DOCK_ORBIT_SPEED);
-
-  if (Math.abs(playerRadius - orbitRadius) <= AUTO_DOCK_ORBIT_RADIUS_BAND && currentSpeed <= AUTO_DOCK_ORBIT_CAPTURE_SPEED) {
-    state = { phase: 'orbit', orbitRadius };
-    return stepAutoDockState(state, station, player);
+  if (Math.abs(playerRadius - stageRadius) > AUTO_DOCK_STAGE_RADIUS_BAND * 1.5) {
+    state = { phase: 'approach', stageRadius };
+    return stepAutoDockState(state, station, player, tuning);
   }
 
+  if (state.phase === 'align') {
+    if (Math.abs(centerAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW) {
+      state = { phase: 'wait', stageRadius };
+      return stepAutoDockState(state, station, player, tuning);
+    }
+
+    return {
+      state,
+      command: {
+        turn: getTargetTurn(player.angle, inwardHeading),
+        thrust: 0,
+        mode: 'wait',
+        debug
+      }
+    };
+  }
+
+  if (state.phase === 'wait') {
+    if (Math.abs(centerAlignment) > AUTO_DOCK_ALIGNMENT_WINDOW * 1.25) {
+      state = { phase: 'align', stageRadius };
+      return stepAutoDockState(state, station, player, tuning);
+    }
+    if (Math.abs(leadError) <= AUTO_DOCK_WAIT_ANGLE_WINDOW) {
+      state = { phase: 'inward', stageRadius };
+      return stepAutoDockState(state, station, player, tuning);
+    }
+
+    return {
+      state,
+      command: {
+        turn: getTargetTurn(player.angle, inwardHeading),
+        thrust: 0,
+        mode: 'wait',
+        debug
+      }
+    };
+  }
+
+  const inwardSpeed = Math.max(0, -(player.vx * radialDirection.x + player.vy * radialDirection.y));
+  const shouldThrust = Math.abs(centerAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW && inwardSpeed < AUTO_DOCK_INWARD_SPEED;
   return {
     state,
     command: {
-      turn: steering.turn,
-      thrust: steering.thrust,
-      mode: 'approach',
-      debug: createDebug(state.phase, station, player, orbitTarget, corridor.slotAngle, doorInFront, {
-        targetOrbitAngle,
-        orbitRadius,
-        leadAngle
-      })
+      turn: getTargetTurn(player.angle, inwardHeading),
+      thrust: shouldThrust ? 1 : 0,
+      mode: 'dock',
+      debug
     }
   };
 }
