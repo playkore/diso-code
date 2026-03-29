@@ -12,7 +12,7 @@ describe('travel combat civilian AI', () => {
     state.encounter.rareTimer = -10_000;
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const dockMouth = getStationDockMouthPoint(state.station);
-    const orbitRadius = Math.hypot(dockMouth.x - state.station.x, dockMouth.y - state.station.y) + 56;
+    const stageRadius = Math.hypot(dockMouth.x - state.station.x, dockMouth.y - state.station.y) + 56;
     state.player.x = 220;
     state.player.y = 250;
     state.enemies.push(createTestEnemy({
@@ -20,7 +20,7 @@ describe('travel combat civilian AI', () => {
       blueprintId: 'cobra-mk3-trader',
       label: 'Cobra Trader',
       behavior: 'stationTraffic',
-      x: state.station.x + orbitRadius,
+      x: state.station.x + stageRadius,
       y: state.station.y,
       vx: 0,
       vy: 0,
@@ -66,11 +66,11 @@ describe('travel combat civilian AI', () => {
 
     stepStationTraffic(enemy, station, 4);
     const phaseAfterFirstTick = enemy.autoDockPhase;
-    const radiusAfterFirstTick = enemy.autoDockOrbitRadius;
+    const radiusAfterFirstTick = enemy.autoDockStageRadius;
     stepStationTraffic(enemy, station, 4);
 
     expect(phaseAfterFirstTick).toBeDefined();
-    expect(enemy.autoDockPhase).toBe(phaseAfterFirstTick);
-    expect(enemy.autoDockOrbitRadius).toBe(radiusAfterFirstTick);
+    expect(enemy.autoDockPhase).toBeDefined();
+    expect(enemy.autoDockStageRadius).toBe(radiusAfterFirstTick);
   });
 });

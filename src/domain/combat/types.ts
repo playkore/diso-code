@@ -171,12 +171,12 @@ export interface CombatEnemy {
   hostileAttackPhase?: HostileAttackPhase;
   hostileStrafeSign?: -1 | 1;
   /**
-   * Station-traffic ships run the same orbital auto-dock plan as the player,
-   * but they persist only the minimal state needed between frames: the active
-   * phase and the captured orbit radius. Other AI behaviors ignore these.
+   * Station-traffic ships reuse the same staged lead-angle auto-dock plan as
+   * the player. They only persist the current phase and chosen staging radius
+   * because every other steering value can be recomputed from live geometry.
    */
-  autoDockPhase?: 'acquire-orbit' | 'orbit' | 'inward';
-  autoDockOrbitRadius?: number;
+  autoDockPhase?: 'approach' | 'align' | 'wait' | 'inward';
+  autoDockStageRadius?: number;
   /**
    * Age in classic 60 Hz ticks.
    *
