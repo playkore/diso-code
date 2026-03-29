@@ -33,11 +33,14 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
     to: TAB_ROUTE_MAP.equipment,
     icon: (
       <NavIcon>
-        <path d="M8 8l8 8" />
-        <path d="M16 8l-2.2 2.2" />
-        <path d="M10.2 13.8L8 16" />
-        <path d="M6 18l2.2-2.2" />
-        <path d="M18 6l-2.2 2.2" />
+        {/* Outfitting is about upgrading the ship itself, so the icon uses a
+            small hull silhouette plus a compact add-marker instead of a
+            generic tool glyph that reads more like repair or settings. */}
+        <path d="M6.5 12l5.5-4 5.5 4-5.5 4z" />
+        <path d="M9.3 13.6l-1.6 2.4" />
+        <path d="M14.7 13.6l1.6 2.4" />
+        <path d="M18 7.5h4" />
+        <path d="M20 5.5v4" />
       </NavIcon>
     )
   },

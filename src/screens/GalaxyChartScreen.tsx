@@ -60,7 +60,6 @@ export function GalaxyChartScreen() {
         <p>
           Selected system: <strong>{detailsSystemName}</strong>
         </p>
-        <p className="star-map__hint">Use Data on System for full planetary details. Travel still launches from Short-range Chart.</p>
       </div>
     </section>
   );
