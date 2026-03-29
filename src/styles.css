@@ -785,9 +785,17 @@ button:disabled {
   fill: var(--cga-yellow);
 }
 
-.star-map__point.is-out-of-range .star-map__star,
+/* Out-of-range systems must stay inside the hard CGA palette, so availability
+   is communicated with a hollow marker instead of alpha. */
+
+.star-map__point.is-out-of-range .star-map__star {
+  fill: var(--cga-black);
+  stroke: var(--cga-yellow);
+  stroke-width: 0.9;
+}
+
 .star-map__point.is-out-of-range .star-map__label {
-  opacity: 0.55;
+  fill: var(--cga-yellow);
 }
 
 .star-map__point.is-selected .star-map__target {
