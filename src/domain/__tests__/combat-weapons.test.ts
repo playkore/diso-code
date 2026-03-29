@@ -460,6 +460,9 @@ describe('travel combat weapons', () => {
     expect(state.enemies).toHaveLength(0);
     expect(state.player.tallyKills).toBe(3);
     expect(state.player.combatReward).toBe(710);
+    expect(state.messages.some((message) => message.text === 'MAMBA DESTROYED: 6.0 Cr')).toBe(true);
+    expect(state.messages.some((message) => message.text === 'ASP MK II DESTROYED: 15.0 Cr')).toBe(true);
+    expect(state.messages.some((message) => message.text === 'THARGOID DESTROYED: 50.0 Cr')).toBe(true);
   });
 
   it('initializes the player energy pool from commander bank data', () => {

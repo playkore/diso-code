@@ -1,5 +1,6 @@
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { MobileFullscreenGate } from './components/MobileFullscreenGate';
 import { BackgroundDebugScreen } from './screens/BackgroundDebugScreen';
 import { EquipmentScreen } from './screens/EquipmentScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
@@ -31,5 +32,10 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      <MobileFullscreenGate />
+    </>
+  );
 }

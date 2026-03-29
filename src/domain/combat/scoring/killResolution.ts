@@ -1,4 +1,5 @@
-import { spawnParticles } from '../state';
+import { formatCredits } from '../../../utils/money';
+import { pushMessage, spawnParticles } from '../state';
 import type { BlueprintId, CombatEnemy, TravelCombatState } from '../types';
 
 /**
@@ -39,11 +40,20 @@ function getKillReward(enemy: CombatEnemy) {
   return PIRATE_KILL_REWARDS[enemy.blueprintId] ?? 0;
 }
 
+/**
+ * Kill notifications are composed in one place so the transient HUD message,
+ * the credited reward, and the ship label always stay in sync.
+ */
+function getKillMessage(enemy: CombatEnemy, reward: number) {
+  return `${enemy.label.toUpperCase()} DESTROYED: ${formatCredits(reward)}`;
+}
+
 export function recordKill(state: TravelCombatState, enemy: CombatEnemy) {
   // Combat kills affect the persistent commander tally after docking, but the
   // flight simulation no longer tracks a separate temporary score counter.
   // Instead it accumulates a cash payout that the travel-completion merge can
   // apply to the docked commander without leaking economy concerns into combat.
+  const reward = getKillReward(enemy);
   if (enemy.roles.innocent) {
     state.legalValue = Math.max(state.legalValue, 32);
   }
@@ -51,6 +61,7 @@ export function recordKill(state: TravelCombatState, enemy: CombatEnemy) {
     state.missionEvents.push({ type: 'mission:target-destroyed', missionId: enemy.missionTag.missionId });
   }
   state.player.tallyKills += 1;
-  state.player.combatReward += getKillReward(enemy);
+  state.player.combatReward += reward;
+  pushMessage(state, getKillMessage(enemy, reward), 1600);
   spawnParticles(state, enemy.x, enemy.y, '#ff5555');
 }

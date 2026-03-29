@@ -16,6 +16,8 @@ export function stepStationTraffic(enemy: CombatEnemy, station: CombatStation, d
     station,
     enemy
   );
+  // The planner owns the persistent orbital state; copy it back before the
+  // kinematic step so the next tick resumes the same docking attempt.
   enemy.autoDockPhase = autoDockStep.state.phase;
   enemy.autoDockStageRadius = autoDockStep.state.stageRadius;
 
