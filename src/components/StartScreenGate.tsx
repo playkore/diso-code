@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createDefaultCommander } from '../domain/commander';
 import { createDefaultMissionTravelContext } from '../domain/missionContext';
-import { createMathRandomSource, createTravelCombatState, type BlueprintId } from '../domain/travelCombat';
+import { BLUEPRINTS, createMathRandomSource, createTravelCombatState, type BlueprintId } from '../domain/travelCombat';
 import { spawnEnemyFromBlueprint } from '../domain/combat/spawn/spawnEnemy';
 import { createStars, TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travelSceneMath';
@@ -29,6 +29,7 @@ const DEMO_SHIP_SHOWCASE_DURATION_SECONDS = 2.1;
 const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
 const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
+const DEMO_STATION_LABEL = 'Coriolis Station';
 const SHOWCASE_BLUEPRINT_IDS: readonly BlueprintId[] = [
   'sidewinder',
   'mamba',
@@ -67,6 +68,19 @@ function getShowcasePhase(elapsedSeconds: number): ShowcasePhase {
   };
 }
 
+function getShowcaseLabel(phase: ShowcasePhase): string {
+  if (phase.kind === 'station') {
+    return DEMO_STATION_LABEL;
+  }
+  if (phase.kind === 'player') {
+    return 'Cobra Mk III';
+  }
+  if (phase.kind === 'enemy') {
+    return BLUEPRINTS[phase.blueprintId].label;
+  }
+  return '';
+}
+
 function isMobilePlatform(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
     return false;
@@ -100,7 +114,7 @@ async function requestDocumentFullscreen(): Promise<void> {
   }
 }
 
-function StartScreenScene() {
+function StartScreenScene({ onShowcaseLabelChange }: { onShowcaseLabelChange: (label: string) => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLSpanElement | null>(null);
 
@@ -129,6 +143,7 @@ function StartScreenScene() {
     );
     const stars = createStars();
     const enemyBankAngles = new Map<number, number>();
+    let lastShowcaseLabel = '';
     let showcasedEnemyId: number | null = null;
     let showcasedEnemyBlueprintId: BlueprintId | null = null;
     let animationFrameId = 0;
@@ -163,6 +178,14 @@ function StartScreenScene() {
       starfieldOffsetX += deltaSeconds * DEMO_STARFIELD_SPEED_X;
       const showcaseAngle = elapsedSeconds * DEMO_STATION_SPIN_SPEED;
       const showcasePhase = getShowcasePhase(elapsedSeconds);
+      const showcaseLabel = getShowcaseLabel(showcasePhase);
+
+      // The overlay label only needs to update when the carousel advances to a
+      // new showcase target, so React avoids re-rendering every animation tick.
+      if (showcaseLabel !== lastShowcaseLabel) {
+        lastShowcaseLabel = showcaseLabel;
+        onShowcaseLabelChange(showcaseLabel);
+      }
 
       combatState.player.x = DEMO_HIDDEN_ENTITY_OFFSET;
       combatState.player.y = DEMO_HIDDEN_ENTITY_OFFSET;
@@ -266,8 +289,9 @@ function StartScreenScene() {
       window.cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
       travelSceneRenderer.dispose();
+      onShowcaseLabelChange('');
     };
-  }, []);
+  }, [onShowcaseLabelChange]);
 
   return (
     <span className="mobile-fullscreen-gate__scene" ref={viewportRef} aria-hidden="true">
@@ -280,6 +304,7 @@ function StartScreenScene() {
 export function StartScreenGate() {
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [showcaseLabel, setShowcaseLabel] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => {
     if (typeof document === 'undefined') {
       return false;
@@ -333,6 +358,9 @@ export function StartScreenGate() {
     if (event.key === 'Tab') {
       return;
     }
+    if (event.key !== ' ' && event.key !== 'Spacebar' && event.key !== 'Enter') {
+      return;
+    }
 
     event.preventDefault();
     handleContinue();
@@ -346,12 +374,15 @@ export function StartScreenGate() {
         className="mobile-fullscreen-gate__button"
         onClick={handleContinue}
         onKeyDown={handleKeyDown}
-        aria-label={mobilePlatform ? 'Press any key to continue in fullscreen' : 'Press any key to continue'}
+        aria-label={mobilePlatform ? 'Press spacebar to start game in fullscreen' : 'Press spacebar to start game'}
       >
         <span className="mobile-fullscreen-gate__frame">
           <span className="mobile-fullscreen-gate__title">DISO CODE</span>
-          <StartScreenScene />
-          <span className="mobile-fullscreen-gate__prompt">Press any key</span>
+          <StartScreenScene onShowcaseLabelChange={setShowcaseLabel} />
+          <span className="mobile-fullscreen-gate__ship-label" aria-live="polite">
+            {showcaseLabel}
+          </span>
+          <span className="mobile-fullscreen-gate__prompt">Press spacebar to start game</span>
           <span className="mobile-fullscreen-gate__copyright">© Alexey Korepanov 2026</span>
         </span>
       </div>
