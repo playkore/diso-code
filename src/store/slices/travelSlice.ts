@@ -174,8 +174,6 @@ export const createTravelSlice: GameSlice<
             ? createArrivalState({ ...state, commander }, dockSystemName)
             : createDockedState({ ...state, commander }, dockSystemName, {
                 spendJumpFuel: false,
-                title: `Docked at ${dockSystemName}`,
-                body: `Returned to ${dockSystemName} station without jumping. Fuel remains ${formatLightYears(commander.fuel)}.`,
                 stardateDelta: 0
               });
       if (!nextState) {

@@ -22,6 +22,12 @@ export const GOVERNMENT_LABELS = [
   'Corporate State'
 ] as const;
 
+function formatPopulation(population: number) {
+  // Classic Elite stores population as tenths of a billion, so values like 35
+  // should be read as 3.5 billion inhabitants rather than a raw headcount.
+  return `${(population / 10).toFixed(1)} Billion`;
+}
+
 /**
  * Normalizes raw procedural system bytes into the player-facing labels used by
  * the classic "Data on System" presentation and other destination summaries.
@@ -31,7 +37,7 @@ export function getSystemFacts(system: SystemData) {
     economy: ECONOMY_LABELS[system.economy] ?? 'Unknown',
     government: GOVERNMENT_LABELS[system.government] ?? 'Unknown',
     techLevel: system.techLevel,
-    population: system.population,
+    population: formatPopulation(system.population),
     productivity: `${system.productivity} M CR`,
     averageRadius: `${system.radius} km`,
     species: system.species

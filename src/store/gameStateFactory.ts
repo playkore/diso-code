@@ -1,11 +1,9 @@
 import { createDefaultCommander, getLegalValueAfterHyperspaceJump, normalizeCommanderState, type CommanderState } from '../domain/commander';
 import { encodeCommanderBinary256 } from '../domain/commanderPersistence';
 import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/gamePersistence';
-import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../domain/fuel';
+import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelUnits } from '../domain/fuel';
 import { getGalaxySystems, getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../domain/market';
-import { formatCredits } from '../utils/money';
-import { formatLightYears } from '../utils/distance';
 import { createUiMessage, withUiMessage } from './uiMessages';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
 import type { AppTab, MarketState } from './types';
@@ -121,7 +119,7 @@ export function getCurrentTechLevel(systemName: string, galaxyIndex = 0): number
 export function createDockedState(
   state: Pick<GameStore, 'universe' | 'commander' | 'ui'>,
   systemName: string,
-  options: { spendJumpFuel: boolean; title: string; body: string; stardateDelta?: number }
+  options: { spendJumpFuel: boolean; title?: string; body?: string; stardateDelta?: number }
 ) {
   // Validate the jump before mutating anything if this transition is supposed
   // to consume hyperspace fuel.
@@ -145,6 +143,11 @@ export function createDockedState(
 
   // The returned object is intentionally a complete docked-state fragment that
   // callers can spread into the store directly.
+  const nextUi =
+    options.title && options.body !== undefined
+      ? withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
+      : state.ui;
+
   return {
     universe: {
       ...state.universe,
@@ -156,7 +159,9 @@ export function createDockedState(
     },
     commander: nextCommander,
     market: nextMarket,
-    ui: withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
+    // Docked transitions do not inherently require a toast/log entry. Callers
+    // opt in only when the transition carries actionable player-facing news.
+    ui: nextUi
   };
 }
 
@@ -165,31 +170,14 @@ export function createDockedState(
  * `createDockedState` and then adds the arrival-specific UI summary.
  */
 export function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
-  const jumpFuelCost = getJumpFuelCost(getSystemDistance(state.universe.currentSystem, systemName, state.universe.galaxyIndex));
   const arrivalCommander = normalizeCommanderState({
     ...state.commander,
     legalValue: getLegalValueAfterHyperspaceJump(state.commander.legalValue, state.commander.cargo)
   });
-  const nextState = createDockedState({ ...state, commander: arrivalCommander }, systemName, {
+  return createDockedState({ ...state, commander: arrivalCommander }, systemName, {
     spendJumpFuel: true,
-    title: `Docked at ${systemName}`,
-    body: '',
     stardateDelta: 1
   });
-  if (!nextState) {
-    return null;
-  }
-
-  const cheapest = getCheapestCommodity(nextState.market.session);
-  nextState.ui = withUiMessage(
-    state.ui,
-    createUiMessage(
-      'info',
-      `Docked at ${systemName}`,
-      `Jumped ${formatLightYears(jumpFuelCost)}. Fuel now ${formatLightYears(nextState.commander.fuel)}. Cheapest local price: ${cheapest.name} at ${formatCredits(cheapest.price)}.`
-    )
-  );
-  return nextState;
 }
 
 /**
