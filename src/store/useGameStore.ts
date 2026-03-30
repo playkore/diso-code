@@ -80,12 +80,20 @@ export const useGameStore = create<GameStore>((set, get, api) => {
       compactMode: true,
       instantTravelEnabled,
       showTravelPerfOverlay,
+      startScreenVisible: true,
       activityLog: []
     },
 
     // Small UI-only helpers stay here rather than in their own slice because
     // they are stateless wrappers around `set`.
     setActiveTab: (tab) => set((state) => ({ ui: { ...state.ui, activeTab: tab } })),
+    setStartScreenVisible: (visible) =>
+      set((state) => ({
+        ui: {
+          ...state.ui,
+          startScreenVisible: visible
+        }
+      })),
     setSelectedChartSystem: (systemName) =>
       set((state) => ({
         ui: {

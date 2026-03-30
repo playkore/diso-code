@@ -72,6 +72,7 @@ export interface GameStore {
   ui: UiState;
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
+  setStartScreenVisible: (visible: boolean) => void;
   setSelectedChartSystem: (systemName: string | null) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
   setShowTravelPerfOverlay: (enabled: boolean) => void;
@@ -91,6 +92,7 @@ export interface GameStore {
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
   startNewGame: () => void;
+  resetAfterDeath: () => void;
 }
 
 /**

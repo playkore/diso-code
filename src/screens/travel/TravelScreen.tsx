@@ -30,12 +30,13 @@ export function TravelScreen() {
   );
   const grantCombatCredits = useGameStore((state) => state.grantCombatCredits);
   const completeTravel = useGameStore((state) => state.completeTravel);
+  const resetAfterDeath = useGameStore((state) => state.resetAfterDeath);
   const showTravelPerfOverlay = useGameStore((state) => state.ui.showTravelPerfOverlay);
   const activeTab = useGameStore((state) => state.ui.activeTab);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  const travel = useTravelSession({ canvasRef, viewportRef }, session, combatCommander, grantCombatCredits, completeTravel, navigate);
+  const travel = useTravelSession({ canvasRef, viewportRef }, session, combatCommander, grantCombatCredits, completeTravel, resetAfterDeath, navigate);
   const handleRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
     travel.recordReactCommit(actualDuration);
   };

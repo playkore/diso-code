@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createDefaultCommander, normalizeCommanderState } from '../commander';
 import { getJumpFuelCost } from '../fuel';
 import { getSystemDistance } from '../galaxyCatalog';
+import { createDefaultMissionTravelContext } from '../missionContext';
 import { DOCKED_SESSION_STORAGE_KEY, loadPersistedDockedSession } from '../../store/gameStateFactory';
 import { useGameStore } from '../../store/useGameStore';
 
@@ -248,6 +249,61 @@ describe('outfitting store flows', () => {
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
 
     expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
+  });
+
+  it('resets to a fresh commander and reopens the start gate after death without an escape pod', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Diso',
+        cash: 4242,
+        fuel: 3.2,
+        cargo: { food: 4 }
+      }),
+      universe: {
+        ...state.universe,
+        currentSystem: 'Diso',
+        nearbySystems: ['Lave']
+      },
+      travelSession: {
+        originSystem: 'Lave',
+        destinationSystem: 'Diso',
+        effectiveDestinationSystem: 'Diso',
+        fuelCost: 0.4,
+        fuelUnits: 4,
+        primaryObjectiveText: 'Test run',
+        missionContext: createDefaultMissionTravelContext('Diso')
+      },
+      ui: {
+        ...state.ui,
+        startScreenVisible: false,
+        latestEvent: {
+          id: 'dead',
+          tone: 'error',
+          title: 'Ship destroyed',
+          body: 'Should be cleared.'
+        },
+        activityLog: [
+          {
+            id: 'dead',
+            tone: 'error',
+            title: 'Ship destroyed',
+            body: 'Should be cleared.'
+          }
+        ]
+      }
+    }));
+
+    useGameStore.getState().resetAfterDeath();
+
+    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().commander.cash).toBe(1000);
+    expect(useGameStore.getState().commander.cargo).toEqual({});
+    expect(useGameStore.getState().travelSession).toBeNull();
+    expect(useGameStore.getState().ui.startScreenVisible).toBe(true);
+    expect(useGameStore.getState().ui.latestEvent).toBeUndefined();
+    expect(useGameStore.getState().ui.activityLog).toEqual([]);
   });
 
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {

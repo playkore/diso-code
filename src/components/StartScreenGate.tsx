@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useGameStore } from '../store/useGameStore';
 
 type FullscreenDocument = Document & {
   webkitFullscreenElement?: Element | null;
@@ -56,8 +57,9 @@ function StartScreenSceneFallback() {
 }
 
 export function StartScreenGate() {
+  const isDismissed = useGameStore((state) => !state.ui.startScreenVisible);
+  const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
-  const [isDismissed, setIsDismissed] = useState(false);
   const [isSceneReady, setIsSceneReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => {
@@ -93,7 +95,7 @@ export function StartScreenGate() {
 
   const handleContinue = () => {
     if (!mobilePlatform || isFullscreen) {
-      setIsDismissed(true);
+      setStartScreenVisible(false);
       return;
     }
 
@@ -105,7 +107,7 @@ export function StartScreenGate() {
         setIsFullscreen(isDocumentFullscreen(document as FullscreenDocument));
       })
       .finally(() => {
-        setIsDismissed(true);
+        setStartScreenVisible(false);
       });
   };
 

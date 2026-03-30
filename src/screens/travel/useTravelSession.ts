@@ -8,14 +8,11 @@ import {
   createMathRandomSource,
   createTravelCombatState,
   enterArrivalSpace,
-  enterStationSpace,
   getPlayerCombatSnapshot,
   isMassNearby,
   canAutoDock,
   isPlayerInStationSafeZone,
   setCombatSystemContext,
-  spawnBombExplosion,
-  stepParticles,
   stepTravelCombat,
   type FlightPhase
 } from '../../domain/travelCombat';
@@ -110,8 +107,6 @@ interface DockingAnimationState {
 
 const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
-const PLAYER_DESTRUCTION_ANIMATION_MS = 3000;
-const PLAYER_DESTRUCTION_PULSE_MS = 180;
 const DOCKING_ANIMATION_DURATION_MS = 1100;
 const DOCKING_ANIMATION_FORWARD_SPEED = 3.4;
 const DOCKING_CAMERA_FOLLOW_DISTANCE = 13;
@@ -214,6 +209,7 @@ export function useTravelSession(
   commander: CombatCommanderSnapshot,
   grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: Parameters<ReturnType<typeof import('../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
+  resetAfterDeath: () => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
   const [hud, setHud] = useState(INITIAL_HUD);
@@ -464,9 +460,6 @@ export function useTravelSession(
     let creditedCombatReward = 0;
     let autoDockActive = false;
     let autoDockState: AutoDockState | null = null;
-    let playerDestructionTimerMs = 0;
-    let playerDestructionPulseTimerMs = 0;
-    let respawnReady = false;
     let dockingAnimationState: DockingAnimationState | null = null;
     let playerBankState = createShipBankState();
     let enemyBankStates = new Map<number, ShipBankState>();
@@ -531,13 +524,6 @@ export function useTravelSession(
       setMessageState(text);
     };
 
-    const triggerPlayerDestructionAnimation = () => {
-      // The player ship explodes in repeated CGA-color pulses so the death
-      // state reads as a full animation instead of a single-frame vanish.
-      spawnBombExplosion(combatState, combatState.player.x, combatState.player.y);
-      playerDestructionPulseTimerMs = PLAYER_DESTRUCTION_PULSE_MS;
-    };
-
     // All successful exits funnel through this helper so the store receives the
     // same snapshot shape whether docking happens manually or via auto-dock.
     const completeDocking = (dockSystemName: string, spendJumpFuel: boolean) => {
@@ -552,6 +538,32 @@ export function useTravelSession(
         installedEquipment: snapshot.installedEquipment,
         missilesInstalled: snapshot.missilesInstalled
       });
+      navigate('/', { replace: true });
+    };
+
+    const resolvePlayerLoss = () => {
+      if (combatState.playerLoadout.installedEquipment.escape_pod) {
+        consumeEscapePod(combatState);
+        const snapshot = getPlayerCombatSnapshot(combatState);
+        completeTravel({
+          outcome: 'rescued',
+          dockSystemName: jumpCompleted ? session.destinationSystem : session.originSystem,
+          spendJumpFuel: jumpCompleted,
+          legalValue: combatState.legalValue,
+          tallyDelta: combatState.player.tallyKills,
+          cargo: snapshot.cargo,
+          fuelDelta: snapshot.fuel,
+          installedEquipment: snapshot.installedEquipment,
+          missilesInstalled: snapshot.missilesInstalled
+        });
+        navigate('/', { replace: true });
+        return;
+      }
+
+      // In classic Elite, destruction without an escape pod throws the player
+      // back to the title flow rather than quietly respawning them in local
+      // space. Reset the docked game and reopen the attract gate.
+      resetAfterDeath();
       navigate('/', { replace: true });
     };
 
@@ -618,47 +630,6 @@ export function useTravelSession(
       updateHud();
     };
 
-    // Reset builds a fresh mutable simulation object while keeping the same
-    // effect-scoped references and React bindings alive for the next loop.
-    const resetPrototype = () => {
-      const fresh = createTravelCombatState(
-        {
-          legalValue: commander.legalValue,
-          government: originSystem.government,
-          techLevel: originSystem.techLevel,
-          missionContext: session.missionContext,
-          energyBanks: commander.energyBanks,
-          energyPerBank: commander.energyPerBank,
-          laserMounts: commander.laserMounts,
-          installedEquipment: commander.installedEquipment,
-          missilesInstalled: commander.missilesInstalled
-        },
-        random
-      );
-      Object.assign(combatState, fresh);
-      setCombatSystemContext(combatState, { government: originSystem.government, techLevel: originSystem.techLevel, witchspace: false }, random);
-      enterStationSpace(combatState, random, { message: 'CLEARED FROM STATION' });
-      stars = createStars();
-      creditedCombatReward = 0;
-      jumpCompleted = false;
-      flightState = 'READY';
-      autoDockActive = false;
-      autoDockState = null;
-      dockingAnimationState = null;
-      playerDestructionTimerMs = 0;
-      playerDestructionPulseTimerMs = 0;
-      respawnReady = false;
-      playerBankState = createShipBankState();
-      enemyBankStates = new Map();
-      elapsedFlightMs = 0;
-      showMessage(
-        hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
-        2400
-      );
-      updateHud();
-      resetInput();
-    };
-
     const onResize = () => resize();
     window.addEventListener('resize', onResize);
 
@@ -675,45 +646,6 @@ export function useTravelSession(
       pushPerfSample(perfAccumulator.frameDeltas, deltaMs);
       const liveInput = inputRef.current;
       const keys = keysRef.current;
-      if (flightState === 'GAMEOVER') {
-        stepParticles(combatState, dt);
-        if (playerDestructionTimerMs > 0) {
-          playerDestructionTimerMs = Math.max(0, playerDestructionTimerMs - deltaMs);
-          playerDestructionPulseTimerMs -= deltaMs;
-          if (playerDestructionTimerMs > 0 && playerDestructionPulseTimerMs <= 0) {
-            triggerPlayerDestructionAnimation();
-          }
-          if (playerDestructionTimerMs <= 0) {
-            showMessage('PRESS LASER TO RESET', 99999);
-          }
-        }
-        if (!keys[' ']) {
-          // Respawn only arms after the player has fully released the laser
-          // toggle control, which prevents the fatal input from being reused.
-          respawnReady = true;
-        }
-        if (playerDestructionTimerMs <= 0 && respawnReady && liveInput.toggleLasers) {
-          resetPrototype();
-        }
-        travelSceneRenderer.renderFrame({
-          combatState,
-          stars,
-          flightState,
-          systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
-          showTargetLock: false,
-          playerBankAngle: 0,
-          enemyBankAngles: new Map(),
-          radarInsetTop,
-          radarInsetRight
-        });
-        pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
-        if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
-          publishPerfSnapshot(timestamp);
-        }
-        animationFrameId = window.requestAnimationFrame(loop);
-        return;
-      }
-
       if (flightState === 'DOCKING_ANIMATION' && dockingAnimationState && combatState.station) {
         const animationProgress = Math.min(1, dockingAnimationState.elapsedMs / DOCKING_ANIMATION_DURATION_MS);
         // Advance station rotation first so camera framing uses the same dock
@@ -963,12 +895,11 @@ export function useTravelSession(
         // decide whether to finish travel, bounce the ship, or show guidance.
         const docking = assessDockingApproach(combatState.station, combatState.player);
         if (docking.collidesWithHull) {
-          combatState.player.energy = Math.max(0, combatState.player.energy - 20);
-          combatState.player.vx *= -1.5;
-          combatState.player.vy *= -1.5;
-          autoDockActive = false;
-          autoDockState = null;
-          showMessage('COLLISION WARNING', 1000);
+          // The station hull is unforgiving in the original game: clipping the
+          // solid ring is a fatal mistake, not a recoverable bumper impact.
+          combatState.player.energy = 0;
+          resolvePlayerLoss();
+          return;
         } else if (docking.isInDockingGap) {
           if (docking.canDock) {
             startDockingAnimation(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
@@ -986,30 +917,12 @@ export function useTravelSession(
       }
 
       if (result.playerDestroyed) {
-        autoDockActive = false;
-        autoDockState = null;
-        flightState = 'GAMEOVER';
-        playerDestructionTimerMs = PLAYER_DESTRUCTION_ANIMATION_MS;
-        respawnReady = false;
-        showMessage('SHIP DESTROYED', PLAYER_DESTRUCTION_ANIMATION_MS);
-        triggerPlayerDestructionAnimation();
+        resolvePlayerLoss();
+        return;
       }
 
       if (result.playerEscaped) {
-        consumeEscapePod(combatState);
-        const snapshot = getPlayerCombatSnapshot(combatState);
-        completeTravel({
-          outcome: 'rescued',
-          dockSystemName: jumpCompleted ? session.destinationSystem : session.originSystem,
-          spendJumpFuel: jumpCompleted,
-          legalValue: combatState.legalValue,
-          tallyDelta: combatState.player.tallyKills,
-          cargo: snapshot.cargo,
-          fuelDelta: snapshot.fuel,
-          installedEquipment: snapshot.installedEquipment,
-          missilesInstalled: snapshot.missilesInstalled
-        });
-        navigate('/', { replace: true });
+        resolvePlayerLoss();
         return;
       }
 
@@ -1069,7 +982,12 @@ export function useTravelSession(
       animationFrameId = window.requestAnimationFrame(loop);
     };
 
-    resetPrototype();
+    showMessage(
+      hasHyperspaceRoute ? `ROUTE ${session.originSystem.toUpperCase()} -> ${session.destinationSystem.toUpperCase()}` : `LOCAL SPACE: ${session.originSystem.toUpperCase()}`,
+      2400
+    );
+    updateHud();
+    resetInput();
     perfRef.current = createPerfAccumulator(performance.now());
     setPerf(EMPTY_PERF_SNAPSHOT);
     animationFrameId = window.requestAnimationFrame(loop);

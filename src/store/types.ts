@@ -42,6 +42,7 @@ export interface UiState {
   compactMode: boolean;
   instantTravelEnabled: boolean;
   showTravelPerfOverlay: boolean;
+  startScreenVisible: boolean;
   latestEvent?: UiMessage;
   activityLog: UiMessage[];
 }

@@ -4,7 +4,7 @@ import { createUiMessage, withUiMessage } from '../uiMessages';
 import type { GameSlice, GameStore } from '../storeTypes';
 import { formatCredits } from '../../utils/money';
 
-export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'loadFromSlot' | 'startNewGame'>> = (set, get) => ({
+export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'loadFromSlot' | 'startNewGame' | 'resetAfterDeath'>> = (set, get) => ({
   saveToSlot: (slotId) => {
     const state = get();
     // Slots store a full snapshot so loading can rebuild every docked subsystem
@@ -28,17 +28,17 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
       return;
     }
     const restoredState = restoreSnapshot(saveState.snapshot);
-    set((current) => ({
-      ...restoredState,
-      // Travel sessions are intentionally transient and cannot survive a restore
-      // because their mutable runtime state only exists in memory.
-      travelSession: null,
-      saveStates: state.saveStates,
-      ui: withUiMessage(
-        { ...current.ui, activeTab: 'market', selectedChartSystem: null },
-        createUiMessage('info', `Slot ${slotId} loaded`, `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`)
-      )
-    }));
+      set((current) => ({
+        ...restoredState,
+        // Travel sessions are intentionally transient and cannot survive a restore
+        // because their mutable runtime state only exists in memory.
+        travelSession: null,
+        saveStates: state.saveStates,
+        ui: withUiMessage(
+          { ...current.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false },
+          createUiMessage('info', `Slot ${slotId} loaded`, `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`)
+        )
+      }));
   },
   startNewGame: () => {
     createDefaultCommander();
@@ -48,9 +48,27 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
       // A new game always returns to the docked market tab with no active trip.
       travelSession: null,
       ui: withUiMessage(
-        { ...state.ui, activeTab: 'market', selectedChartSystem: null },
+        { ...state.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false },
         createUiMessage('info', 'New game started', 'Fresh commander created. Save when you want to overwrite Slot 1.')
       )
+    }));
+  },
+  resetAfterDeath: () => {
+    const freshState = createFreshGameState();
+    set((state) => ({
+      ...freshState,
+      // Death without an escape pod mirrors the original game's trip back to
+      // the title flow, so the attract gate is reopened over a fresh commander.
+      travelSession: null,
+      saveStates: state.saveStates,
+      ui: {
+        ...state.ui,
+        activeTab: 'market',
+        selectedChartSystem: null,
+        startScreenVisible: true,
+        latestEvent: undefined,
+        activityLog: []
+      }
     }));
   }
 });
