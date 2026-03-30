@@ -53,6 +53,12 @@ interface TravelSceneRenderArgs {
     position: { x: number; y: number; z: number };
     lookAt: { x: number; y: number; z: number };
   };
+  playerDeathEffect?: {
+    elapsedMs: number;
+    showGameOver: boolean;
+    showPrompt: boolean;
+    continueVisible: boolean;
+  } | null;
   radarInsetTop: number;
   radarInsetRight: number;
 }
@@ -66,6 +72,7 @@ const STATION_Z = PLAYER_Z;
 const SHIP_Z = 0;
 const PROJECTILE_Z = 14;
 const PARTICLE_Z = 22;
+const PLAYER_DEATH_Z = PLAYER_Z + 2;
 
 function toSceneY(worldY: number) {
   return -worldY;
@@ -187,6 +194,15 @@ function createQuad(width: number, height: number, color: string, opacity = 1) {
   );
 }
 
+function rotateOffset(x: number, y: number, angle: number) {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos
+  };
+}
+
 function createTextSprite(text: string, color: string) {
   const canvas = document.createElement('canvas');
   const bootstrap = canvas.getContext('2d');
@@ -299,6 +315,7 @@ export class TravelSceneRenderer {
     enemyBankAngles,
     starfieldAnchor,
     cameraOverride,
+    playerDeathEffect,
     radarInsetTop,
     radarInsetRight
   }: TravelSceneRenderArgs) {
@@ -322,8 +339,8 @@ export class TravelSceneRenderer {
     }
 
     this.buildStarfield(stars, combatState, flightState, starfieldAnchor);
-    this.buildWorld(combatState, playerBankAngle, enemyBankAngles, showSafeZoneRing);
-    this.buildOverlay(combatState, systemLabel, showTargetLock, showRadar, radarInsetTop, radarInsetRight);
+    this.buildWorld(combatState, playerBankAngle, enemyBankAngles, showSafeZoneRing, playerDeathEffect ?? null);
+    this.buildOverlay(combatState, systemLabel, showTargetLock, showRadar, radarInsetTop, radarInsetRight, playerDeathEffect ?? null);
     this.updateFlash(combatState);
 
     this.renderer.clear(true, true, true);
@@ -399,7 +416,8 @@ export class TravelSceneRenderer {
     combatState: TravelCombatState,
     playerBankAngle: number,
     enemyBankAngles: ReadonlyMap<number, number>,
-    showSafeZoneRing: boolean
+    showSafeZoneRing: boolean,
+    playerDeathEffect: TravelSceneRenderArgs['playerDeathEffect']
   ) {
     if (combatState.station) {
       const station = createStationObject();
@@ -447,20 +465,24 @@ export class TravelSceneRenderer {
       }
     }
 
-    const player = this.shipPresenter.playerGeometryMode === 'mesh'
-      ? this.shipPresenter.createPlayerObject?.() ?? new Group()
-      : createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
-    const playerAnchor = new Group();
-    playerAnchor.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
-    // Heading stays on the outer anchor so the ship still rotates around the
-    // axis from the player toward the camera. The child ship can then bank
-    // around its own forward axis without corrupting the heading axis itself.
-    playerAnchor.rotation.z = -combatState.player.angle;
-    // The hull uses +X as its nose direction, so rolling around local X makes
-    // the ship lean onto its left/right side instead of skewing its turn axis.
-    player.rotation.set(playerBankAngle, 0, 0);
-    playerAnchor.add(player);
-    this.worldGroup.add(playerAnchor);
+    if (playerDeathEffect) {
+      this.buildPlayerDeathEffect(combatState, playerDeathEffect);
+    } else {
+      const player = this.shipPresenter.playerGeometryMode === 'mesh'
+        ? this.shipPresenter.createPlayerObject?.() ?? new Group()
+        : createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
+      const playerAnchor = new Group();
+      playerAnchor.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
+      // Heading stays on the outer anchor so the ship still rotates around the
+      // axis from the player toward the camera. The child ship can then bank
+      // around its own forward axis without corrupting the heading axis itself.
+      playerAnchor.rotation.z = -combatState.player.angle;
+      // The hull uses +X as its nose direction, so rolling around local X makes
+      // the ship lean onto its left/right side instead of skewing its turn axis.
+      player.rotation.set(playerBankAngle, 0, 0);
+      playerAnchor.add(player);
+      this.worldGroup.add(playerAnchor);
+    }
 
     for (const projectile of combatState.projectiles) {
       this.worldGroup.add(
@@ -491,7 +513,8 @@ export class TravelSceneRenderer {
     showTargetLock: boolean,
     showRadar: boolean,
     radarInsetTop: number,
-    radarInsetRight: number
+    radarInsetRight: number,
+    playerDeathEffect: TravelSceneRenderArgs['playerDeathEffect']
   ) {
     for (const enemy of combatState.enemies) {
       const projected = new Vector3(enemy.x, toSceneY(enemy.y), SHIP_Z).project(this.worldCamera);
@@ -508,6 +531,83 @@ export class TravelSceneRenderer {
 
     if (showRadar) {
       this.buildRadar(combatState, systemLabel, radarInsetTop, radarInsetRight);
+    }
+    if (playerDeathEffect?.showGameOver) {
+      this.buildGameOverOverlay(playerDeathEffect);
+    }
+  }
+
+  /**
+   * The player explosion is deliberately local to the player ship so the rest
+   * of the scene can stay intact: enemies, station and projectiles remain on
+   * screen while only the Cobra breaks apart into stylized CGA shards.
+   */
+  private buildPlayerDeathEffect(
+    combatState: TravelCombatState,
+    playerDeathEffect: NonNullable<TravelSceneRenderArgs['playerDeathEffect']>
+  ) {
+    const centerX = combatState.player.x;
+    const centerY = combatState.player.y;
+    const baseAngle = combatState.player.angle;
+    const elapsed = playerDeathEffect.elapsedMs;
+    // Keep the bright core only for the opening blast. Leaving it on screen for
+    // the whole death phase reads as a stuck square rather than an explosion.
+    if (elapsed <= 420) {
+      const flashRadius = Math.min(30, 8 + elapsed * 0.05);
+      const flash = createQuad(flashRadius * 2, flashRadius * 2, elapsed < 180 ? CGA_YELLOW : CGA_RED, elapsed < 180 ? 0.95 : 0.55);
+      flash.position.set(centerX, toSceneY(centerY), PLAYER_DEATH_Z);
+      this.worldGroup.add(flash);
+    }
+
+    const shardAngles = [-1.9, -1.25, -0.65, -0.18, 0.22, 0.75, 1.28, 1.92];
+    for (let index = 0; index < shardAngles.length; index += 1) {
+      const direction = baseAngle + shardAngles[index];
+      const travel = 10 + elapsed * (0.045 + index * 0.004);
+      const shardCenter = rotateOffset(travel, (index - 3.5) * 1.8, direction);
+      const shardLength = 10 + (index % 3) * 4;
+      const shardTilt = direction + index * 0.22;
+      const segment = rotateOffset(shardLength * 0.5, 0, shardTilt);
+      const color = index % 2 === 0 ? CGA_YELLOW : CGA_RED;
+      this.worldGroup.add(
+        createSegmentObject(
+          centerX + shardCenter.x - segment.x,
+          centerY + shardCenter.y - segment.y,
+          centerX + shardCenter.x + segment.x,
+          centerY + shardCenter.y + segment.y,
+          color,
+          PLAYER_DEATH_Z
+        )
+      );
+    }
+
+    for (let index = 0; index < 18; index += 1) {
+      const angle = baseAngle + (index / 18) * Math.PI * 2;
+      const radius = 6 + elapsed * (0.03 + (index % 5) * 0.003);
+      const offset = rotateOffset(radius, 0, angle);
+      const sparkSize = index % 3 === 0 ? 4 : 2.5;
+      const spark = createQuad(sparkSize, sparkSize, index % 4 === 0 ? CGA_RED : CGA_YELLOW, 0.92);
+      spark.position.set(centerX + offset.x, toSceneY(centerY + offset.y), PLAYER_DEATH_Z + 0.5);
+      this.worldGroup.add(spark);
+    }
+  }
+
+  private buildGameOverOverlay(playerDeathEffect: NonNullable<TravelSceneRenderArgs['playerDeathEffect']>) {
+    const title = createTextSprite('GAME OVER', CGA_RED);
+    if (title) {
+      title.center.set(0.5, 0.5);
+      title.scale.set(title.scale.x * 1.8, title.scale.y * 1.8, 1);
+      title.position.set(this.width / 2, this.height / 2 - 32, 0);
+      this.overlayGroup.add(title);
+    }
+    if (!playerDeathEffect.showPrompt || !playerDeathEffect.continueVisible) {
+      return;
+    }
+    const prompt = createTextSprite('PRESS ANY KEY TO CONTINUE', CGA_YELLOW);
+    if (prompt) {
+      prompt.center.set(0.5, 0.5);
+      prompt.scale.set(prompt.scale.x * 1.25, prompt.scale.y * 1.25, 1);
+      prompt.position.set(this.width / 2, this.height / 2 + 18, 0);
+      this.overlayGroup.add(prompt);
     }
   }
 

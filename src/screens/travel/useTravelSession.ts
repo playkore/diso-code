@@ -28,6 +28,14 @@ import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 
+interface PlayerDeathState {
+  elapsedMs: number;
+}
+
+const PLAYER_DEATH_ANIMATION_MS = 1800;
+const PLAYER_DEATH_GAME_OVER_MS = 900;
+const PLAYER_DEATH_PROMPT_BLINK_MS = 320;
+
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
  * combat simulation.
@@ -467,9 +475,16 @@ export function useTravelSession(
     let autoDockActive = false;
     let autoDockState: AutoDockState | null = null;
     let dockingAnimationState: DockingAnimationState | null = null;
+    let playerDeathState: PlayerDeathState | null = null;
     let playerBankState = createShipBankState();
     let enemyBankStates = new Map<number, ShipBankState>();
     let elapsedFlightMs = 0;
+    let continueAfterDeathRequested = false;
+    const onAnyContinueInput = () => {
+      if (playerDeathState && playerDeathState.elapsedMs >= PLAYER_DEATH_ANIMATION_MS) {
+        continueAfterDeathRequested = true;
+      }
+    };
     const syncAutoDockUi = () => {
       setAutoDockState({
         visible: combatState.playerLoadout.installedEquipment.docking_computer,
@@ -547,7 +562,7 @@ export function useTravelSession(
       navigate('/', { replace: true });
     };
 
-    const resolvePlayerLoss = () => {
+    const finishPlayerLoss = () => {
       if (combatState.playerLoadout.installedEquipment.escape_pod) {
         consumeEscapePod(combatState);
         const snapshot = getPlayerCombatSnapshot(combatState);
@@ -571,6 +586,30 @@ export function useTravelSession(
       // space. Reset the docked game and reopen the attract gate.
       resetAfterDeath();
       navigate('/', { replace: true });
+    };
+
+    const startPlayerDeathSequence = () => {
+      if (combatState.playerLoadout.installedEquipment.escape_pod) {
+        finishPlayerLoss();
+        return;
+      }
+      if (playerDeathState) {
+        return;
+      }
+      // Death is a presentation phase, not an immediate teardown: the rest of
+      // the encounter stays visible while the player hull disintegrates and the
+      // title prompt waits for explicit acknowledgement.
+      flightState = 'GAMEOVER';
+      autoDockActive = false;
+      autoDockState = null;
+      combatState.player.vx = 0;
+      combatState.player.vy = 0;
+      playerDeathState = { elapsedMs: 0 };
+      continueAfterDeathRequested = false;
+      overlayMessage = '';
+      overlayTimer = 0;
+      setMessageState('');
+      updateHud();
     };
 
     const startDockingAnimation = (dockSystemName: string, spendJumpFuel: boolean) => {
@@ -638,6 +677,8 @@ export function useTravelSession(
 
     const onResize = () => resize();
     window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onAnyContinueInput);
+    viewport.addEventListener('pointerdown', onAnyContinueInput);
 
     // The frame loop is the authoritative owner of mutable session state. It
     // folds together keyboard/touch input, advances the simulation, resolves
@@ -730,6 +771,74 @@ export function useTravelSession(
         if (dockingAnimationState.elapsedMs >= DOCKING_ANIMATION_DURATION_MS) {
           completeDocking(dockingAnimationState.dockSystemName, dockingAnimationState.spendJumpFuel);
           return;
+        }
+        animationFrameId = window.requestAnimationFrame(loop);
+        return;
+      }
+
+      if (playerDeathState) {
+        playerDeathState.elapsedMs += deltaMs;
+        const showGameOver = playerDeathState.elapsedMs >= PLAYER_DEATH_GAME_OVER_MS;
+        const showPrompt = playerDeathState.elapsedMs >= PLAYER_DEATH_ANIMATION_MS;
+        const deathWorldFlightState: FlightPhase = jumpCompleted ? 'ARRIVED' : 'PLAYING';
+        if (showPrompt && continueAfterDeathRequested) {
+          finishPlayerLoss();
+          return;
+        }
+        const previousEnemyAngles = new Map<number, number>(combatState.enemies.map((enemy) => [enemy.id, enemy.angle]));
+        // Keep the encounter alive behind the death animation so station
+        // rotation, enemy movement and projectiles continue instead of freezing
+        // on the exact frame where the player died.
+        stepTravelCombat(
+          combatState,
+          {
+            thrust: 0,
+            turn: 0,
+            toggleLasers: false,
+            jump: false,
+            hyperspace: false,
+            activateEcm: false,
+            triggerEnergyBomb: false,
+            autoDock: false
+          },
+          dt,
+          deathWorldFlightState,
+          commander.cargo,
+          random
+        );
+        enemyBankStates = new Map<number, ShipBankState>(
+          combatState.enemies.map((enemy) => {
+            const previousAngle = previousEnemyAngles.get(enemy.id) ?? enemy.angle;
+            const previousState = enemyBankStates.get(enemy.id) ?? createShipBankState();
+            return [enemy.id, stepShipBankState(previousState, {
+              currentAngle: enemy.angle,
+              previousAngle,
+              dt
+            })];
+          })
+        );
+        setMessageState('');
+        updateHud();
+        travelSceneRenderer.renderFrame({
+          combatState,
+          stars,
+          flightState: deathWorldFlightState,
+          systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
+          showTargetLock: false,
+          playerBankAngle: 0,
+          enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+          playerDeathEffect: {
+            elapsedMs: playerDeathState.elapsedMs,
+            showGameOver,
+            showPrompt,
+            continueVisible: Math.floor(playerDeathState.elapsedMs / PLAYER_DEATH_PROMPT_BLINK_MS) % 2 === 0
+          },
+          radarInsetTop,
+          radarInsetRight
+        });
+        pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+        if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+          publishPerfSnapshot(timestamp);
         }
         animationFrameId = window.requestAnimationFrame(loop);
         return;
@@ -904,7 +1013,12 @@ export function useTravelSession(
           // The station hull is unforgiving in the original game: clipping the
           // solid ring is a fatal mistake, not a recoverable bumper impact.
           combatState.player.energy = 0;
-          resolvePlayerLoss();
+          startPlayerDeathSequence();
+          pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+          if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+            publishPerfSnapshot(timestamp);
+          }
+          animationFrameId = window.requestAnimationFrame(loop);
           return;
         } else if (docking.isInDockingGap) {
           if (docking.canDock) {
@@ -923,12 +1037,17 @@ export function useTravelSession(
       }
 
       if (result.playerDestroyed) {
-        resolvePlayerLoss();
+        startPlayerDeathSequence();
+        pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+        if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+          publishPerfSnapshot(timestamp);
+        }
+        animationFrameId = window.requestAnimationFrame(loop);
         return;
       }
 
       if (result.playerEscaped) {
-        resolvePlayerLoss();
+        finishPlayerLoss();
         return;
       }
 
@@ -978,6 +1097,7 @@ export function useTravelSession(
         showTargetLock: Boolean(combatState.playerTargetLock),
         playerBankAngle: playerBankState.visualAngle,
         enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+        playerDeathEffect: null,
         radarInsetTop,
         radarInsetRight
       });
@@ -1002,6 +1122,8 @@ export function useTravelSession(
       // leak held inputs into the next session.
       window.cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', onResize);
+      window.removeEventListener('keydown', onAnyContinueInput);
+      viewport.removeEventListener('pointerdown', onAnyContinueInput);
       travelSceneRenderer.dispose();
       resetInput();
     };
