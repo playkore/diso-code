@@ -12,9 +12,16 @@ import { useTravelSession } from './useTravelSession';
 
 export function TravelScreen() {
   const navigate = useNavigate();
-  const session = useGameStore((state) => state.travelSession);
-  const commanderCash = useGameStore((state) => state.commander.cash);
-  const commanderFuel = useGameStore((state) => state.commander.fuel);
+  const screenState = useGameStore(
+    (state) => ({
+      session: state.travelSession,
+      commanderCash: state.commander.cash,
+      commanderFuel: state.commander.fuel,
+      showTravelPerfOverlay: state.ui.showTravelPerfOverlay,
+      activeTab: state.ui.activeTab
+    }),
+    shallow
+  );
   const combatCommander = useGameStore(
     (state) => ({
       cargo: state.commander.cargo,
@@ -31,28 +38,34 @@ export function TravelScreen() {
   const grantCombatCredits = useGameStore((state) => state.grantCombatCredits);
   const completeTravel = useGameStore((state) => state.completeTravel);
   const resetAfterDeath = useGameStore((state) => state.resetAfterDeath);
-  const showTravelPerfOverlay = useGameStore((state) => state.ui.showTravelPerfOverlay);
-  const activeTab = useGameStore((state) => state.ui.activeTab);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  const travel = useTravelSession({ canvasRef, viewportRef }, session, combatCommander, grantCombatCredits, completeTravel, resetAfterDeath, navigate);
+  const travel = useTravelSession(
+    { canvasRef, viewportRef },
+    screenState.session,
+    combatCommander,
+    grantCombatCredits,
+    completeTravel,
+    resetAfterDeath,
+    navigate
+  );
   const handleRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
     travel.recordReactCommit(actualDuration);
   };
 
-  if (!session) {
+  if (!screenState.session) {
     // A browser refresh during flight restores the last docked autosave instead
     // of trying to rebuild the transient simulation runtime.
-    return <Navigate to={getRouteForTab(activeTab)} replace />;
+    return <Navigate to={getRouteForTab(screenState.activeTab)} replace />;
   }
 
   // Undocking reuses the travel screen with a zero-cost local-space session.
   // In that mode there is no selected hyperspace destination, so the HUD should
   // present the route as absent and fuel as the ship's remaining reserve.
-  const hasHyperspaceRoute = session.fuelUnits > 0 && session.originSystem !== session.destinationSystem;
-  const routeLabel = hasHyperspaceRoute ? `${session.originSystem} -> ${session.destinationSystem}` : 'none';
-  const fuelLabel = hasHyperspaceRoute ? formatLightYears(session.fuelCost) : formatLightYears(commanderFuel);
+  const hasHyperspaceRoute = screenState.session.fuelUnits > 0 && screenState.session.originSystem !== screenState.session.destinationSystem;
+  const routeLabel = hasHyperspaceRoute ? `${screenState.session.originSystem} -> ${screenState.session.destinationSystem}` : 'none';
+  const fuelLabel = hasHyperspaceRoute ? formatLightYears(screenState.session.fuelCost) : formatLightYears(screenState.commanderFuel);
 
   const energyBanks = travel.hud.energyBanks.map((ratio, index) => (
     <span key={`energy-bank-${index}`} className="travel-screen__hud-bank">
@@ -89,7 +102,7 @@ export function TravelScreen() {
               </span>
               <span className="travel-screen__hud-stat">
                 <span className="travel-screen__hud-key">Credits</span>
-                <span className="travel-screen__hud-value">{formatCredits(commanderCash)}</span>
+                <span className="travel-screen__hud-value">{formatCredits(screenState.commanderCash)}</span>
               </span>
               <span className="travel-screen__hud-stat travel-screen__hud-stat--bar">
                 <span className="travel-screen__hud-key">Energy</span>
@@ -128,7 +141,7 @@ export function TravelScreen() {
             </div>
           </div>
 
-          {showTravelPerfOverlay ? <TravelPerfOverlay perf={travel.perf} /> : null}
+          {screenState.showTravelPerfOverlay ? <TravelPerfOverlay perf={travel.perf} /> : null}
 
           <div className="travel-screen__message">{travel.message}</div>
 

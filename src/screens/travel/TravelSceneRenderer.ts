@@ -194,6 +194,14 @@ function createQuad(width: number, height: number, color: string, opacity = 1) {
   );
 }
 
+function setRenderOrder(object: Object3D, renderOrder: number) {
+  object.traverse((node) => {
+    node.renderOrder = renderOrder;
+  });
+  object.renderOrder = renderOrder;
+  return object;
+}
+
 function rotateOffset(x: number, y: number, angle: number) {
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
@@ -714,6 +722,9 @@ export class TravelSceneRenderer {
     radarInsetTop: number,
     radarInsetRight: number
   ) {
+    const RADAR_PANEL_ORDER = 10;
+    const RADAR_GRID_ORDER = 20;
+    const RADAR_CONTACT_ORDER = 30;
     const radarSize = Math.min(156, Math.max(120, Math.round(Math.min(this.width, this.height) * 0.24)));
     const radarX = this.width - radarInsetRight - radarSize;
     const radarY = radarInsetTop;
@@ -723,9 +734,9 @@ export class TravelSceneRenderer {
 
     const panel = createQuad(radarSize, radarSize, CGA_BLACK);
     panel.position.set(radarCenterX, radarCenterY, 0);
-    this.overlayGroup.add(panel);
+    this.overlayGroup.add(setRenderOrder(panel, RADAR_PANEL_ORDER));
     this.overlayGroup.add(
-      createLineShapeObject(
+      setRenderOrder(createLineShapeObject(
         [
           {
             points: [
@@ -739,27 +750,27 @@ export class TravelSceneRenderer {
         ],
         CGA_GREEN,
         false
-      )
+      ), RADAR_GRID_ORDER)
     );
 
     const outer = createCircleLoop(radarRadius, 64, CGA_GREEN, false, false);
     outer.position.set(radarCenterX, radarCenterY, 0);
-    this.overlayGroup.add(outer);
+    this.overlayGroup.add(setRenderOrder(outer, RADAR_GRID_ORDER));
     const inner = createCircleLoop(radarRadius * 0.55, 64, CGA_GREEN, false, false);
     inner.position.set(radarCenterX, radarCenterY, 0);
-    this.overlayGroup.add(inner);
-    this.overlayGroup.add(createSegmentObject(radarCenterX - radarRadius, radarCenterY, radarCenterX + radarRadius, radarCenterY, CGA_GREEN));
-    this.overlayGroup.add(createSegmentObject(radarCenterX, radarCenterY - radarRadius, radarCenterX, radarCenterY + radarRadius, CGA_GREEN));
+    this.overlayGroup.add(setRenderOrder(inner, RADAR_GRID_ORDER));
+    this.overlayGroup.add(setRenderOrder(createSegmentObject(radarCenterX - radarRadius, radarCenterY, radarCenterX + radarRadius, radarCenterY, CGA_GREEN), RADAR_GRID_ORDER));
+    this.overlayGroup.add(setRenderOrder(createSegmentObject(radarCenterX, radarCenterY - radarRadius, radarCenterX, radarCenterY + radarRadius, CGA_GREEN), RADAR_GRID_ORDER));
 
     const titleSprite = createTextSprite('DOCK RADAR', CGA_GREEN);
     if (titleSprite) {
       titleSprite.position.set(radarX + 12, radarY + 18, 0);
-      this.overlayGroup.add(titleSprite);
+      this.overlayGroup.add(setRenderOrder(titleSprite, RADAR_GRID_ORDER));
     }
     const labelSprite = createTextSprite(systemLabel.toUpperCase(), CGA_GREEN);
     if (labelSprite) {
       labelSprite.position.set(radarX + 12, radarY + 34, 0);
-      this.overlayGroup.add(labelSprite);
+      this.overlayGroup.add(setRenderOrder(labelSprite, RADAR_GRID_ORDER));
     }
 
     if (combatState.station) {
@@ -767,17 +778,24 @@ export class TravelSceneRenderer {
       const dy = combatState.station.y - combatState.player.y;
       const distance = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
-      const radarDistance = Math.min(radarRadius - 8, distance * 0.08);
+      // Keep the station marker away from the radar crosshair. When the player
+      // is near the station, a purely distance-proportional blip lands almost on
+      // the center lines and becomes hard to distinguish from the green grid.
+      const radarDistance = Math.min(radarRadius - 8, Math.max(16, distance * 0.08));
       const blipX = radarCenterX + Math.cos(angle) * radarDistance;
       const blipY = radarCenterY + Math.sin(angle) * radarDistance;
       // Station position must read instantly on the scanner even when the
       // launch camera and world scale make the station itself tiny in view, so
       // the radar uses a filled blip with a crosshair instead of a thin loop.
-      const fill = createQuad(8, 8, CGA_YELLOW);
-      fill.position.set(blipX, blipY, 0);
-      this.overlayGroup.add(fill);
-      this.overlayGroup.add(createSegmentObject(blipX - 5, blipY, blipX + 5, blipY, CGA_YELLOW));
-      this.overlayGroup.add(createSegmentObject(blipX, blipY - 5, blipX, blipY + 5, CGA_YELLOW));
+      // The station marker stays intentionally lightweight so it reads as a
+      // scanner blip rather than a second HUD widget. A small filled circle is
+      // enough once the marker is kept clear of the radar center crosshair.
+      const stationBlip = createCircleLoop(3, 16, CGA_YELLOW, false, false);
+      stationBlip.position.set(blipX, blipY, 0);
+      this.overlayGroup.add(setRenderOrder(stationBlip, RADAR_CONTACT_ORDER));
+      const stationCore = createQuad(4, 4, CGA_YELLOW);
+      stationCore.position.set(blipX, blipY, 0);
+      this.overlayGroup.add(setRenderOrder(stationCore, RADAR_CONTACT_ORDER));
     }
 
     for (const enemy of getVisibleRadarContacts(combatState, RADAR_SHIP_RANGE)) {
@@ -788,7 +806,7 @@ export class TravelSceneRenderer {
       const radarDistance = Math.min(radarRadius - 4, distance * 0.06);
       const blip = createCircleLoop(2.5, 12, getEnemyColor(enemy.roles, enemy.missionTag), false, false);
       blip.position.set(radarCenterX + Math.cos(angle) * radarDistance, radarCenterY + Math.sin(angle) * radarDistance, 0);
-      this.overlayGroup.add(blip);
+      this.overlayGroup.add(setRenderOrder(blip, RADAR_CONTACT_ORDER));
     }
   }
 

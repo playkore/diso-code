@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+import { createWithEqualityFn } from 'zustand/traditional';
 import { createDefaultCommander } from '../domain/commander';
 import {
   createInitialGameState,
@@ -54,7 +54,7 @@ function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'univers
  * - outfittingSlice: equipment, lasers and missiles
  * - saveLoadSlice: persistence and new game flow
  */
-export const useGameStore = create<GameStore>((set, get, api) => {
+export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) => {
   // Boot sequence:
   // 1. create a default commander
   // 2. derive the initial docked world state for that commander

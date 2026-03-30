@@ -444,11 +444,11 @@ export function useTravelSession(
       },
       random
     );
-    // Local undock sessions start in station space immediately, while routed
-    // travel waits to create the destination station until hyperspace arrival.
-    if (!hasHyperspaceRoute) {
-      enterStationSpace(combatState, random);
-    }
+    // Every travel session starts in the origin system's station space. Routed
+    // travel later rebinds the combat state to the destination system and calls
+    // `enterArrivalSpace(...)`, which replaces this origin station with the
+    // destination station after hyperspace completes.
+    enterStationSpace(combatState, random);
 
     let cw = 0;
     let ch = 0;
