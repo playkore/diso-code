@@ -193,6 +193,21 @@ function getJoystickTurnCommand(currentAngle: number, targetAngle: number) {
   return clampUnit(clampAngle(targetAngle - currentAngle) / JOYSTICK_TARGET_TURN_ANGLE);
 }
 
+/**
+ * Projects the joystick vector onto the ship's forward axis.
+ *
+ * The virtual joystick still chooses a target heading from its full 2D vector,
+ * but thrust must only come from the component that already points through the
+ * nose. Pulling behind the ship therefore produces zero forward thrust until
+ * the hull rotates far enough for that same joystick vector to move into the
+ * forward hemisphere.
+ */
+export function getJoystickProjectedThrust(vectorX: number, vectorY: number, shipAngle: number) {
+  const noseX = Math.cos(shipAngle);
+  const noseY = Math.sin(shipAngle);
+  return Math.max(0, vectorX * noseX + vectorY * noseY);
+}
+
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
@@ -830,8 +845,10 @@ export function useTravelSession(
 
       const joystickHeadingActive = joyActiveRef.current && liveInput.vectorStrength > 0.08 && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING';
       let joystickHeading: number | null = null;
+      let joystickThrust: number | null = null;
       if (joystickHeadingActive) {
         joystickHeading = Math.atan2(liveInput.vectorY, liveInput.vectorX);
+        joystickThrust = getJoystickProjectedThrust(liveInput.vectorX, liveInput.vectorY, combatState.player.angle);
       }
 
       if (jumpActivationFrames > 0) {
@@ -864,7 +881,7 @@ export function useTravelSession(
           // While auto-dock is active, the docking computer injects the same
           // low-level turn/thrust controls a pilot would use, so the ship
           // still follows the normal flight model and station collision rules.
-          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.thrust ?? liveInput.thrust,
+          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.thrust ?? joystickThrust ?? liveInput.thrust,
           turn: playerTurnCommand,
           toggleLasers: flightState === 'HYPERSPACE' ? false : liveInput.toggleLasers,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
