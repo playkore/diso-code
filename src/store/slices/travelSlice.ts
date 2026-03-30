@@ -166,8 +166,6 @@ export const createTravelSlice: GameSlice<
         report?.outcome === 'rescued'
           ? createDockedState({ ...state, commander }, dockSystemName, {
               spendJumpFuel,
-              title: `Recovered at ${dockSystemName}`,
-              body: `Escape pod recovery complete. Insurance docked you at ${dockSystemName} with cargo losses applied.`,
               stardateDelta: 1
             })
           : spendJumpFuel
