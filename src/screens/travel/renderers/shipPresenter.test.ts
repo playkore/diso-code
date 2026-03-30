@@ -19,14 +19,14 @@ describe('createLowPolyPlayerObject', () => {
     expect(hullMaterial.polygonOffset).toBe(true);
     expect(edgeMaterial.color.getHexString()).toBe(CGA_YELLOW.slice(1));
     expect(edgeMaterial.depthWrite).toBe(false);
-    expect(edges.geometry.getAttribute('position').count).toBe(32);
+    expect(edges.geometry.getAttribute('position').count).toBe(76);
   });
 });
 
 describe('selectShipPresenter geometry split', () => {
   it('uses mesh-backed geometry for both enemy and player ships in the default presenter', () => {
     const presenter = selectShipPresenter();
-    const enemy = presenter.createEnemyObject?.('enemy', CGA_RED) as Group;
+    const enemy = presenter.createEnemyObject?.('sidewinder', CGA_RED) as Group;
 
     expect(presenter.enemyGeometryMode).toBe('mesh');
     expect(presenter.playerGeometryMode).toBe('mesh');
@@ -38,9 +38,9 @@ describe('selectShipPresenter geometry split', () => {
     expect(presenter.createPlayerObject?.()).toBeInstanceOf(Group);
   });
 
-  it('keeps separate authored 3D meshes for police and thargoids', () => {
+  it('keeps separate authored 3D meshes for different ship blueprints', () => {
     const presenter = selectShipPresenter();
-    const police = presenter.createEnemyObject?.('police', CGA_YELLOW) as Group;
+    const police = presenter.createEnemyObject?.('viper', CGA_YELLOW) as Group;
     const thargoid = presenter.createEnemyObject?.('thargoid', CGA_YELLOW) as Group;
 
     expect(police).toBeInstanceOf(Group);

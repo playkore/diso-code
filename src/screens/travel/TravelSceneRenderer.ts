@@ -224,13 +224,9 @@ function getEnemyShape(enemy: TravelCombatState['enemies'][number]) {
 }
 
 function getEnemyMeshId(enemy: TravelCombatState['enemies'][number]): EnemyShipMeshId {
-  if (enemy.roles.cop) {
-    return 'police';
-  }
-  if (enemy.blueprintId === 'thargoid' || enemy.blueprintId === 'thargon') {
-    return 'thargoid';
-  }
-  return 'enemy';
+  // Renderer geometry now follows the authored ship blueprint instead of
+  // collapsing everything into generic hostile/police silhouettes.
+  return enemy.blueprintId;
 }
 
 /**

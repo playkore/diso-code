@@ -1,18 +1,11 @@
+import type { BlueprintId } from '../../../domain/combat/types';
 import { BufferGeometry, Float32BufferAttribute, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, type Object3D } from 'three';
 import { STATION_MESH_DEFINITION } from '../../../domain/combat/station/stationGeometry';
+import { getEliteShipMeshDefinition, type ShipMeshDefinition } from './eliteShipGeometry';
 
 import { CGA_BLACK, CGA_YELLOW } from './constants';
 
-type HullPoint = readonly [x: number, y: number, z: number];
-type Triangle = readonly [HullPoint, HullPoint, HullPoint];
-type Edge = readonly [HullPoint, HullPoint];
-
-export type EnemyShipMeshId = 'enemy' | 'police' | 'thargoid';
-
-export interface ShipMeshDefinition {
-  hullTriangles: readonly Triangle[];
-  wireEdges: readonly Edge[];
-}
+export type EnemyShipMeshId = BlueprintId;
 
 export interface ShipPresenter {
   id: 'flat-wireframe' | 'low-poly-ships';
@@ -29,14 +22,14 @@ export type RequestedShipPresenter = ShipPresenter['id'];
  * derived from the legacy 2D contour on the fly. That keeps renderer logic
  * simple and lets each hull evolve independently in the future.
  */
-function createTriangleGeometry(triangles: readonly Triangle[]) {
+function createTriangleGeometry(triangles: ShipMeshDefinition['hullTriangles']) {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(triangles.flatMap((triangle) => triangle.flat()), 3));
   geometry.computeVertexNormals();
   return geometry;
 }
 
-function createEdgeGeometry(edges: readonly Edge[]) {
+function createEdgeGeometry(edges: ShipMeshDefinition['wireEdges']) {
   const geometry = new BufferGeometry();
   geometry.setAttribute('position', new Float32BufferAttribute(edges.flatMap((edge) => [...edge[0], ...edge[1]]), 3));
   return geometry;
@@ -71,143 +64,6 @@ function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: st
   return ship;
 }
 
-const PLAYER_MESH: ShipMeshDefinition = {
-  hullTriangles: [
-    [[15, 0, 0], [4, 9, 2], [1, 0, 5]],
-    [[15, 0, 0], [1, 0, 5], [4, -9, 2]],
-    [[4, 9, 2], [-12, 6, 1], [1, 0, 5]],
-    [[1, 0, 5], [-12, 6, 1], [-14, 0, 2]],
-    [[1, 0, 5], [-14, 0, 2], [-12, -6, 1]],
-    [[1, 0, 5], [-12, -6, 1], [4, -9, 2]],
-    [[15, 0, 0], [4, -9, 2], [-7, -4, -3]],
-    [[15, 0, 0], [-7, -4, -3], [-7, 4, -3]],
-    [[15, 0, 0], [-7, 4, -3], [4, 9, 2]],
-    [[4, 9, 2], [-7, 4, -3], [-12, 6, 1]],
-    [[-12, 6, 1], [-7, 4, -3], [-15, 0, -1]],
-    [[-15, 0, -1], [-7, -4, -3], [-12, -6, 1]],
-    [[-12, -6, 1], [-7, -4, -3], [4, -9, 2]]
-  ],
-  wireEdges: [
-    [[15, 0, 0], [4, 9, 2]],
-    [[4, 9, 2], [-12, 6, 1]],
-    [[-12, 6, 1], [-14, 0, 2]],
-    [[-14, 0, 2], [-12, -6, 1]],
-    [[-12, -6, 1], [4, -9, 2]],
-    [[4, -9, 2], [15, 0, 0]],
-    [[15, 0, 0], [1, 0, 5]],
-    [[1, 0, 5], [-14, 0, 2]],
-    [[15, 0, 0], [-7, 4, -3]],
-    [[-7, 4, -3], [-15, 0, -1]],
-    [[-15, 0, -1], [-7, -4, -3]],
-    [[-7, -4, -3], [15, 0, 0]],
-    [[4, 9, 2], [-7, 4, -3]],
-    [[4, -9, 2], [-7, -4, -3]],
-    [[-12, 6, 1], [-15, 0, -1]],
-    [[-12, -6, 1], [-15, 0, -1]]
-  ]
-};
-
-const ENEMY_MESH: ShipMeshDefinition = {
-  hullTriangles: [
-    [[12, 0, 0], [-2, 9, 2], [-2, -9, 2]],
-    [[12, 0, 0], [-2, -9, 2], [-8, 0, 5]],
-    [[12, 0, 0], [-8, 0, 5], [-2, 9, 2]],
-    [[12, 0, 0], [-2, 6, -3], [-6, 0, -4]],
-    [[12, 0, 0], [-6, 0, -4], [-2, -6, -3]],
-    [[12, 0, 0], [-2, -6, -3], [-2, 6, -3]],
-    [[-2, 9, 2], [-8, 0, 5], [-8, 10, 0]],
-    [[-2, -9, 2], [-8, -10, 0], [-8, 0, 5]],
-    [[-2, 6, -3], [-8, 10, 0], [-6, 0, -4]],
-    [[-2, -6, -3], [-6, 0, -4], [-8, -10, 0]],
-    [[-8, 10, 0], [-8, 0, 5], [-8, -10, 0]],
-    [[-8, 10, 0], [-8, -10, 0], [-6, 0, -4]]
-  ],
-  wireEdges: [
-    [[12, 0, 0], [-2, 9, 2]],
-    [[12, 0, 0], [-2, -9, 2]],
-    [[12, 0, 0], [-2, 6, -3]],
-    [[12, 0, 0], [-2, -6, -3]],
-    [[-2, 9, 2], [-8, 10, 0]],
-    [[-2, -9, 2], [-8, -10, 0]],
-    [[-2, 6, -3], [-6, 0, -4]],
-    [[-2, -6, -3], [-6, 0, -4]],
-    [[-8, 10, 0], [-8, 0, 5]],
-    [[-8, 0, 5], [-8, -10, 0]],
-    [[-8, 10, 0], [-6, 0, -4]],
-    [[-6, 0, -4], [-8, -10, 0]]
-  ]
-};
-
-const POLICE_MESH: ShipMeshDefinition = {
-  hullTriangles: [
-    [[13, 0, 0], [0, 0, 5], [0, 12, 0]],
-    [[13, 0, 0], [0, -12, 0], [0, 0, 5]],
-    [[13, 0, 0], [0, 12, 0], [0, 0, -5]],
-    [[13, 0, 0], [0, 0, -5], [0, -12, 0]],
-    [[0, 12, 0], [-10, 0, 0], [0, 0, 5]],
-    [[0, 0, 5], [-10, 0, 0], [0, -12, 0]],
-    [[0, 12, 0], [0, 0, -5], [-10, 0, 0]],
-    [[0, 0, -5], [0, -12, 0], [-10, 0, 0]]
-  ],
-  wireEdges: [
-    [[13, 0, 0], [0, 12, 0]],
-    [[13, 0, 0], [0, -12, 0]],
-    [[13, 0, 0], [0, 0, 5]],
-    [[13, 0, 0], [0, 0, -5]],
-    [[0, 12, 0], [-10, 0, 0]],
-    [[-10, 0, 0], [0, -12, 0]],
-    [[0, 12, 0], [0, 0, 5]],
-    [[0, 0, 5], [0, -12, 0]],
-    [[0, 12, 0], [0, 0, -5]],
-    [[0, 0, -5], [0, -12, 0]],
-    [[0, 0, 5], [-10, 0, 0]],
-    [[-10, 0, 0], [0, 0, -5]]
-  ]
-};
-
-const THARGOID_MESH: ShipMeshDefinition = {
-  hullTriangles: [
-    [[12, 0, 0], [4, 12, 0], [0, 0, 5]],
-    [[4, 12, 0], [-8, 8, 0], [0, 0, 5]],
-    [[-8, 8, 0], [-12, 0, 0], [0, 0, 5]],
-    [[-12, 0, 0], [-8, -8, 0], [0, 0, 5]],
-    [[-8, -8, 0], [4, -12, 0], [0, 0, 5]],
-    [[4, -12, 0], [12, 0, 0], [0, 0, 5]],
-    [[4, 12, 0], [12, 0, 0], [0, 0, -5]],
-    [[-8, 8, 0], [4, 12, 0], [0, 0, -5]],
-    [[-12, 0, 0], [-8, 8, 0], [0, 0, -5]],
-    [[-8, -8, 0], [-12, 0, 0], [0, 0, -5]],
-    [[4, -12, 0], [-8, -8, 0], [0, 0, -5]],
-    [[12, 0, 0], [4, -12, 0], [0, 0, -5]]
-  ],
-  wireEdges: [
-    [[12, 0, 0], [4, 12, 0]],
-    [[4, 12, 0], [-8, 8, 0]],
-    [[-8, 8, 0], [-12, 0, 0]],
-    [[-12, 0, 0], [-8, -8, 0]],
-    [[-8, -8, 0], [4, -12, 0]],
-    [[4, -12, 0], [12, 0, 0]],
-    [[12, 0, 0], [0, 0, 5]],
-    [[4, 12, 0], [0, 0, 5]],
-    [[-8, 8, 0], [0, 0, 5]],
-    [[-12, 0, 0], [0, 0, 5]],
-    [[-8, -8, 0], [0, 0, 5]],
-    [[4, -12, 0], [0, 0, 5]],
-    [[12, 0, 0], [0, 0, -5]],
-    [[4, 12, 0], [0, 0, -5]],
-    [[-8, 8, 0], [0, 0, -5]],
-    [[-12, 0, 0], [0, 0, -5]],
-    [[-8, -8, 0], [0, 0, -5]],
-    [[4, -12, 0], [0, 0, -5]]
-  ]
-};
-
-const ENEMY_SHIP_MESHES: Record<EnemyShipMeshId, ShipMeshDefinition> = {
-  enemy: ENEMY_MESH,
-  police: POLICE_MESH,
-  thargoid: THARGOID_MESH
-};
-
 const STATION_MESH: ShipMeshDefinition = STATION_MESH_DEFINITION;
 
 /**
@@ -220,11 +76,11 @@ const STATION_MESH: ShipMeshDefinition = STATION_MESH_DEFINITION;
  * CGA palette by using black hull faces plus colored wire edges only.
  */
 export function createLowPolyPlayerObject() {
-  return createWireframeMeshObject(PLAYER_MESH, CGA_YELLOW);
+  return createWireframeMeshObject(getEliteShipMeshDefinition('cobra-mk3-player'), CGA_YELLOW);
 }
 
 export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: string) {
-  return createWireframeMeshObject(ENEMY_SHIP_MESHES[shipId], edgeColor);
+  return createWireframeMeshObject(getEliteShipMeshDefinition(shipId), edgeColor);
 }
 
 /**
