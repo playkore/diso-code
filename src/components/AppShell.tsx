@@ -107,11 +107,10 @@ export function AppShell() {
   const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
-  const isDebugBackgroundRoute = location.pathname === '/debug/backgrounds';
 
-  if (isTravelRoute || isDebugBackgroundRoute) {
-    // Travel and debug playground routes own their own full-screen chrome, so
-    // the shell strips everything back to an outlet container while they are active.
+  if (isTravelRoute) {
+    // Travel owns its own full-screen chrome, so the shell strips everything
+    // back to an outlet container while the flight view is active.
     return (
       <div className="app-shell app-shell--travel">
         <main>

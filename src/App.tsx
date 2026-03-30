@@ -2,7 +2,6 @@ import { Suspense, lazy } from 'react';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { StartScreenGate } from './components/StartScreenGate';
-import { BackgroundDebugScreen } from './screens/BackgroundDebugScreen';
 import { EquipmentScreen } from './screens/EquipmentScreen';
 import { GalaxyChartScreen } from './screens/GalaxyChartScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
@@ -39,7 +38,6 @@ const router = createBrowserRouter([
           </Suspense>
         )
       },
-      { path: 'debug/backgrounds', element: <BackgroundDebugScreen /> },
       { path: 'save-load', element: <SaveLoadScreen /> },
       { path: '*', element: <Navigate to="/" replace /> }
     ]
