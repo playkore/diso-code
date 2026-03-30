@@ -63,9 +63,17 @@ export function drawRadarPanel(
     const blipY = radarCenterY + Math.sin(angle) * radarDistance;
 
     ctx.fillStyle = CGA_YELLOW;
+    // The station marker must stay readable even when the world renderer shows
+    // the station as a tiny distant wireframe, so the radar uses a filled blip
+    // plus crosshair instead of a subtle outline-only marker.
+    ctx.fillRect(blipX - 4, blipY - 4, 8, 8);
     ctx.beginPath();
-    ctx.arc(blipX, blipY, 4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(blipX - 5, blipY);
+    ctx.lineTo(blipX + 5, blipY);
+    ctx.moveTo(blipX, blipY - 5);
+    ctx.lineTo(blipX, blipY + 5);
+    ctx.strokeStyle = CGA_YELLOW;
+    ctx.stroke();
   }
 
   for (const enemy of getVisibleRadarContacts(state, RADAR_SHIP_RANGE)) {

@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const wormBlueprint: CombatBlueprint = {
   id: 'worm',
@@ -9,7 +10,7 @@ export const wormBlueprint: CombatBlueprint = {
   missiles: 0,
   targetableArea: 170,
   laserRange: 250,
-  topSpeed: 6.8,
+  topSpeed: toWorldSpeed(23),
   acceleration: 0.13,
   turnRate: 0.06,
   roles: { pirate: true, hostile: true },

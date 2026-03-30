@@ -1,4 +1,5 @@
 import type { BlueprintId } from '../../../domain/combat/types';
+import { CLASSIC_COORDINATE_SCALE } from '../../../domain/combat/classicFlightModel';
 import { RAW_ELITE_SHIP_MODELS } from './rawEliteShipModels';
 
 type HullPoint = readonly [x: number, y: number, z: number];
@@ -16,11 +17,6 @@ type RawModelKey = keyof typeof RAW_ELITE_SHIP_MODELS;
 type RawVertex = (typeof RAW_ELITE_SHIP_MODELS)[RawModelKey]['vertices'][number];
 type RawFace = (typeof RAW_ELITE_SHIP_MODELS)[RawModelKey]['faces'][number];
 
-// BBC Elite stores ship coordinates in a much larger integer space than this
-// renderer expects. A single global scale preserves the original relative hull
-// sizes while keeping combat framing close to the existing prototype camera.
-const CLASSIC_MODEL_SCALE = 0.12;
-
 /**
  * Elite's authored ship data uses a conventional "x right, y up, z nose"
  * coordinate system. The Three.js presenter expects "x nose, y wing span,
@@ -28,7 +24,7 @@ const CLASSIC_MODEL_SCALE = 0.12;
  * native axes without changing handedness.
  */
 function toScenePoint([x, y, z]: RawVertex): HullPoint {
-  return [z * CLASSIC_MODEL_SCALE, x * CLASSIC_MODEL_SCALE, y * CLASSIC_MODEL_SCALE];
+  return [z * CLASSIC_COORDINATE_SCALE, x * CLASSIC_COORDINATE_SCALE, y * CLASSIC_COORDINATE_SCALE];
 }
 
 function toSceneNormal([x, y, z]: RawFace): HullPoint {

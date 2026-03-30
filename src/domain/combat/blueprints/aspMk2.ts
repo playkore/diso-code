@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const aspMk2Blueprint: CombatBlueprint = {
   id: 'asp-mk2',
@@ -9,7 +10,7 @@ export const aspMk2Blueprint: CombatBlueprint = {
   missiles: 1,
   targetableArea: 280,
   laserRange: 380,
-  topSpeed: 6.6,
+  topSpeed: toWorldSpeed(40),
   acceleration: 0.12,
   turnRate: 0.06,
   roles: { bountyHunter: true },

@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const geckoBlueprint: CombatBlueprint = {
   id: 'gecko',
@@ -9,7 +10,7 @@ export const geckoBlueprint: CombatBlueprint = {
   missiles: 0,
   targetableArea: 185,
   laserRange: 270,
-  topSpeed: 6.1,
+  topSpeed: toWorldSpeed(30),
   acceleration: 0.11,
   turnRate: 0.055,
   roles: { pirate: true, hostile: true },

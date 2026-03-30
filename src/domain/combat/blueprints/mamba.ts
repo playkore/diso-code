@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const mambaBlueprint: CombatBlueprint = {
   id: 'mamba',
@@ -9,7 +10,7 @@ export const mambaBlueprint: CombatBlueprint = {
   missiles: 2,
   targetableArea: 220,
   laserRange: 320,
-  topSpeed: 6.7,
+  topSpeed: toWorldSpeed(30),
   acceleration: 0.12,
   turnRate: 0.055,
   roles: { pirate: true, hostile: true },

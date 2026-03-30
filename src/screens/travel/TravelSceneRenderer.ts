@@ -668,9 +668,16 @@ export class TravelSceneRenderer {
       const distance = Math.hypot(dx, dy);
       const angle = Math.atan2(dy, dx);
       const radarDistance = Math.min(radarRadius - 8, distance * 0.08);
-      const blip = createCircleLoop(4, 18, CGA_YELLOW, false, false);
-      blip.position.set(radarCenterX + Math.cos(angle) * radarDistance, radarCenterY + Math.sin(angle) * radarDistance, 0);
-      this.overlayGroup.add(blip);
+      const blipX = radarCenterX + Math.cos(angle) * radarDistance;
+      const blipY = radarCenterY + Math.sin(angle) * radarDistance;
+      // Station position must read instantly on the scanner even when the
+      // launch camera and world scale make the station itself tiny in view, so
+      // the radar uses a filled blip with a crosshair instead of a thin loop.
+      const fill = createQuad(8, 8, CGA_YELLOW);
+      fill.position.set(blipX, blipY, 0);
+      this.overlayGroup.add(fill);
+      this.overlayGroup.add(createSegmentObject(blipX - 5, blipY, blipX + 5, blipY, CGA_YELLOW));
+      this.overlayGroup.add(createSegmentObject(blipX, blipY - 5, blipX, blipY + 5, CGA_YELLOW));
     }
 
     for (const enemy of getVisibleRadarContacts(combatState, RADAR_SHIP_RANGE)) {

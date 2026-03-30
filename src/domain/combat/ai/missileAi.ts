@@ -1,14 +1,15 @@
 import type { CombatProjectile, TravelCombatState } from '../types';
+import { CLASSIC_MISSILE_TOP_SPEED, toWorldSpeed } from '../classicFlightModel';
 
 const ENEMY_MISSILE_ACCELERATION = 0.3;
 const ENEMY_MISSILE_TURN_BLEND = 0.14;
-const ENEMY_MISSILE_MIN_SPEED = 6.8;
-const ENEMY_MISSILE_MAX_SPEED = 7.6;
+const ENEMY_MISSILE_MIN_SPEED = toWorldSpeed(CLASSIC_MISSILE_TOP_SPEED);
+const ENEMY_MISSILE_MAX_SPEED = toWorldSpeed(CLASSIC_MISSILE_TOP_SPEED);
 
 /**
- * Enemy missiles should stay threatening without feeling impossible: they turn
- * toward the current player position every frame and settle into a speed band
- * that is slower than older tuning, but still above the Cobra's top speed.
+ * The homing behavior in this clone is modernized, but the missile's absolute
+ * speed still matches classic Elite once converted into the scaled world
+ * coordinate space used by this project.
  */
 export function stepEnemyMissile(projectile: CombatProjectile, state: TravelCombatState, dt: number) {
   const dx = state.player.x - projectile.x;

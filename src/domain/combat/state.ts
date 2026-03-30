@@ -1,5 +1,6 @@
 import { getLegalStatus } from '../commander';
 import type { LaserId, LaserMountPosition } from '../shipCatalog';
+import { CLASSIC_PLAYER_TOP_SPEED, toWorldSpeed } from './classicFlightModel';
 import { selectBlueprintFile } from './encounters/spawnRules';
 import type { RandomSource, TravelCombatInit, TravelCombatState } from './types';
 
@@ -97,12 +98,13 @@ export function createDeterministicRandomSource(bytes: number[]): RandomSource {
 }
 
 /**
- * Placeholder for future speed tuning by ship/loadout. The current prototype
- * keeps the player Cobra Mk III aligned with the pirate Cobra Mk III so the
- * player cannot simply outrun the common hostile baseline.
+ * The player always flies a Cobra Mk III, but classic Elite stores the
+ * player's max throttle in `DELTA` rather than in the NPC Cobra blueprint.
+ * Converting that canonical `DELTA=40` value through the shared world scale
+ * keeps player speed aligned with the rendered ship size.
  */
 function getPlayerMaxSpeed(_laserMounts: TravelCombatInit['laserMounts']): number {
-  return 6;
+  return toWorldSpeed(CLASSIC_PLAYER_TOP_SPEED);
 }
 
 function getPlayerMaxShield(installedEquipment: TravelCombatInit['installedEquipment']): number {

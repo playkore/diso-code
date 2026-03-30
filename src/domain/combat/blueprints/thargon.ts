@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const thargonBlueprint: CombatBlueprint = {
   id: 'thargon',
@@ -9,7 +10,7 @@ export const thargonBlueprint: CombatBlueprint = {
   missiles: 0,
   targetableArea: 150,
   laserRange: 240,
-  topSpeed: 7.6,
+  topSpeed: toWorldSpeed(30),
   acceleration: 0.18,
   turnRate: 0.08,
   roles: { hostile: true }

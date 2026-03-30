@@ -1,5 +1,6 @@
 import { applyPlayerDamage, pushMessage, projectileId, spawnParticles } from '../state';
 import { spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
+import { CLASSIC_MISSILE_TOP_SPEED, toWorldSpeed } from '../classicFlightModel';
 import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
 /**
@@ -39,14 +40,15 @@ export function applyEnemyHostility(state: TravelCombatState, enemy: CombatEnemy
 }
 
 export function spawnEnemyMissile(state: TravelCombatState, enemy: CombatEnemy) {
+  const missileSpeed = toWorldSpeed(CLASSIC_MISSILE_TOP_SPEED);
   state.projectiles.push({
     id: projectileId(state),
     kind: 'missile',
     owner: 'enemy',
     x: enemy.x + Math.cos(enemy.angle) * 14,
     y: enemy.y + Math.sin(enemy.angle) * 14,
-    vx: enemy.vx + Math.cos(enemy.angle) * 6,
-    vy: enemy.vy + Math.sin(enemy.angle) * 6,
+    vx: enemy.vx + Math.cos(enemy.angle) * missileSpeed,
+    vy: enemy.vy + Math.sin(enemy.angle) * missileSpeed,
     damage: 22,
     life: 180,
     sourceEnemyId: enemy.id

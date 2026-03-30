@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const ferDeLanceBlueprint: CombatBlueprint = {
   id: 'fer-de-lance',
@@ -9,7 +10,7 @@ export const ferDeLanceBlueprint: CombatBlueprint = {
   missiles: 2,
   targetableArea: 260,
   laserRange: 340,
-  topSpeed: 6.7,
+  topSpeed: toWorldSpeed(30),
   acceleration: 0.12,
   turnRate: 0.06,
   roles: { bountyHunter: true },

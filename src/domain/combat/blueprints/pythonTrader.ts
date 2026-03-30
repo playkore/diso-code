@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const pythonTraderBlueprint: CombatBlueprint = {
   id: 'python-trader',
@@ -9,7 +10,7 @@ export const pythonTraderBlueprint: CombatBlueprint = {
   missiles: 0,
   targetableArea: 360,
   laserRange: 290,
-  topSpeed: 4.9,
+  topSpeed: toWorldSpeed(20),
   acceleration: 0.06,
   turnRate: 0.035,
   roles: { trader: true, innocent: true }

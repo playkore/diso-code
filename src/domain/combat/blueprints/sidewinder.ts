@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const sidewinderBlueprint: CombatBlueprint = {
   id: 'sidewinder',
@@ -9,7 +10,7 @@ export const sidewinderBlueprint: CombatBlueprint = {
   missiles: 0,
   targetableArea: 210,
   laserRange: 290,
-  topSpeed: 6.2,
+  topSpeed: toWorldSpeed(37),
   acceleration: 0.11,
   turnRate: 0.05,
   roles: { pirate: true, hostile: true },

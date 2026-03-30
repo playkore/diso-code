@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const kraitBlueprint: CombatBlueprint = {
   id: 'krait',
@@ -9,7 +10,7 @@ export const kraitBlueprint: CombatBlueprint = {
   missiles: 0,
   targetableArea: 200,
   laserRange: 300,
-  topSpeed: 6.5,
+  topSpeed: toWorldSpeed(30),
   acceleration: 0.12,
   turnRate: 0.058,
   roles: { pirate: true, hostile: true },

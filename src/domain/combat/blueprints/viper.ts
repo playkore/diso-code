@@ -1,4 +1,5 @@
 import type { CombatBlueprint } from '../types';
+import { toWorldSpeed } from '../classicFlightModel';
 
 export const viperBlueprint: CombatBlueprint = {
   id: 'viper',
@@ -9,7 +10,7 @@ export const viperBlueprint: CombatBlueprint = {
   missiles: 1,
   targetableArea: 230,
   laserRange: 350,
-  topSpeed: 7.0,
+  topSpeed: toWorldSpeed(32),
   acceleration: 0.14,
   turnRate: 0.065,
   roles: { cop: true, hostile: true, stationDefense: true }

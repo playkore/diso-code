@@ -8,6 +8,7 @@ import {
   createMathRandomSource,
   createTravelCombatState,
   enterArrivalSpace,
+  enterStationSpace,
   getPlayerCombatSnapshot,
   isMassNearby,
   canAutoDock,
@@ -435,6 +436,11 @@ export function useTravelSession(
       },
       random
     );
+    // Local undock sessions start in station space immediately, while routed
+    // travel waits to create the destination station until hyperspace arrival.
+    if (!hasHyperspaceRoute) {
+      enterStationSpace(combatState, random);
+    }
 
     let cw = 0;
     let ch = 0;

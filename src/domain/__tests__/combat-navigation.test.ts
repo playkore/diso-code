@@ -26,14 +26,14 @@ describe('travel combat navigation rules', () => {
     state.player.vx = 5;
     state.player.vy = 0;
     stepTravelCombat(state, { thrust: 0, turn: 0, jump: true }, 1, 'JUMPING', {}, { nextByte: () => 0, nextFloat: () => 0 });
-    expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(60, 5);
+    expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(48, 5);
     expect(state.player.vx).toBeCloseTo(0, 5);
-    expect(state.player.vy).toBeCloseTo(60, 5);
+    expect(state.player.vy).toBeCloseTo(48, 5);
 
     state.player.vx = 200;
     state.player.vy = 0;
     stepTravelCombat(state, { thrust: 0, turn: 0, jump: false }, 1, 'PLAYING', {}, { nextByte: () => 0, nextFloat: () => 0 });
-    expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(6, 5);
+    expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(4.8, 5);
   });
 
   it('limits radar ship contacts to the configured range', () => {
