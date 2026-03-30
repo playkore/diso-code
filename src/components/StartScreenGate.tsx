@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createDefaultCommander } from '../domain/commander';
 import { createDefaultMissionTravelContext } from '../domain/missionContext';
-import { createMathRandomSource, createTravelCombatState } from '../domain/travelCombat';
+import { createMathRandomSource, createTravelCombatState, type BlueprintId } from '../domain/travelCombat';
+import { spawnEnemyFromBlueprint } from '../domain/combat/spawn/spawnEnemy';
 import { createStars, TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travelSceneMath';
 
@@ -19,13 +20,52 @@ const DEMO_SYSTEM_NAME = 'Lave';
 const DEMO_CAMERA_FOV_DEGREES = 36;
 const DEMO_STATION_RADIUS = 96;
 const DEMO_SAFE_ZONE_RADIUS = 240;
-const DEMO_ORBIT_RADIUS_X = 322;
-const DEMO_ORBIT_RADIUS_Y = 210;
-const DEMO_ORBIT_SPEED = 0.38;
-const DEMO_CAMERA_SIDE_OFFSET = 0;
-const DEMO_CAMERA_HEIGHT_OFFSET = 0;
-const DEMO_CAMERA_DISTANCE_FACTOR = 1.4;
+const DEMO_STATION_SPIN_SPEED = 0.42;
+const DEMO_STATION_CAMERA_DISTANCE_FACTOR = 1.4;
+const DEMO_SHIP_CAMERA_DISTANCE_FACTOR = 0.07;
 const DEMO_STARFIELD_SPEED_X = 42;
+const DEMO_STATION_SHOWCASE_DURATION_SECONDS = 2.8;
+const DEMO_SHIP_SHOWCASE_DURATION_SECONDS = 2.1;
+const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
+const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
+const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
+const SHOWCASE_BLUEPRINT_IDS: readonly BlueprintId[] = [
+  'sidewinder',
+  'mamba',
+  'krait',
+  'adder',
+  'gecko',
+  'cobra-mk1',
+  'cobra-mk3-pirate',
+  'asp-mk2',
+  'python-pirate',
+  'fer-de-lance'
+] as const;
+
+type ShowcasePhase =
+  | { kind: 'station' }
+  | { kind: 'player' }
+  | { kind: 'enemy'; blueprintId: BlueprintId };
+
+function getShowcasePhase(elapsedSeconds: number): ShowcasePhase {
+  const cycleDuration =
+    DEMO_STATION_SHOWCASE_DURATION_SECONDS + DEMO_SHIP_SHOWCASE_DURATION_SECONDS * (1 + SHOWCASE_BLUEPRINT_IDS.length);
+  const cycleSeconds = elapsedSeconds % cycleDuration;
+  if (cycleSeconds < DEMO_STATION_SHOWCASE_DURATION_SECONDS) {
+    return { kind: 'station' };
+  }
+
+  const shipCycleSeconds = cycleSeconds - DEMO_STATION_SHOWCASE_DURATION_SECONDS;
+  const shipSlotIndex = Math.floor(shipCycleSeconds / DEMO_SHIP_SHOWCASE_DURATION_SECONDS);
+  if (shipSlotIndex === 0) {
+    return { kind: 'player' };
+  }
+
+  return {
+    kind: 'enemy',
+    blueprintId: SHOWCASE_BLUEPRINT_IDS[(shipSlotIndex - 1) % SHOWCASE_BLUEPRINT_IDS.length]
+  };
+}
 
 function isMobilePlatform(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
@@ -89,6 +129,8 @@ function StartScreenScene() {
     );
     const stars = createStars();
     const enemyBankAngles = new Map<number, number>();
+    let showcasedEnemyId: number | null = null;
+    let showcasedEnemyBlueprintId: BlueprintId | null = null;
     let animationFrameId = 0;
     let lastTimestamp = 0;
     let elapsedSeconds = 0;
@@ -96,17 +138,10 @@ function StartScreenScene() {
     let viewportHeight = 1;
     let starfieldOffsetX = 0;
 
-    // The attract scene reuses the real travel renderer, but it owns a tiny
-    // self-contained state: one station, one player ship, no combat entities.
+    // The attract scene reuses the real travel renderer, but it keeps its own
+    // tiny self-contained choreography instead of stepping the real sim:
+    // station-only showcase, then one large ship at a time in a loop.
     combatState.playerLasersActive = false;
-    combatState.station = {
-      x: 0,
-      y: 0,
-      radius: DEMO_STATION_RADIUS,
-      angle: 0,
-      rotSpeed: DEMO_ORBIT_SPEED,
-      safeZoneRadius: DEMO_SAFE_ZONE_RADIUS
-    };
     combatState.encounter.safeZone = true;
 
     const resize = () => {
@@ -125,27 +160,71 @@ function StartScreenScene() {
       const deltaSeconds = lastTimestamp === 0 ? 1 / 60 : Math.min(0.05, (timestamp - lastTimestamp) / 1000);
       lastTimestamp = timestamp;
       elapsedSeconds += deltaSeconds;
-
-      const orbitAngle = elapsedSeconds * DEMO_ORBIT_SPEED;
-      const playerX = Math.cos(orbitAngle) * DEMO_ORBIT_RADIUS_X;
-      const playerY = Math.sin(orbitAngle) * DEMO_ORBIT_RADIUS_Y;
-      const tangentX = -Math.sin(orbitAngle) * DEMO_ORBIT_RADIUS_X;
-      const tangentY = Math.cos(orbitAngle) * DEMO_ORBIT_RADIUS_Y;
       starfieldOffsetX += deltaSeconds * DEMO_STARFIELD_SPEED_X;
+      const showcaseAngle = elapsedSeconds * DEMO_STATION_SPIN_SPEED;
+      const showcasePhase = getShowcasePhase(elapsedSeconds);
 
-      combatState.player.x = playerX;
-      combatState.player.y = playerY;
-      combatState.player.vx = tangentX * DEMO_ORBIT_SPEED;
-      combatState.player.vy = tangentY * DEMO_ORBIT_SPEED;
-      combatState.player.angle = Math.atan2(tangentY, tangentX);
-      if (combatState.station) {
-        combatState.station.angle += deltaSeconds * 0.42;
+      combatState.player.x = DEMO_HIDDEN_ENTITY_OFFSET;
+      combatState.player.y = DEMO_HIDDEN_ENTITY_OFFSET;
+      combatState.player.vx = 0;
+      combatState.player.vy = 0;
+      combatState.player.angle = 0;
+      combatState.enemies.length = 0;
+      enemyBankAngles.clear();
+
+      if (showcasePhase.kind === 'station') {
+        combatState.station = {
+          x: 0,
+          y: 0,
+          radius: DEMO_STATION_RADIUS,
+          angle: showcaseAngle,
+          rotSpeed: DEMO_STATION_SPIN_SPEED,
+          safeZoneRadius: DEMO_SAFE_ZONE_RADIUS
+        };
+      } else {
+        // Once the station phase ends, the preview becomes a pure ship
+        // carousel. The station is removed entirely so each hull owns the full
+        // frame without competing geometry behind it.
+        combatState.station = null;
       }
 
-      // Match the travel screen camera distance, but keep the shot centered on
-      // the station instead of the player so the attract scene reads like a
-      // remote traffic camera near the dock.
-      const cameraDistance = getPerspectiveCameraDistance(viewportHeight, DEMO_CAMERA_FOV_DEGREES) * DEMO_CAMERA_DISTANCE_FACTOR;
+      if (showcasePhase.kind === 'player') {
+        combatState.player.x = DEMO_PLAYER_SHOWCASE_DISTANCE;
+        combatState.player.y = 0;
+        combatState.player.angle = showcaseAngle;
+      }
+
+      if (showcasePhase.kind === 'enemy') {
+        if (showcasedEnemyBlueprintId !== showcasePhase.blueprintId || showcasedEnemyId === null) {
+          showcasedEnemyBlueprintId = showcasePhase.blueprintId;
+          combatState.nextId += 1;
+          showcasedEnemyId = combatState.nextId;
+        }
+
+        const showcasedEnemy = spawnEnemyFromBlueprint(combatState, showcasePhase.blueprintId, createMathRandomSource(), {
+          id: showcasedEnemyId,
+          x: DEMO_ENEMY_SHOWCASE_DISTANCE,
+          y: 0,
+          vx: 0,
+          vy: 0,
+          angle: showcaseAngle,
+          aggression: 0,
+          baseAggression: 0,
+          fireCooldown: Number.POSITIVE_INFINITY,
+          missileCooldown: Number.POSITIVE_INFINITY,
+          lifetime: 0
+        });
+        enemyBankAngles.set(showcasedEnemy.id, showcaseAngle);
+      } else {
+        showcasedEnemyBlueprintId = null;
+        showcasedEnemyId = null;
+      }
+
+      // The station keeps the original distant "traffic camera" framing, while
+      // ships move much closer so each hull nearly fills the viewport on its
+      // own and reads like a hero render instead of a gameplay camera.
+      const cameraDistance = getPerspectiveCameraDistance(viewportHeight, DEMO_CAMERA_FOV_DEGREES)
+        * (showcasePhase.kind === 'station' ? DEMO_STATION_CAMERA_DISTANCE_FACTOR : DEMO_SHIP_CAMERA_DISTANCE_FACTOR);
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
@@ -154,7 +233,7 @@ function StartScreenScene() {
         showRadar: false,
         showSafeZoneRing: false,
         showTargetLock: false,
-        playerBankAngle: Math.sin(elapsedSeconds * 1.2) * 0.22,
+        playerBankAngle: showcasePhase.kind === 'player' ? showcaseAngle : 0,
         enemyBankAngles,
         starfieldAnchor: {
           x: starfieldOffsetX,
@@ -164,8 +243,8 @@ function StartScreenScene() {
         },
         cameraOverride: {
           position: {
-            x: DEMO_CAMERA_SIDE_OFFSET,
-            y: DEMO_CAMERA_HEIGHT_OFFSET,
+            x: 0,
+            y: 0,
             z: cameraDistance
           },
           lookAt: {
