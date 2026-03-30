@@ -40,7 +40,7 @@ type ShowcasePhase =
 
 export interface StartScreenSceneProps {
   onShowcaseLabelChange: (label: string) => void;
-  onSceneReady?: () => void;
+  onSceneReady?: (ready: boolean) => void;
 }
 
 function getShowcasePhase(elapsedSeconds: number): ShowcasePhase {
@@ -134,7 +134,7 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
     resize();
     // The gate prompt swaps from "Loading" to the start instruction only after
     // the showcase module is mounted and has a real canvas to render into.
-    onSceneReady?.();
+    onSceneReady?.(true);
 
     const renderFrame = (timestamp: number) => {
       const deltaSeconds = lastTimestamp === 0 ? 1 / 60 : Math.min(0.05, (timestamp - lastTimestamp) / 1000);

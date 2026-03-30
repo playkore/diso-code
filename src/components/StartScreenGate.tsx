@@ -51,7 +51,6 @@ function StartScreenSceneFallback() {
   return (
     <span className="mobile-fullscreen-gate__scene mobile-fullscreen-gate__scene--fallback" aria-hidden="true">
       <span className="mobile-fullscreen-gate__scene-overlay" />
-      <span className="mobile-fullscreen-gate__scene-loading">Loading showcase</span>
     </span>
   );
 }
@@ -59,6 +58,7 @@ function StartScreenSceneFallback() {
 export function StartScreenGate() {
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [isSceneReady, setIsSceneReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => {
     if (typeof document === 'undefined') {
@@ -134,12 +134,12 @@ export function StartScreenGate() {
         <span className="mobile-fullscreen-gate__frame">
           <span className="mobile-fullscreen-gate__title">DISO CODE</span>
           <Suspense fallback={<StartScreenSceneFallback />}>
-            <StartScreenScene onShowcaseLabelChange={setShowcaseLabel} />
+            <StartScreenScene onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsSceneReady} />
           </Suspense>
           <span className="mobile-fullscreen-gate__ship-label" aria-live="polite">
             {showcaseLabel}
           </span>
-          <span className="mobile-fullscreen-gate__prompt">Press spacebar to start game</span>
+          <span className="mobile-fullscreen-gate__prompt">{isSceneReady ? 'Press spacebar to start game' : ''}</span>
           <span className="mobile-fullscreen-gate__copyright">© Alexey Korepanov 2026</span>
         </span>
       </div>
