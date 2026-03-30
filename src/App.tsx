@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
 import { StartScreenGate } from './components/StartScreenGate';
@@ -9,7 +10,10 @@ import { MarketScreen } from './screens/MarketScreen';
 import { SaveLoadScreen } from './screens/SaveLoadScreen';
 import { SystemDataScreen } from './screens/SystemDataScreen';
 import { StarMapScreen } from './screens/StarMapScreen';
-import { TravelScreen } from './screens/TravelScreen';
+
+// Travel is the only route that pulls in Three.js and the full flight renderer,
+// so loading it lazily keeps docked screens out of that heavier dependency path.
+const TravelScreen = lazy(() => import('./screens/TravelScreen').then((module) => ({ default: module.TravelScreen })));
 
 const router = createBrowserRouter([
   {
@@ -25,7 +29,16 @@ const router = createBrowserRouter([
       { path: 'short-range-chart', element: <StarMapScreen /> },
       { path: 'star-map', element: <Navigate to="/short-range-chart" replace /> },
       { path: 'galaxy-chart', element: <GalaxyChartScreen /> },
-      { path: 'travel', element: <TravelScreen /> },
+      {
+        path: 'travel',
+        element: (
+          // The fallback stays visually empty because the route transition is
+          // already framed by the in-game UI shell and should not flash new UI.
+          <Suspense fallback={null}>
+            <TravelScreen />
+          </Suspense>
+        )
+      },
       { path: 'debug/backgrounds', element: <BackgroundDebugScreen /> },
       { path: 'save-load', element: <SaveLoadScreen /> },
       { path: '*', element: <Navigate to="/" replace /> }

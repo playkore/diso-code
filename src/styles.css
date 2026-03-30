@@ -90,6 +90,12 @@ body {
   background: var(--cga-black);
 }
 
+.mobile-fullscreen-gate__scene--fallback {
+  /* The gate shell should paint immediately even before the heavier Three.js
+     showcase arrives, so the fallback keeps a readable attract-screen frame. */
+  border: 1px solid var(--cga-green);
+}
+
 .mobile-fullscreen-gate__scene-canvas,
 .mobile-fullscreen-gate__scene-overlay {
   position: absolute;
@@ -104,6 +110,16 @@ body {
 
 .mobile-fullscreen-gate__scene-overlay {
   pointer-events: none;
+}
+
+.mobile-fullscreen-gate__scene-loading {
+  position: relative;
+  z-index: 1;
+  color: var(--cga-green);
+  font-size: clamp(0.85rem, 3.5vw, 1rem);
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 .mobile-fullscreen-gate__prompt {
