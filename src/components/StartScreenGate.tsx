@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   hasPersistedDockedSession,
@@ -8,6 +8,7 @@ import {
   persistStartMenuMusicEnabled
 } from '../store/gameStateFactory';
 import { useGameStore } from '../store/useGameStore';
+import { getStartMenuAudio, pauseStartMenuAudio, playStartMenuAudio } from './startMenuAudio';
 
 type FullscreenElement = HTMLElement & {
   requestFullscreen?: () => Promise<void>;
@@ -18,7 +19,6 @@ type FullscreenElement = HTMLElement & {
 // behind a lazy boundary while the menu controls render synchronously.
 const StartScreenScene = lazy(() => import('./StartScreenScene').then((module) => ({ default: module.StartScreenScene })));
 const START_SCREEN_SCENE_PROMISE = import('./StartScreenScene');
-const START_SCREEN_MUSIC_PATH = '/music/intro.mp3';
 
 function isMobilePlatform(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
@@ -67,49 +67,12 @@ export function StartScreenGate() {
   const startNewGame = useGameStore((state) => state.startNewGame);
   const saveStates = useGameStore((state) => state.saveStates);
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
-  const musicRef = useRef<HTMLAudioElement | null>(null);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
   const canContinue = Object.keys(saveStates).length > 0 || hasPersistedDockedSession();
-
-  useEffect(() => {
-    const music = new Audio(START_SCREEN_MUSIC_PATH);
-    music.loop = true;
-    music.preload = 'auto';
-    musicRef.current = music;
-
-    // Browsers may block autoplay on first paint, so the menu retries once on
-    // the first trusted interaction while the overlay remains visible.
-    const tryPlayMusic = () => {
-      if (!isMenuVisible || !musicEnabled) {
-        return;
-      }
-      void music.play().catch(() => {
-        // The retry path below is enough; failed autoplay should stay silent.
-      });
-    };
-
-    const handleInteractionUnlock = () => {
-      tryPlayMusic();
-      window.removeEventListener('pointerdown', handleInteractionUnlock);
-      window.removeEventListener('keydown', handleInteractionUnlock);
-    };
-
-    tryPlayMusic();
-    window.addEventListener('pointerdown', handleInteractionUnlock);
-    window.addEventListener('keydown', handleInteractionUnlock);
-
-    return () => {
-      window.removeEventListener('pointerdown', handleInteractionUnlock);
-      window.removeEventListener('keydown', handleInteractionUnlock);
-      music.pause();
-      music.currentTime = 0;
-      musicRef.current = null;
-    };
-  }, [isMenuVisible, musicEnabled]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -127,19 +90,23 @@ export function StartScreenGate() {
 
   useEffect(() => {
     persistStartMenuMusicEnabled(musicEnabled);
-    const music = musicRef.current;
+    const music = getStartMenuAudio();
     if (!music) {
       return;
     }
 
     if (!isMenuVisible || !musicEnabled) {
-      music.pause();
-      music.currentTime = 0;
+      pauseStartMenuAudio();
       return;
     }
 
-    void music.play().catch(() => {
-      // Some browsers still require an explicit tap before playback begins.
+    if (!music.paused) {
+      return;
+    }
+
+    void playStartMenuAudio().catch(() => {
+      // Browsers may still reject playback in dev after a hot reload. The menu
+      // stays usable and the next explicit interaction can resume the track.
     });
   }, [isMenuVisible, musicEnabled]);
 
@@ -148,11 +115,7 @@ export function StartScreenGate() {
   }, [fullscreenEnabled]);
 
   const closeMenu = () => {
-    const music = musicRef.current;
-    if (music) {
-      music.pause();
-      music.currentTime = 0;
-    }
+    pauseStartMenuAudio();
     setStartScreenVisible(false);
   };
 

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { loadStartMenuMusicEnabled, persistStartMenuMusicEnabled } from '../store/gameStateFactory';
+import { playStartMenuAudio } from './startMenuAudio';
 
 const START_SCREEN_SCENE_PROMISE = import('./StartScreenScene');
 
 export interface StartScreenLoaderProps {
-  onContinue: () => void;
+  onContinue: () => void | Promise<void>;
 }
 
 export function StartScreenLoader({ onContinue }: StartScreenLoaderProps) {
@@ -33,7 +34,12 @@ export function StartScreenLoader({ onContinue }: StartScreenLoaderProps) {
     }
 
     const handleContinue = () => {
-      onContinue();
+      if (musicEnabled) {
+        void playStartMenuAudio().catch(() => {
+          // The menu still opens even if the browser rejects playback.
+        });
+      }
+      void onContinue();
     };
 
     window.addEventListener('keydown', handleContinue);
@@ -41,7 +47,7 @@ export function StartScreenLoader({ onContinue }: StartScreenLoaderProps) {
     return () => {
       window.removeEventListener('keydown', handleContinue);
     };
-  }, [isReady, onContinue]);
+  }, [isReady, musicEnabled, onContinue]);
 
   useEffect(() => {
     persistStartMenuMusicEnabled(musicEnabled);
@@ -51,9 +57,14 @@ export function StartScreenLoader({ onContinue }: StartScreenLoaderProps) {
     <section
       className="start-loader"
       aria-label="Start screen loader"
-      onPointerDown={() => {
+      onClick={() => {
         if (isReady) {
-          onContinue();
+          if (musicEnabled) {
+            void playStartMenuAudio().catch(() => {
+              // The menu still opens even if the browser rejects playback.
+            });
+          }
+          void onContinue();
         }
       }}
     >
@@ -67,7 +78,11 @@ export function StartScreenLoader({ onContinue }: StartScreenLoaderProps) {
           event.stopPropagation();
         }}
       >
-        <input type="checkbox" checked={musicEnabled} onChange={(event) => setMusicEnabled(event.target.checked)} />
+        <input
+          type="checkbox"
+          checked={musicEnabled}
+          onChange={(event) => setMusicEnabled(event.target.checked)}
+        />
         <span>Music</span>
       </label>
     </section>
