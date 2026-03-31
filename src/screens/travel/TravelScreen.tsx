@@ -144,6 +144,11 @@ export function TravelScreen() {
           {screenState.showTravelPerfOverlay ? <TravelPerfOverlay perf={travel.perf} /> : null}
 
           <div className="travel-screen__message">{travel.message}</div>
+          {travel.gameOverOverlay.visible ? (
+            <div className="travel-screen__game-over" aria-live="polite">
+              <div className="travel-screen__game-over-title">GAME OVER</div>
+            </div>
+          ) : null}
 
           <div className="travel-screen__controls">
             <div

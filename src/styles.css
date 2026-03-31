@@ -1182,6 +1182,25 @@ button:disabled {
   white-space: pre-line;
 }
 
+.travel-screen__game-over {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  gap: 1rem;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.travel-screen__game-over-title {
+  color: var(--cga-red);
+  font-size: clamp(2rem, 7vw, 3rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
 .travel-screen__perf {
   position: absolute;
   top: 0.9rem;

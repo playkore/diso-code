@@ -1,4 +1,5 @@
 import {
+  DoubleSide,
   BufferGeometry,
   Color,
   Float32BufferAttribute,
@@ -17,9 +18,6 @@ import {
   Points,
   PointsMaterial,
   Scene,
-  Sprite,
-  SpriteMaterial,
-  Texture,
   Vector3,
   WebGLRenderer
 } from 'three';
@@ -57,7 +55,6 @@ interface TravelSceneRenderArgs {
     elapsedMs: number;
     showGameOver: boolean;
     showPrompt: boolean;
-    continueVisible: boolean;
   } | null;
   radarInsetTop: number;
   radarInsetRight: number;
@@ -73,7 +70,6 @@ const SHIP_Z = 0;
 const PROJECTILE_Z = 14;
 const PARTICLE_Z = 22;
 const PLAYER_DEATH_Z = PLAYER_Z + 2;
-
 function toSceneY(worldY: number) {
   return -worldY;
 }
@@ -101,8 +97,7 @@ function disposeObject(object: Object3D) {
           | LineDashedMaterial
           | MeshBasicMaterial
           | PointsMaterial
-          | SpriteMaterial
-          | Array<LineBasicMaterial | LineDashedMaterial | MeshBasicMaterial | PointsMaterial | SpriteMaterial>;
+          | Array<LineBasicMaterial | LineDashedMaterial | MeshBasicMaterial | PointsMaterial>;
       }
     ).material;
     if (Array.isArray(material)) {
@@ -187,9 +182,14 @@ function createQuad(width: number, height: number, color: string, opacity = 1) {
     new PlaneGeometry(width, height),
     new MeshBasicMaterial({
       color,
+      side: DoubleSide,
       transparent: opacity < 1,
       opacity,
-      depthTest: false
+      // HUD quads are screen-space overlays and should never participate in
+      // depth buffering; otherwise coplanar panels can hide later fills even
+      // when the renderer computes the right health ratios.
+      depthTest: false,
+      depthWrite: false
     })
   );
 }
@@ -211,30 +211,56 @@ function rotateOffset(x: number, y: number, angle: number) {
   };
 }
 
-function createTextSprite(text: string, color: string) {
-  const canvas = document.createElement('canvas');
-  const bootstrap = canvas.getContext('2d');
-  if (!bootstrap) {
-    return null;
+/**
+ * Enemy health bars use plain overlay primitives rather than texture-backed
+ * quads. That keeps the meter logic obvious, avoids texture-orientation edge
+ * cases, and matches how the original canvas renderer already decomposes the
+ * UI into a frame plus four filled banks.
+ */
+function createEnemyHealthBarObject(healthBar: NonNullable<ReturnType<typeof getEnemyHealthBarState>>) {
+  const bankCount = 4;
+  const bankWidth = 4;
+  const bankGap = 1;
+  const width = bankCount * bankWidth + (bankCount - 1) * bankGap;
+  const height = 4;
+  const group = new Group();
+  const panel = createQuad(width + 2, height + 2, CGA_BLACK);
+  panel.position.set(0, 0, 0);
+  group.add(panel);
+  group.add(
+    createLineShapeObject(
+      [
+        {
+          points: [
+            [-(width + 1) / 2, -(height + 1) / 2],
+            [(width + 1) / 2, -(height + 1) / 2],
+            [(width + 1) / 2, (height + 1) / 2],
+            [-(width + 1) / 2, (height + 1) / 2]
+          ],
+          closed: true
+        }
+      ],
+      CGA_YELLOW,
+      false
+    )
+  );
+
+  for (let bankIndex = 0; bankIndex < bankCount; bankIndex += 1) {
+    const bankX = -width / 2 + bankIndex * (bankWidth + bankGap) + bankWidth / 2;
+    const fillWidth = Math.round(bankWidth * healthBar.bankRatios[bankIndex]);
+    const underlay = createQuad(bankWidth, height, CGA_RED);
+    underlay.position.set(bankX, 0, 0.01);
+    group.add(underlay);
+    if (fillWidth > 0) {
+      const fill = createQuad(fillWidth, height, healthBar.fillColor);
+      // Fill grows from the left edge of each bank so partial segments match
+      // the canvas HUD instead of expanding symmetrically around the center.
+      fill.position.set(bankX - (bankWidth - fillWidth) / 2, 0, 0.02);
+      group.add(fill);
+    }
   }
-  bootstrap.font = 'bold 24px "Courier New", monospace';
-  const metrics = bootstrap.measureText(text);
-  canvas.width = Math.max(2, Math.ceil(metrics.width) + 12);
-  canvas.height = 32;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    return null;
-  }
-  ctx.font = 'bold 24px "Courier New", monospace';
-  ctx.fillStyle = color;
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, 6, 4);
-  const texture = new Texture(canvas);
-  texture.needsUpdate = true;
-  const sprite = new Sprite(new SpriteMaterial({ map: texture, transparent: true, depthTest: false }));
-  sprite.center.set(0, 1);
-  sprite.scale.set(canvas.width, canvas.height, 1);
-  return sprite;
+
+  return group;
 }
 
 function getEnemyShape(enemy: TravelCombatState['enemies'][number]) {
@@ -264,8 +290,8 @@ export class TravelSceneRenderer {
   private readonly starScene = new Scene();
   private readonly worldScene = new Scene();
   private readonly overlayScene = new Scene();
-  private readonly starCamera = new OrthographicCamera(0, 1, 0, 1, -1000, 1000);
-  private readonly overlayCamera = new OrthographicCamera(0, 1, 0, 1, -1000, 1000);
+  private readonly starCamera = new OrthographicCamera(0, 1, 0, 1, 0.1, 2000);
+  private readonly overlayCamera = new OrthographicCamera(0, 1, 0, 1, 0.1, 2000);
   private readonly worldCamera = new PerspectiveCamera(CAMERA_FOV_DEGREES, 1, CAMERA_NEAR, CAMERA_FAR);
   private readonly starGroup = new Group();
   private readonly worldGroup = new Group();
@@ -283,6 +309,14 @@ export class TravelSceneRenderer {
     });
     this.renderer.autoClear = false;
     this.renderer.setClearColor(new Color(CGA_BLACK), 1);
+    // Orthographic HUD scenes use screen-space coordinates at z=0. The camera
+    // must sit in front of that plane and look toward it; leaving the default
+    // camera transform at the origin makes sprites and quads vanish because
+    // they end up on the same plane as the camera itself.
+    this.starCamera.position.z = 10;
+    this.starCamera.lookAt(0, 0, 0);
+    this.overlayCamera.position.z = 10;
+    this.overlayCamera.lookAt(0, 0, 0);
     this.starScene.add(this.starGroup);
     this.worldScene.add(this.worldGroup);
     this.overlayScene.add(this.overlayGroup);
@@ -315,7 +349,6 @@ export class TravelSceneRenderer {
     combatState,
     stars,
     flightState,
-    systemLabel,
     showRadar = true,
     showSafeZoneRing = true,
     showTargetLock,
@@ -348,7 +381,7 @@ export class TravelSceneRenderer {
 
     this.buildStarfield(stars, combatState, flightState, starfieldAnchor);
     this.buildWorld(combatState, playerBankAngle, enemyBankAngles, showSafeZoneRing, playerDeathEffect ?? null);
-    this.buildOverlay(combatState, systemLabel, showTargetLock, showRadar, radarInsetTop, radarInsetRight, playerDeathEffect ?? null);
+    this.buildOverlay(combatState, showTargetLock, showRadar, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
 
     this.renderer.clear(true, true, true);
@@ -517,12 +550,10 @@ export class TravelSceneRenderer {
 
   private buildOverlay(
     combatState: TravelCombatState,
-    systemLabel: string,
     showTargetLock: boolean,
     showRadar: boolean,
     radarInsetTop: number,
-    radarInsetRight: number,
-    playerDeathEffect: TravelSceneRenderArgs['playerDeathEffect']
+    radarInsetRight: number
   ) {
     for (const enemy of combatState.enemies) {
       const projected = new Vector3(enemy.x, toSceneY(enemy.y), SHIP_Z).project(this.worldCamera);
@@ -538,10 +569,7 @@ export class TravelSceneRenderer {
     }
 
     if (showRadar) {
-      this.buildRadar(combatState, systemLabel, radarInsetTop, radarInsetRight);
-    }
-    if (playerDeathEffect?.showGameOver) {
-      this.buildGameOverOverlay(playerDeathEffect);
+      this.buildRadar(combatState, radarInsetTop, radarInsetRight);
     }
   }
 
@@ -599,74 +627,15 @@ export class TravelSceneRenderer {
     }
   }
 
-  private buildGameOverOverlay(playerDeathEffect: NonNullable<TravelSceneRenderArgs['playerDeathEffect']>) {
-    const title = createTextSprite('GAME OVER', CGA_RED);
-    if (title) {
-      title.center.set(0.5, 0.5);
-      title.scale.set(title.scale.x * 1.8, title.scale.y * 1.8, 1);
-      title.position.set(this.width / 2, this.height / 2 - 32, 0);
-      this.overlayGroup.add(title);
-    }
-    if (!playerDeathEffect.showPrompt || !playerDeathEffect.continueVisible) {
-      return;
-    }
-    const prompt = createTextSprite('PRESS ANY KEY TO CONTINUE', CGA_YELLOW);
-    if (prompt) {
-      prompt.center.set(0.5, 0.5);
-      prompt.scale.set(prompt.scale.x * 1.25, prompt.scale.y * 1.25, 1);
-      prompt.position.set(this.width / 2, this.height / 2 + 18, 0);
-      this.overlayGroup.add(prompt);
-    }
-  }
-
   private buildEnemyHealthBar(enemy: TravelCombatState['enemies'][number], screenX: number, screenY: number) {
     const healthBar = getEnemyHealthBarState(enemy);
     if (!healthBar) {
       return;
     }
 
-    const bankCount = 4;
-    const bankWidth = 4;
-    const bankGap = 1;
-    const width = bankCount * bankWidth + (bankCount - 1) * bankGap;
-    const height = 4;
-    const x = Math.round(screenX - width / 2);
-    const y = Math.round(screenY - 18);
-
-    const frame = createQuad(width + 2, height + 2, CGA_BLACK);
-    frame.position.set(x + width / 2, y + height / 2, 0);
-    this.overlayGroup.add(frame);
-    this.overlayGroup.add(
-      createLineShapeObject(
-        [
-          {
-            points: [
-              [x - 0.5, y - 0.5],
-              [x + width + 0.5, y - 0.5],
-              [x + width + 0.5, y + height + 0.5],
-              [x - 0.5, y + height + 0.5]
-            ],
-            closed: true
-          }
-        ],
-        CGA_YELLOW,
-        false
-      )
-    );
-
-    for (let bankIndex = 0; bankIndex < bankCount; bankIndex += 1) {
-      const bankX = x + bankIndex * (bankWidth + bankGap);
-      const underlay = createQuad(bankWidth, height, CGA_RED);
-      underlay.position.set(bankX + bankWidth / 2, y + height / 2, 0);
-      this.overlayGroup.add(underlay);
-
-      const fillWidth = Math.round(bankWidth * healthBar.bankRatios[bankIndex]);
-      if (fillWidth > 0) {
-        const fill = createQuad(fillWidth, height, healthBar.fillColor);
-        fill.position.set(bankX + fillWidth / 2, y + height / 2, 0);
-        this.overlayGroup.add(fill);
-      }
-    }
+    const bar = createEnemyHealthBarObject(healthBar);
+    bar.position.set(Math.round(screenX), Math.round(screenY - 15), 0);
+    this.overlayGroup.add(bar);
   }
 
   private buildTargetIndicator(screenX: number, screenY: number) {
@@ -718,7 +687,6 @@ export class TravelSceneRenderer {
 
   private buildRadar(
     combatState: TravelCombatState,
-    systemLabel: string,
     radarInsetTop: number,
     radarInsetRight: number
   ) {
@@ -761,17 +729,6 @@ export class TravelSceneRenderer {
     this.overlayGroup.add(setRenderOrder(inner, RADAR_GRID_ORDER));
     this.overlayGroup.add(setRenderOrder(createSegmentObject(radarCenterX - radarRadius, radarCenterY, radarCenterX + radarRadius, radarCenterY, CGA_GREEN), RADAR_GRID_ORDER));
     this.overlayGroup.add(setRenderOrder(createSegmentObject(radarCenterX, radarCenterY - radarRadius, radarCenterX, radarCenterY + radarRadius, CGA_GREEN), RADAR_GRID_ORDER));
-
-    const titleSprite = createTextSprite('DOCK RADAR', CGA_GREEN);
-    if (titleSprite) {
-      titleSprite.position.set(radarX + 12, radarY + 18, 0);
-      this.overlayGroup.add(setRenderOrder(titleSprite, RADAR_GRID_ORDER));
-    }
-    const labelSprite = createTextSprite(systemLabel.toUpperCase(), CGA_GREEN);
-    if (labelSprite) {
-      labelSprite.position.set(radarX + 12, radarY + 34, 0);
-      this.overlayGroup.add(setRenderOrder(labelSprite, RADAR_GRID_ORDER));
-    }
 
     if (combatState.station) {
       const dx = combatState.station.x - combatState.player.x;

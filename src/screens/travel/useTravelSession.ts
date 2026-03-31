@@ -34,7 +34,6 @@ interface PlayerDeathState {
 
 const PLAYER_DEATH_ANIMATION_MS = 1800;
 const PLAYER_DEATH_GAME_OVER_MS = 900;
-const PLAYER_DEATH_PROMPT_BLINK_MS = 320;
 
 /**
  * Owns the real-time travel session that bridges React UI and the mutable
@@ -105,6 +104,10 @@ interface BombUiState {
 }
 
 interface EcmUiState {
+  visible: boolean;
+}
+
+interface GameOverOverlayState {
   visible: boolean;
 }
 
@@ -236,6 +239,7 @@ export function useTravelSession(
     visible: commander.installedEquipment.ecm
   });
   const [perf, setPerf] = useState(EMPTY_PERF_SNAPSHOT);
+  const [gameOverOverlay, setGameOverOverlay] = useState<GameOverOverlayState>({ visible: false });
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
@@ -818,6 +822,7 @@ export function useTravelSession(
           })
         );
         setMessageState('');
+        setGameOverOverlay({ visible: showGameOver });
         updateHud();
         travelSceneRenderer.renderFrame({
           combatState,
@@ -829,9 +834,8 @@ export function useTravelSession(
           enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
           playerDeathEffect: {
             elapsedMs: playerDeathState.elapsedMs,
-            showGameOver,
-            showPrompt,
-            continueVisible: Math.floor(playerDeathState.elapsedMs / PLAYER_DEATH_PROMPT_BLINK_MS) % 2 === 0
+            showGameOver: false,
+            showPrompt: false
           },
           radarInsetTop,
           radarInsetRight
@@ -1089,6 +1093,7 @@ export function useTravelSession(
       }
 
       updateHud();
+      setGameOverOverlay({ visible: false });
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
@@ -1132,6 +1137,7 @@ export function useTravelSession(
   return {
     hud,
     message,
+    gameOverOverlay,
     hyperspaceHidden,
     autoDock,
     bomb,
