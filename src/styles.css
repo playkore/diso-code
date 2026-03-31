@@ -231,6 +231,45 @@ body {
   border-style: dashed;
 }
 
+.start-menu__ship-debug {
+  position: absolute;
+  left: 50%;
+  top: 10.2rem;
+  z-index: 2;
+  display: inline-flex;
+  gap: 0.5rem;
+  transform: translateX(-50%);
+}
+
+.start-menu__ship-debug-button {
+  min-height: 1.8rem;
+  padding: 0.2rem 0.55rem;
+  border: 2px solid var(--cga-yellow);
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.start-menu__ship-debug-button:hover,
+.start-menu__ship-debug-button:focus-visible,
+.start-menu__ship-debug-button--active {
+  outline: none;
+  background: var(--cga-yellow);
+  color: var(--cga-black);
+}
+
+.start-menu__ship-debug-button:disabled,
+.start-menu__ship-debug-button:disabled:hover,
+.start-menu__ship-debug-button:disabled:focus-visible {
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  border-style: dashed;
+}
+
 .start-menu__settings {
   position: absolute;
   left: 50%;
@@ -282,6 +321,10 @@ body {
 
   .start-menu__ship-nav {
     top: 8.3rem;
+  }
+
+  .start-menu__ship-debug {
+    top: 11rem;
   }
 
   .start-menu__controls {

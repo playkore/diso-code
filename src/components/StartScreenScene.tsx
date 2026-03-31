@@ -5,6 +5,7 @@ import { spawnEnemyFromBlueprint } from '../domain/combat/spawn/spawnEnemy';
 import { BLUEPRINTS, createMathRandomSource, createTravelCombatState, type BlueprintId } from '../domain/travelCombat';
 import { createStars, TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travelSceneMath';
+import { setShipPresenterDebugOptions } from '../screens/travel/renderers/shipPresenter';
 import { START_SCREEN_SHOWCASE_COUNT, START_SCREEN_SHOWCASE_SHIP_IDS } from './startScreenShowcase';
 
 const DEMO_SYSTEM_NAME = 'Lave';
@@ -17,6 +18,8 @@ const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
 export interface StartScreenSceneProps {
   showcaseIndex: number;
+  debugFaceLabels?: boolean;
+  debugDoubleSide?: boolean;
   onShowcaseLabelChange: (label: string) => void;
   onSceneReady?: (ready: boolean) => void;
 }
@@ -28,7 +31,13 @@ function getShowcaseLabel(showcaseShipId: 'player' | BlueprintId): string {
   return BLUEPRINTS[showcaseShipId].label;
 }
 
-export function StartScreenScene({ showcaseIndex, onShowcaseLabelChange, onSceneReady }: StartScreenSceneProps) {
+export function StartScreenScene({
+  showcaseIndex,
+  debugFaceLabels = false,
+  debugDoubleSide = false,
+  onShowcaseLabelChange,
+  onSceneReady
+}: StartScreenSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLSpanElement | null>(null);
   const showcaseIndexRef = useRef(showcaseIndex);
@@ -36,6 +45,19 @@ export function StartScreenScene({ showcaseIndex, onShowcaseLabelChange, onScene
   useEffect(() => {
     showcaseIndexRef.current = showcaseIndex;
   }, [showcaseIndex]);
+
+  useEffect(() => {
+    setShipPresenterDebugOptions({
+      showFaceLabels: debugFaceLabels,
+      doubleSidedHull: debugDoubleSide
+    });
+    return () => {
+      setShipPresenterDebugOptions({
+        showFaceLabels: false,
+        doubleSidedHull: false
+      });
+    };
+  }, [debugDoubleSide, debugFaceLabels]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

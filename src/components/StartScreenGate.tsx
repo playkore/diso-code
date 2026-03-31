@@ -54,6 +54,8 @@ export function StartScreenGate() {
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [showcaseIndex, setShowcaseIndex] = useState(0);
+  const [debugFaceLabels, setDebugFaceLabels] = useState(false);
+  const [debugDoubleSide, setDebugDoubleSide] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
@@ -150,7 +152,13 @@ export function StartScreenGate() {
         <span className="start-menu__frame">
           <span className="start-menu__title">DISO CODE</span>
           <Suspense fallback={<StartScreenSceneFallback />}>
-            <StartScreenScene showcaseIndex={showcaseIndex} onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsMenuReady} />
+            <StartScreenScene
+              showcaseIndex={showcaseIndex}
+              debugFaceLabels={debugFaceLabels}
+              debugDoubleSide={debugDoubleSide}
+              onShowcaseLabelChange={setShowcaseLabel}
+              onSceneReady={setIsMenuReady}
+            />
           </Suspense>
           <div className="start-menu__ship-nav" aria-label="Ship showcase controls">
             <button
@@ -173,6 +181,24 @@ export function StartScreenGate() {
               aria-label="Next ship"
             >
               &gt;
+            </button>
+          </div>
+          <div className="start-menu__ship-debug">
+            <button
+              type="button"
+              className={`start-menu__ship-debug-button${debugFaceLabels ? ' start-menu__ship-debug-button--active' : ''}`}
+              onClick={() => setDebugFaceLabels((current) => !current)}
+              disabled={!isMenuReady}
+            >
+              Face IDs
+            </button>
+            <button
+              type="button"
+              className={`start-menu__ship-debug-button${debugDoubleSide ? ' start-menu__ship-debug-button--active' : ''}`}
+              onClick={() => setDebugDoubleSide((current) => !current)}
+              disabled={!isMenuReady}
+            >
+              Double Side
             </button>
           </div>
           <div className="start-menu__controls">

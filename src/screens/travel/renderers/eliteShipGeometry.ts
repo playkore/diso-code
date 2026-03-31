@@ -6,9 +6,16 @@ type HullPoint = readonly [x: number, y: number, z: number];
 type Triangle = readonly [HullPoint, HullPoint, HullPoint];
 type Edge = readonly [HullPoint, HullPoint];
 
+export interface ShipFaceLabelAnchor {
+  index: number;
+  position: HullPoint;
+  normal: HullPoint;
+}
+
 export interface ShipMeshDefinition {
   hullTriangles: readonly Triangle[];
   wireEdges: readonly Edge[];
+  faceLabels: readonly ShipFaceLabelAnchor[];
 }
 
 export type EliteShipModelId = BlueprintId | 'cobra-mk3-player';
@@ -53,6 +60,14 @@ function normalizeVector(vector: HullPoint): HullPoint {
     return [0, 0, 1];
   }
   return [vector[0] / length, vector[1] / length, vector[2] / length];
+}
+
+function averagePoint(points: readonly HullPoint[]): HullPoint {
+  const sum = points.reduce<HullPoint>(
+    (accumulator, point) => [accumulator[0] + point[0], accumulator[1] + point[1], accumulator[2] + point[2]],
+    [0, 0, 0]
+  );
+  return [sum[0] / points.length, sum[1] / points.length, sum[2] / points.length];
 }
 
 function getFaceVertexIndexes(edges: readonly (readonly [number, number, number, number])[], faceIndex: number) {
@@ -106,22 +121,32 @@ function triangulateFace(
 ) {
   const vertexIndexes = getFaceVertexIndexes(edges, faceIndex);
   if (vertexIndexes.length < 3) {
-    return [] as Triangle[];
+    return { triangles: [] as Triangle[], label: null };
   }
-  const orderedVertices = orderFaceVertices(vertexIndexes.map((index) => vertices[index]), toSceneNormal(face));
+  const faceNormal = normalizeVector(toSceneNormal(face));
+  const orderedVertices = orderFaceVertices(vertexIndexes.map((index) => vertices[index]), faceNormal);
   const triangles: Triangle[] = [];
   for (let index = 1; index < orderedVertices.length - 1; index += 1) {
     triangles.push([orderedVertices[0], orderedVertices[index], orderedVertices[index + 1]]);
   }
-  return triangles;
+  return {
+    triangles,
+    label: {
+      index: faceIndex,
+      position: averagePoint(orderedVertices),
+      normal: faceNormal
+    } satisfies ShipFaceLabelAnchor
+  };
 }
 
 function buildShipMeshDefinition(modelKey: RawModelKey): ShipMeshDefinition {
   const rawModel = RAW_ELITE_SHIP_MODELS[modelKey];
   const vertices = rawModel.vertices.map((vertex) => toScenePoint(vertex));
+  const triangulatedFaces = rawModel.faces.map((face, faceIndex) => triangulateFace(vertices, rawModel.edges, face, faceIndex));
   return {
-    hullTriangles: rawModel.faces.flatMap((face, faceIndex) => triangulateFace(vertices, rawModel.edges, face, faceIndex)),
-    wireEdges: rawModel.edges.map(([start, end]) => [vertices[start], vertices[end]] as const)
+    hullTriangles: triangulatedFaces.flatMap((entry) => entry.triangles),
+    wireEdges: rawModel.edges.map(([start, end]) => [vertices[start], vertices[end]] as const),
+    faceLabels: triangulatedFaces.flatMap((entry) => (entry.label ? [entry.label] : []))
   };
 }
 
