@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cargoUsedTonnes } from '../domain/commander';
 import { SAVE_SLOT_IDS } from '../store/gameStateFactory';
 import { useGameStore } from '../store/useGameStore';
-import { formatLightYears } from '../utils/distance';
-import { formatCredits } from '../utils/money';
 
 export function LoadScreen() {
   const navigate = useNavigate();
@@ -34,7 +31,6 @@ export function LoadScreen() {
           const saveState = saveStates[slotId];
           const savedCommander = saveState?.snapshot.commander;
           const savedUniverse = saveState?.snapshot.universe;
-          const savedCargo = savedCommander ? cargoUsedTonnes(savedCommander.cargo) : 0;
 
           return (
             <section key={slotId} className="save-panel">
@@ -54,14 +50,6 @@ export function LoadScreen() {
                     <dd>{savedCommander.name}</dd>
                     <dt>System</dt>
                     <dd>{savedCommander.currentSystem}</dd>
-                    <dt>Credits</dt>
-                    <dd>{formatCredits(savedCommander.cash)}</dd>
-                    <dt>Fuel</dt>
-                    <dd>{formatLightYears(savedCommander.fuel)}</dd>
-                    <dt>Cargo</dt>
-                    <dd>
-                      {savedCargo} / {savedCommander.cargoCapacity} t
-                    </dd>
                     <dt>Stardate</dt>
                     <dd>{savedUniverse.stardate}</dd>
                   </dl>

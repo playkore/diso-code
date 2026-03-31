@@ -49,13 +49,12 @@ export function StartScreenGate() {
   const isMenuVisible = useGameStore((state) => state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const startNewGame = useGameStore((state) => state.startNewGame);
-  const saveStates = useGameStore((state) => state.saveStates);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
-  const canContinue = Object.keys(saveStates).length > 0 || hasPersistedDockedSession();
+  const canContinue = hasPersistedDockedSession();
 
   useEffect(() => {
     let isCancelled = false;

@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { cargoUsedTonnes } from '../domain/commander';
 import { SAVE_SLOT_IDS } from '../store/gameStateFactory';
 import { useGameStore } from '../store/useGameStore';
-import { formatLightYears } from '../utils/distance';
-import { formatCredits } from '../utils/money';
 
 export function SaveScreen() {
   const navigate = useNavigate();
@@ -14,7 +11,6 @@ export function SaveScreen() {
   const universe = useGameStore((state) => state.universe);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const [savedSlotId, setSavedSlotId] = useState<(typeof SAVE_SLOT_IDS)[number] | null>(null);
-  const currentCargo = cargoUsedTonnes(commander.cargo);
 
   return (
     <section className="screen">
@@ -41,14 +37,6 @@ export function SaveScreen() {
             <dd>{commander.name}</dd>
             <dt>System</dt>
             <dd>{commander.currentSystem}</dd>
-            <dt>Credits</dt>
-            <dd>{formatCredits(commander.cash)}</dd>
-            <dt>Fuel</dt>
-            <dd>{formatLightYears(commander.fuel)}</dd>
-            <dt>Cargo</dt>
-            <dd>
-              {currentCargo} / {commander.cargoCapacity} t
-            </dd>
             <dt>Stardate</dt>
             <dd>{universe.stardate}</dd>
           </dl>
@@ -57,7 +45,6 @@ export function SaveScreen() {
           const saveState = saveStates[slotId];
           const savedCommander = saveState?.snapshot.commander;
           const savedUniverse = saveState?.snapshot.universe;
-          const savedCargo = savedCommander ? cargoUsedTonnes(savedCommander.cargo) : 0;
 
           return (
             <section key={slotId} className="save-panel">
@@ -83,14 +70,6 @@ export function SaveScreen() {
                     <dd>{savedCommander.name}</dd>
                     <dt>System</dt>
                     <dd>{savedCommander.currentSystem}</dd>
-                    <dt>Credits</dt>
-                    <dd>{formatCredits(savedCommander.cash)}</dd>
-                    <dt>Fuel</dt>
-                    <dd>{formatLightYears(savedCommander.fuel)}</dd>
-                    <dt>Cargo</dt>
-                    <dd>
-                      {savedCargo} / {savedCommander.cargoCapacity} t
-                    </dd>
                     <dt>Stardate</dt>
                     <dd>{savedUniverse.stardate}</dd>
                   </dl>
