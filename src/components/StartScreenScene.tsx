@@ -8,18 +8,12 @@ import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travel
 
 const DEMO_SYSTEM_NAME = 'Lave';
 const DEMO_CAMERA_FOV_DEGREES = 36;
-const DEMO_STATION_RADIUS = 96;
-const DEMO_SAFE_ZONE_RADIUS = 240;
 const DEMO_STATION_SPIN_SPEED = 0.42;
-const DEMO_STATION_CAMERA_DISTANCE_FACTOR = 1.4;
 const DEMO_SHIP_CAMERA_DISTANCE_FACTOR = 0.07;
 const DEMO_STARFIELD_SPEED_X = 42;
-const DEMO_STATION_SHOWCASE_DURATION_SECONDS = 2.8;
-const DEMO_SHIP_SHOWCASE_DURATION_SECONDS = 2.1;
 const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
 const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
-const DEMO_STATION_LABEL = 'Coriolis Station';
 const SHOWCASE_BLUEPRINT_IDS: readonly BlueprintId[] = [
   'sidewinder',
   'mamba',
@@ -33,52 +27,30 @@ const SHOWCASE_BLUEPRINT_IDS: readonly BlueprintId[] = [
   'fer-de-lance'
 ] as const;
 
-type ShowcasePhase =
-  | { kind: 'station' }
-  | { kind: 'player' }
-  | { kind: 'enemy'; blueprintId: BlueprintId };
+const SHOWCASE_SHIP_IDS: readonly ('player' | BlueprintId)[] = ['player', ...SHOWCASE_BLUEPRINT_IDS] as const;
 
 export interface StartScreenSceneProps {
+  showcaseIndex: number;
   onShowcaseLabelChange: (label: string) => void;
   onSceneReady?: (ready: boolean) => void;
 }
+export const START_SCREEN_SHOWCASE_COUNT = SHOWCASE_SHIP_IDS.length;
 
-function getShowcasePhase(elapsedSeconds: number): ShowcasePhase {
-  const cycleDuration =
-    DEMO_STATION_SHOWCASE_DURATION_SECONDS + DEMO_SHIP_SHOWCASE_DURATION_SECONDS * (1 + SHOWCASE_BLUEPRINT_IDS.length);
-  const cycleSeconds = elapsedSeconds % cycleDuration;
-  if (cycleSeconds < DEMO_STATION_SHOWCASE_DURATION_SECONDS) {
-    return { kind: 'station' };
-  }
-
-  const shipCycleSeconds = cycleSeconds - DEMO_STATION_SHOWCASE_DURATION_SECONDS;
-  const shipSlotIndex = Math.floor(shipCycleSeconds / DEMO_SHIP_SHOWCASE_DURATION_SECONDS);
-  if (shipSlotIndex === 0) {
-    return { kind: 'player' };
-  }
-
-  return {
-    kind: 'enemy',
-    blueprintId: SHOWCASE_BLUEPRINT_IDS[(shipSlotIndex - 1) % SHOWCASE_BLUEPRINT_IDS.length]
-  };
-}
-
-function getShowcaseLabel(phase: ShowcasePhase): string {
-  if (phase.kind === 'station') {
-    return DEMO_STATION_LABEL;
-  }
-  if (phase.kind === 'player') {
+function getShowcaseLabel(showcaseShipId: 'player' | BlueprintId): string {
+  if (showcaseShipId === 'player') {
     return 'Cobra Mk III';
   }
-  if (phase.kind === 'enemy') {
-    return BLUEPRINTS[phase.blueprintId].label;
-  }
-  return '';
+  return BLUEPRINTS[showcaseShipId].label;
 }
 
-export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartScreenSceneProps) {
+export function StartScreenScene({ showcaseIndex, onShowcaseLabelChange, onSceneReady }: StartScreenSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLSpanElement | null>(null);
+  const showcaseIndexRef = useRef(showcaseIndex);
+
+  useEffect(() => {
+    showcaseIndexRef.current = showcaseIndex;
+  }, [showcaseIndex]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -114,12 +86,17 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
     let viewportWidth = 1;
     let viewportHeight = 1;
     let starfieldOffsetX = 0;
+    let dragAnchorX = 0;
+    let dragAnchorY = 0;
+    let showcaseAngleOffset = 0;
+    let activePointerId: number | null = null;
 
-    // The attract scene reuses the real travel renderer, but it keeps its own
-    // tiny self-contained choreography instead of stepping the real sim:
-    // station-only showcase, then one large ship at a time in a loop.
+    // The attract scene reuses the real travel renderer, but it keeps a frozen
+    // simulation state so only one hull is visible at a time and controls stay
+    // deterministic while the user browses ships manually.
     combatState.playerLasersActive = false;
     combatState.encounter.safeZone = true;
+    combatState.station = null;
 
     const resize = () => {
       viewportWidth = Math.max(1, viewport.clientWidth);
@@ -141,9 +118,9 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
       lastTimestamp = timestamp;
       elapsedSeconds += deltaSeconds;
       starfieldOffsetX += deltaSeconds * DEMO_STARFIELD_SPEED_X;
-      const showcaseAngle = elapsedSeconds * DEMO_STATION_SPIN_SPEED;
-      const showcasePhase = getShowcasePhase(elapsedSeconds);
-      const showcaseLabel = getShowcaseLabel(showcasePhase);
+      const showcaseShipId = SHOWCASE_SHIP_IDS[showcaseIndexRef.current % SHOWCASE_SHIP_IDS.length];
+      const showcaseAngle = elapsedSeconds * DEMO_STATION_SPIN_SPEED + showcaseAngleOffset;
+      const showcaseLabel = getShowcaseLabel(showcaseShipId);
 
       // The overlay label only needs to update when the carousel advances to a
       // new showcase target, so React avoids re-rendering every animation tick.
@@ -159,37 +136,20 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
       combatState.player.angle = 0;
       combatState.enemies.length = 0;
       enemyBankAngles.clear();
-
-      if (showcasePhase.kind === 'station') {
-        combatState.station = {
-          x: 0,
-          y: 0,
-          radius: DEMO_STATION_RADIUS,
-          angle: showcaseAngle,
-          rotSpeed: DEMO_STATION_SPIN_SPEED,
-          safeZoneRadius: DEMO_SAFE_ZONE_RADIUS
-        };
-      } else {
-        // Once the station phase ends, the preview becomes a pure ship
-        // carousel. The station is removed entirely so each hull owns the full
-        // frame without competing geometry behind it.
-        combatState.station = null;
-      }
-
-      if (showcasePhase.kind === 'player') {
+      if (showcaseShipId === 'player') {
         combatState.player.x = DEMO_PLAYER_SHOWCASE_DISTANCE;
         combatState.player.y = 0;
         combatState.player.angle = showcaseAngle;
       }
 
-      if (showcasePhase.kind === 'enemy') {
-        if (showcasedEnemyBlueprintId !== showcasePhase.blueprintId || showcasedEnemyId === null) {
-          showcasedEnemyBlueprintId = showcasePhase.blueprintId;
+      if (showcaseShipId !== 'player') {
+        if (showcasedEnemyBlueprintId !== showcaseShipId || showcasedEnemyId === null) {
+          showcasedEnemyBlueprintId = showcaseShipId;
           combatState.nextId += 1;
           showcasedEnemyId = combatState.nextId;
         }
 
-        const showcasedEnemy = spawnEnemyFromBlueprint(combatState, showcasePhase.blueprintId, createMathRandomSource(), {
+        const showcasedEnemy = spawnEnemyFromBlueprint(combatState, showcaseShipId, createMathRandomSource(), {
           id: showcasedEnemyId,
           x: DEMO_ENEMY_SHOWCASE_DISTANCE,
           y: 0,
@@ -208,11 +168,10 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
         showcasedEnemyId = null;
       }
 
-      // The station keeps the original distant "traffic camera" framing, while
-      // ships move much closer so each hull nearly fills the viewport on its
-      // own and reads like a hero render instead of a gameplay camera.
+      // The start screen keeps a close camera so every showcased hull reads as
+      // a large hero render instead of a distant gameplay object.
       const cameraDistance = getPerspectiveCameraDistance(viewportHeight, DEMO_CAMERA_FOV_DEGREES)
-        * (showcasePhase.kind === 'station' ? DEMO_STATION_CAMERA_DISTANCE_FACTOR : DEMO_SHIP_CAMERA_DISTANCE_FACTOR);
+        * DEMO_SHIP_CAMERA_DISTANCE_FACTOR;
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
@@ -221,7 +180,7 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
         showRadar: false,
         showSafeZoneRing: false,
         showTargetLock: false,
-        playerBankAngle: showcasePhase.kind === 'player' ? showcaseAngle : 0,
+        playerBankAngle: showcaseShipId === 'player' ? showcaseAngle : 0,
         enemyBankAngles,
         starfieldAnchor: {
           x: starfieldOffsetX,
@@ -248,9 +207,53 @@ export function StartScreenScene({ onShowcaseLabelChange, onSceneReady }: StartS
       animationFrameId = window.requestAnimationFrame(renderFrame);
     };
 
+    // Drag gestures can start in any direction. Horizontal and vertical deltas
+    // both contribute to the same bank angle so users can rotate the ship by
+    // swiping naturally with one finger.
+    const handlePointerDown = (event: PointerEvent) => {
+      if (activePointerId !== null) {
+        return;
+      }
+      activePointerId = event.pointerId;
+      dragAnchorX = event.clientX;
+      dragAnchorY = event.clientY;
+      viewport.setPointerCapture(event.pointerId);
+    };
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (event.pointerId !== activePointerId) {
+        return;
+      }
+      const deltaX = event.clientX - dragAnchorX;
+      const deltaY = event.clientY - dragAnchorY;
+      const rotationFromDrag = (deltaX - deltaY) * 0.008;
+      showcaseAngleOffset += rotationFromDrag;
+      dragAnchorX = event.clientX;
+      dragAnchorY = event.clientY;
+    };
+
+    const handlePointerEnd = (event: PointerEvent) => {
+      if (event.pointerId !== activePointerId) {
+        return;
+      }
+      if (viewport.hasPointerCapture(event.pointerId)) {
+        viewport.releasePointerCapture(event.pointerId);
+      }
+      activePointerId = null;
+    };
+
+    viewport.addEventListener('pointerdown', handlePointerDown);
+    viewport.addEventListener('pointermove', handlePointerMove);
+    viewport.addEventListener('pointerup', handlePointerEnd);
+    viewport.addEventListener('pointercancel', handlePointerEnd);
+
     animationFrameId = window.requestAnimationFrame(renderFrame);
 
     return () => {
+      viewport.removeEventListener('pointerdown', handlePointerDown);
+      viewport.removeEventListener('pointermove', handlePointerMove);
+      viewport.removeEventListener('pointerup', handlePointerEnd);
+      viewport.removeEventListener('pointercancel', handlePointerEnd);
       window.cancelAnimationFrame(animationFrameId);
       resizeObserver.disconnect();
       travelSceneRenderer.dispose();
