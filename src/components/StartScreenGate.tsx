@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 
 type FullscreenDocument = Document & {
@@ -14,6 +14,7 @@ type FullscreenElement = HTMLElement & {
 // The title shell must paint immediately because it is the game's first
 // visible screen, so only the heavier Three.js showcase loads lazily.
 const StartScreenScene = lazy(() => import('./StartScreenScene').then((module) => ({ default: module.StartScreenScene })));
+const START_SCREEN_SHOWCASE_COUNT_PROMISE = import('./StartScreenScene').then((module) => module.START_SCREEN_SHOWCASE_COUNT);
 
 function isMobilePlatform(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
@@ -62,6 +63,8 @@ export function StartScreenGate() {
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
   const [isSceneReady, setIsSceneReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
+  const [showcaseIndex, setShowcaseIndex] = useState(0);
+  const [showcaseCount, setShowcaseCount] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(() => {
     if (typeof document === 'undefined') {
       return false;
@@ -69,6 +72,18 @@ export function StartScreenGate() {
 
     return isDocumentFullscreen(document as FullscreenDocument);
   });
+
+  useEffect(() => {
+    let isCancelled = false;
+    START_SCREEN_SHOWCASE_COUNT_PROMISE.then((count) => {
+      if (!isCancelled) {
+        setShowcaseCount(Math.max(1, count));
+      }
+    });
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!mobilePlatform) {
@@ -111,37 +126,51 @@ export function StartScreenGate() {
       });
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Tab') {
-      return;
-    }
-    if (event.key !== ' ' && event.key !== 'Spacebar' && event.key !== 'Enter') {
-      return;
-    }
-
-    event.preventDefault();
-    handleContinue();
+  const handleShowcaseStep = (direction: -1 | 1) => {
+    // The gallery loops forever so users can cycle ships in either direction
+    // without hitting a hard edge or resetting the start screen.
+    setShowcaseIndex((prevIndex) => (prevIndex + direction + showcaseCount) % showcaseCount);
   };
 
   return (
     <div className="mobile-fullscreen-gate" role="presentation">
-      <div
-        role="button"
-        tabIndex={0}
-        className="mobile-fullscreen-gate__button"
-        onClick={handleContinue}
-        onKeyDown={handleKeyDown}
-        aria-label={mobilePlatform ? 'Press spacebar to start game in fullscreen' : 'Press spacebar to start game'}
-      >
+      <div className="mobile-fullscreen-gate__button">
         <span className="mobile-fullscreen-gate__frame">
           <span className="mobile-fullscreen-gate__title">DISO CODE</span>
           <Suspense fallback={<StartScreenSceneFallback />}>
-            <StartScreenScene onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsSceneReady} />
+            <StartScreenScene
+              showcaseIndex={showcaseIndex}
+              onShowcaseLabelChange={setShowcaseLabel}
+              onSceneReady={setIsSceneReady}
+            />
           </Suspense>
           <span className="mobile-fullscreen-gate__ship-label" aria-live="polite">
             {showcaseLabel}
           </span>
-          <span className="mobile-fullscreen-gate__prompt">{isSceneReady ? 'Press spacebar to start game' : ''}</span>
+          <button
+            type="button"
+            className="mobile-fullscreen-gate__nav mobile-fullscreen-gate__nav--prev"
+            onClick={() => handleShowcaseStep(-1)}
+            aria-label="Show previous ship"
+          >
+            Prev
+          </button>
+          <button
+            type="button"
+            className="mobile-fullscreen-gate__start"
+            onClick={handleContinue}
+            aria-label={mobilePlatform ? 'Start game in fullscreen' : 'Start game'}
+          >
+            {isSceneReady ? 'Start' : 'Loading...'}
+          </button>
+          <button
+            type="button"
+            className="mobile-fullscreen-gate__nav mobile-fullscreen-gate__nav--next"
+            onClick={() => handleShowcaseStep(1)}
+            aria-label="Show next ship"
+          >
+            Next
+          </button>
           <span className="mobile-fullscreen-gate__copyright">© Alexey Korepanov 2026</span>
         </span>
       </div>
