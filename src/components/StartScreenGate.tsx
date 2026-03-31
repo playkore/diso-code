@@ -49,12 +49,17 @@ export function StartScreenGate() {
   const isMenuVisible = useGameStore((state) => state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const startNewGame = useGameStore((state) => state.startNewGame);
+  const saveStates = useGameStore((state) => state.saveStates);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
-  const canContinue = hasPersistedDockedSession();
+  const hasResumeSession = hasPersistedDockedSession();
+  const hasManualSave = Object.keys(saveStates).length > 0;
+  const canContinue = hasResumeSession;
+  const canSave = hasResumeSession;
+  const canLoad = hasManualSave;
 
   useEffect(() => {
     let isCancelled = false;
@@ -151,18 +156,16 @@ export function StartScreenGate() {
             >
               New Game
             </button>
-            {canContinue ? (
-              <button
-                type="button"
-                className="start-menu__action"
-                onClick={() => {
-                  void launchIntoGame('continue');
-                }}
-                disabled={!isMenuReady || isLaunching}
-              >
-                Continue
-              </button>
-            ) : null}
+            <button
+              type="button"
+              className="start-menu__action"
+              onClick={() => {
+                void launchIntoGame('continue');
+              }}
+              disabled={!isMenuReady || isLaunching || !canContinue}
+            >
+              Continue
+            </button>
             <button
               type="button"
               className="start-menu__action"
@@ -170,6 +173,7 @@ export function StartScreenGate() {
                 closeMenu();
                 navigate('/save');
               }}
+              disabled={!isMenuReady || !canSave}
             >
               Save
             </button>
@@ -180,6 +184,7 @@ export function StartScreenGate() {
                 closeMenu();
                 navigate('/load');
               }}
+              disabled={!isMenuReady || !canLoad}
             >
               Load
             </button>

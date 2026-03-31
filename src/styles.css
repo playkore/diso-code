@@ -177,8 +177,9 @@ body {
 .start-menu__action:disabled:focus-visible {
   background: var(--cga-black);
   color: var(--cga-yellow);
-  opacity: 0.7;
-  cursor: wait;
+  opacity: 1;
+  cursor: default;
+  border-style: dashed;
 }
 
 .start-menu__ship-label {
