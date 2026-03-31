@@ -182,18 +182,53 @@ body {
   border-style: dashed;
 }
 
-.start-menu__ship-label {
+.start-menu__ship-nav {
   position: absolute;
   left: 50%;
   top: 7.5rem;
   z-index: 2;
+  display: inline-grid;
+  grid-template-columns: auto minmax(10rem, auto) auto;
+  align-items: center;
+  gap: 0.6rem;
   transform: translateX(-50%);
+}
+
+.start-menu__ship-label {
   color: var(--cga-yellow);
   font-size: clamp(0.9rem, 3.6vw, 1.1rem);
   line-height: 1;
   text-align: center;
   white-space: nowrap;
   pointer-events: none;
+}
+
+.start-menu__ship-nav-button {
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0;
+  border: 2px solid var(--cga-yellow);
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.start-menu__ship-nav-button:hover,
+.start-menu__ship-nav-button:focus-visible {
+  outline: none;
+  background: var(--cga-yellow);
+  color: var(--cga-black);
+}
+
+.start-menu__ship-nav-button:disabled,
+.start-menu__ship-nav-button:disabled:hover,
+.start-menu__ship-nav-button:disabled:focus-visible {
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  border-style: dashed;
 }
 
 .start-menu__settings {
@@ -245,7 +280,7 @@ body {
     top: 3.2rem;
   }
 
-  .start-menu__ship-label {
+  .start-menu__ship-nav {
     top: 8.3rem;
   }
 

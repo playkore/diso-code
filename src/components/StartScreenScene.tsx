@@ -5,6 +5,7 @@ import { spawnEnemyFromBlueprint } from '../domain/combat/spawn/spawnEnemy';
 import { BLUEPRINTS, createMathRandomSource, createTravelCombatState, type BlueprintId } from '../domain/travelCombat';
 import { createStars, TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travelSceneMath';
+import { START_SCREEN_SHOWCASE_COUNT, START_SCREEN_SHOWCASE_SHIP_IDS } from './startScreenShowcase';
 
 const DEMO_SYSTEM_NAME = 'Lave';
 const DEMO_CAMERA_FOV_DEGREES = 36;
@@ -14,27 +15,11 @@ const DEMO_STARFIELD_SPEED_X = 42;
 const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
 const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
-const SHOWCASE_BLUEPRINT_IDS: readonly BlueprintId[] = [
-  'sidewinder',
-  'mamba',
-  'krait',
-  'adder',
-  'gecko',
-  'cobra-mk1',
-  'cobra-mk3-pirate',
-  'asp-mk2',
-  'python-pirate',
-  'fer-de-lance'
-] as const;
-
-const SHOWCASE_SHIP_IDS: readonly ('player' | BlueprintId)[] = ['player', ...SHOWCASE_BLUEPRINT_IDS] as const;
-
 export interface StartScreenSceneProps {
   showcaseIndex: number;
   onShowcaseLabelChange: (label: string) => void;
   onSceneReady?: (ready: boolean) => void;
 }
-export const START_SCREEN_SHOWCASE_COUNT = SHOWCASE_SHIP_IDS.length;
 
 function getShowcaseLabel(showcaseShipId: 'player' | BlueprintId): string {
   if (showcaseShipId === 'player') {
@@ -118,7 +103,7 @@ export function StartScreenScene({ showcaseIndex, onShowcaseLabelChange, onScene
       lastTimestamp = timestamp;
       elapsedSeconds += deltaSeconds;
       starfieldOffsetX += deltaSeconds * DEMO_STARFIELD_SPEED_X;
-      const showcaseShipId = SHOWCASE_SHIP_IDS[showcaseIndexRef.current % SHOWCASE_SHIP_IDS.length];
+      const showcaseShipId = START_SCREEN_SHOWCASE_SHIP_IDS[showcaseIndexRef.current % START_SCREEN_SHOWCASE_COUNT];
       const showcaseAngle = elapsedSeconds * DEMO_STATION_SPIN_SPEED + showcaseAngleOffset;
       const showcaseLabel = getShowcaseLabel(showcaseShipId);
 

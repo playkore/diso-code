@@ -9,6 +9,7 @@ import {
 } from '../store/gameStateFactory';
 import { useGameStore } from '../store/useGameStore';
 import { getStartMenuAudio, pauseStartMenuAudio, playStartMenuAudio } from './startMenuAudio';
+import { START_SCREEN_SHOWCASE_COUNT } from './startScreenShowcase';
 
 type FullscreenElement = HTMLElement & {
   requestFullscreen?: () => Promise<void>;
@@ -52,6 +53,7 @@ export function StartScreenGate() {
   const saveStates = useGameStore((state) => state.saveStates);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
+  const [showcaseIndex, setShowcaseIndex] = useState(0);
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
@@ -107,6 +109,13 @@ export function StartScreenGate() {
     setStartScreenVisible(false);
   };
 
+  const stepShowcase = (delta: number) => {
+    setShowcaseIndex((current) => {
+      const next = current + delta;
+      return (next % START_SCREEN_SHOWCASE_COUNT + START_SCREEN_SHOWCASE_COUNT) % START_SCREEN_SHOWCASE_COUNT;
+    });
+  };
+
   const launchIntoGame = async (mode: 'continue' | 'new-game') => {
     if (!isMenuReady || isLaunching) {
       return;
@@ -141,11 +150,31 @@ export function StartScreenGate() {
         <span className="start-menu__frame">
           <span className="start-menu__title">DISO CODE</span>
           <Suspense fallback={<StartScreenSceneFallback />}>
-            <StartScreenScene showcaseIndex={0} onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsMenuReady} />
+            <StartScreenScene showcaseIndex={showcaseIndex} onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsMenuReady} />
           </Suspense>
-          <span className="start-menu__ship-label" aria-live="polite">
-            {showcaseLabel}
-          </span>
+          <div className="start-menu__ship-nav" aria-label="Ship showcase controls">
+            <button
+              type="button"
+              className="start-menu__ship-nav-button"
+              onClick={() => stepShowcase(-1)}
+              disabled={!isMenuReady}
+              aria-label="Previous ship"
+            >
+              &lt;
+            </button>
+            <span className="start-menu__ship-label" aria-live="polite">
+              {showcaseLabel}
+            </span>
+            <button
+              type="button"
+              className="start-menu__ship-nav-button"
+              onClick={() => stepShowcase(1)}
+              disabled={!isMenuReady}
+              aria-label="Next ship"
+            >
+              &gt;
+            </button>
+          </div>
           <div className="start-menu__controls">
             <button
               type="button"
