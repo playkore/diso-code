@@ -30,6 +30,8 @@ body {
   min-height: 100vh;
   display: grid;
   place-items: center;
+  align-content: center;
+  gap: 1rem;
   padding: 1rem;
   background: var(--cga-black);
 }
@@ -41,6 +43,23 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   text-align: center;
+}
+
+.start-loader__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--cga-yellow);
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.start-loader__toggle input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--cga-yellow);
 }
 
 .start-menu {
