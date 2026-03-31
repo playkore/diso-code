@@ -702,7 +702,7 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgba(0, 0, 0, 0.92);
+  background: transparent;
   z-index: 20;
 }
 
