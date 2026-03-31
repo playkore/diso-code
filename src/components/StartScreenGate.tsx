@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useGameStore } from '../store/useGameStore';
 
 type FullscreenDocument = Document & {
@@ -56,10 +56,13 @@ function StartScreenSceneFallback() {
   );
 }
 
+const START_SCREEN_MUSIC_PATH = '/music/intro.mp3';
+
 export function StartScreenGate() {
   const isDismissed = useGameStore((state) => !state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
+  const musicRef = useRef<HTMLAudioElement | null>(null);
   const [isSceneReady, setIsSceneReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => {
@@ -89,11 +92,59 @@ export function StartScreenGate() {
     };
   }, [mobilePlatform]);
 
+  useEffect(() => {
+    if (isDismissed || typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const music = new Audio(START_SCREEN_MUSIC_PATH);
+    musicRef.current = music;
+    music.loop = true;
+    music.preload = 'auto';
+
+    // Browsers may block autoplay until the first trusted gesture, so the gate
+    // tries immediately and then retries once the player taps or presses a key.
+    let interactionUnlockAttached = false;
+
+    const tryPlayMusic = () => {
+      void music.play().catch(() => {
+        // The retry path below handles browsers that require interaction.
+      });
+    };
+
+    const handleInteractionUnlock = () => {
+      tryPlayMusic();
+      window.removeEventListener('pointerdown', handleInteractionUnlock);
+      window.removeEventListener('keydown', handleInteractionUnlock);
+    };
+
+    tryPlayMusic();
+    window.addEventListener('pointerdown', handleInteractionUnlock);
+    window.addEventListener('keydown', handleInteractionUnlock);
+    interactionUnlockAttached = true;
+
+    return () => {
+      if (interactionUnlockAttached) {
+        window.removeEventListener('pointerdown', handleInteractionUnlock);
+        window.removeEventListener('keydown', handleInteractionUnlock);
+      }
+      music.pause();
+      music.currentTime = 0;
+      musicRef.current = null;
+    };
+  }, [isDismissed]);
+
   if (isDismissed) {
     return null;
   }
 
   const handleContinue = () => {
+    const music = musicRef.current;
+    if (music) {
+      music.pause();
+      music.currentTime = 0;
+    }
+
     if (!mobilePlatform || isFullscreen) {
       setStartScreenVisible(false);
       return;
