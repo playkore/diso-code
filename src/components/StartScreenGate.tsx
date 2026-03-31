@@ -206,13 +206,6 @@ export function StartScreenGate() {
               <span>Full Screen</span>
             </label>
           </div>
-          <span className="start-menu__status">
-            {isMenuReady
-              ? mobilePlatform && fullscreenEnabled
-                ? 'Start actions open the game in fullscreen on mobile.'
-                : 'Start actions open the game without fullscreen.'
-              : 'Loading start menu...'}
-          </span>
           <span className="start-menu__copyright">© Alexey Korepanov 2026</span>
         </span>
       </div>

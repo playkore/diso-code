@@ -222,20 +222,6 @@ body {
   accent-color: var(--cga-yellow);
 }
 
-.start-menu__status {
-  position: absolute;
-  left: 50%;
-  bottom: 11.6rem;
-  z-index: 2;
-  transform: translateX(-50%);
-  max-width: min(24rem, calc(100vw - 5rem));
-  color: var(--cga-yellow);
-  font-size: clamp(0.82rem, 3vw, 0.95rem);
-  line-height: 1.3;
-  text-align: center;
-  pointer-events: none;
-}
-
 .start-menu__copyright {
   position: absolute;
   left: 50%;
@@ -264,10 +250,6 @@ body {
 
   .start-menu__controls {
     bottom: 7.6rem;
-  }
-
-  .start-menu__status {
-    bottom: 12.1rem;
   }
 }
 
