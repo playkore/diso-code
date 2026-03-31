@@ -47,20 +47,18 @@ export function SaveScreen() {
           const savedUniverse = saveState?.snapshot.universe;
 
           return (
-            <section key={slotId} className="save-panel">
+            <button
+              key={slotId}
+              type="button"
+              className="save-panel save-slot-button"
+              onClick={() => {
+                saveToSlot(slotId);
+                setSavedSlotId(slotId);
+              }}
+            >
               <div className="save-slot__header">
                 <p className="dialog-kicker">Slot {slotId}</p>
-                <div className="save-slot__actions save-slot__actions--single">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      saveToSlot(slotId);
-                      setSavedSlotId(slotId);
-                    }}
-                  >
-                    Save
-                  </button>
-                </div>
+                <p className="save-slot__cta">Save</p>
               </div>
               {savedCommander && savedUniverse ? (
                 <>
@@ -77,7 +75,7 @@ export function SaveScreen() {
               ) : (
                 <p className="muted">Empty slot.</p>
               )}
-            </section>
+            </button>
           );
         })}
       </div>

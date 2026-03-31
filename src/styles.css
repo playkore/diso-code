@@ -590,6 +590,31 @@ main {
   background: #000;
 }
 
+.save-slot-button {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  text-align: left;
+}
+
+.save-slot-button:hover,
+.save-slot-button:focus-visible {
+  outline: none;
+  background: var(--cga-yellow);
+  color: var(--cga-black);
+}
+
+.save-slot-button:hover .dialog-kicker,
+.save-slot-button:hover .muted,
+.save-slot-button:hover .detail-grid dt,
+.save-slot-button:hover .detail-grid dd,
+.save-slot-button:focus-visible .dialog-kicker,
+.save-slot-button:focus-visible .muted,
+.save-slot-button:focus-visible .detail-grid dt,
+.save-slot-button:focus-visible .detail-grid dd {
+  color: var(--cga-black);
+}
+
 .save-panel__actions {
   margin-top: 0.9rem;
   padding-top: 0.9rem;
@@ -646,6 +671,19 @@ main {
   align-items: start;
 }
 
+.save-slot__cta {
+  margin: 0;
+  color: var(--cga-yellow);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.save-slot-button:hover .save-slot__cta,
+.save-slot-button:focus-visible .save-slot__cta {
+  color: var(--cga-black);
+}
+
 .save-slot__actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -673,7 +711,8 @@ button {
 }
 
 button:disabled {
-  opacity: 0.45;
+  opacity: 1;
+  border-style: dashed;
 }
 
 .button-danger {

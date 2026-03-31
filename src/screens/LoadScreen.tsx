@@ -33,14 +33,16 @@ export function LoadScreen() {
           const savedUniverse = saveState?.snapshot.universe;
 
           return (
-            <section key={slotId} className="save-panel">
+            <button
+              key={slotId}
+              type="button"
+              className="save-panel save-slot-button"
+              onClick={() => setPendingLoadSlotId(slotId)}
+              disabled={!saveState}
+            >
               <div className="save-slot__header">
                 <p className="dialog-kicker">Slot {slotId}</p>
-                <div className="save-slot__actions save-slot__actions--single">
-                  <button type="button" onClick={() => setPendingLoadSlotId(slotId)} disabled={!saveState}>
-                    Load
-                  </button>
-                </div>
+                <p className="save-slot__cta">Load</p>
               </div>
               {savedCommander && savedUniverse ? (
                 <>
@@ -57,7 +59,7 @@ export function LoadScreen() {
               ) : (
                 <p className="muted">Empty slot.</p>
               )}
-            </section>
+            </button>
           );
         })}
       </div>
