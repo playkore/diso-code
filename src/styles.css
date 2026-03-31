@@ -150,50 +150,87 @@ body {
   pointer-events: none;
 }
 
-.mobile-fullscreen-gate__start,
-.mobile-fullscreen-gate__nav {
-  position: absolute;
-  z-index: 3;
-  min-width: 4.8rem;
-  min-height: 2.2rem;
+.start-bootstrap {
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: grid;
+  place-items: center;
+  padding: 0.75rem;
+  background: var(--cga-black);
+}
+
+.start-bootstrap__panel {
+  width: min(100%, 28rem);
+  display: grid;
+  gap: 1rem;
+  padding: 1.4rem 1.2rem;
+  border: 2px solid var(--cga-yellow);
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.start-bootstrap__title {
+  color: var(--cga-green);
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1;
+}
+
+.start-bootstrap__status {
+  justify-self: center;
+  max-width: 22rem;
+  font-size: clamp(0.85rem, 3.5vw, 1rem);
+  line-height: 1.35;
+}
+
+.start-bootstrap__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+}
+
+.start-bootstrap__toggle input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--cga-yellow);
+}
+
+.start-bootstrap__action {
+  justify-self: center;
+  min-width: 8rem;
+  min-height: 2.4rem;
+  padding: 0.55rem 1.2rem;
   border: 2px solid var(--cga-yellow);
   border-radius: 0;
   background: var(--cga-black);
   color: var(--cga-yellow);
   font-family: inherit;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.mobile-fullscreen-gate__start {
-  left: 50%;
-  bottom: 5.1rem;
-  transform: translateX(-50%);
-  padding: 0.5rem 1.1rem;
-}
-
-.mobile-fullscreen-gate__nav {
-  bottom: 5.1rem;
-  padding: 0.5rem 0.8rem;
-}
-
-.mobile-fullscreen-gate__nav--prev {
-  left: 1.2rem;
-}
-
-.mobile-fullscreen-gate__nav--next {
-  right: 1.2rem;
-}
-
-.mobile-fullscreen-gate__start:hover,
-.mobile-fullscreen-gate__start:focus-visible,
-.mobile-fullscreen-gate__nav:hover,
-.mobile-fullscreen-gate__nav:focus-visible {
+.start-bootstrap__action:hover,
+.start-bootstrap__action:focus-visible {
   outline: none;
   background: var(--cga-yellow);
   color: var(--cga-black);
+}
+
+.start-bootstrap__action:disabled,
+.start-bootstrap__action:disabled:hover,
+.start-bootstrap__action:disabled:focus-visible {
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  opacity: 0.7;
+  cursor: wait;
 }
 
 @media (min-width: 768px) {
@@ -211,15 +248,6 @@ body {
 
   .mobile-fullscreen-gate__prompt {
     bottom: 6.1rem;
-  }
-
-  .mobile-fullscreen-gate__copyright {
-    bottom: 2.2rem;
-  }
-
-  .mobile-fullscreen-gate__start,
-  .mobile-fullscreen-gate__nav {
-    bottom: 5.7rem;
   }
 }
 

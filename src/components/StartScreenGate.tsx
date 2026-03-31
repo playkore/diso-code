@@ -1,9 +1,8 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useGameStore } from '../store/useGameStore';
 
 type FullscreenDocument = Document & {
   webkitFullscreenElement?: Element | null;
-  webkitExitFullscreen?: () => Promise<void> | void;
 };
 
 type FullscreenElement = HTMLElement & {
@@ -14,7 +13,8 @@ type FullscreenElement = HTMLElement & {
 // The title shell must paint immediately because it is the game's first
 // visible screen, so only the heavier Three.js showcase loads lazily.
 const StartScreenScene = lazy(() => import('./StartScreenScene').then((module) => ({ default: module.StartScreenScene })));
-const START_SCREEN_SHOWCASE_COUNT_PROMISE = import('./StartScreenScene').then((module) => module.START_SCREEN_SHOWCASE_COUNT);
+const START_SCREEN_SCENE_PROMISE = import('./StartScreenScene');
+const START_SCREEN_MUSIC_PATH = '/music/intro.mp3';
 
 function isMobilePlatform(): boolean {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
@@ -27,8 +27,8 @@ function isMobilePlatform(): boolean {
   const isTouchMac = navigator.platform === 'MacIntel' && touches > 1;
   const prefersCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
-  // The gate is limited to mobile-class devices where browser chrome tends to
-  // consume a meaningful part of the viewport and immersive mode matters.
+  // Fullscreen is only worth requesting on phone-class devices where browser
+  // chrome steals a meaningful slice of the already small viewport.
   return isMobileAgent || (isTouchMac && prefersCoarsePointer);
 }
 
@@ -36,17 +36,20 @@ function isDocumentFullscreen(doc: FullscreenDocument): boolean {
   return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
 }
 
-async function requestDocumentFullscreen(): Promise<void> {
+async function requestDocumentFullscreen(): Promise<boolean> {
   const root = document.documentElement as FullscreenElement;
 
   if (root.requestFullscreen) {
     await root.requestFullscreen();
-    return;
+    return true;
   }
 
   if (root.webkitRequestFullscreen) {
     await root.webkitRequestFullscreen();
+    return true;
   }
+
+  return false;
 }
 
 function StartScreenSceneFallback() {
@@ -57,32 +60,42 @@ function StartScreenSceneFallback() {
   );
 }
 
-const START_SCREEN_MUSIC_PATH = '/music/intro.mp3';
-
 export function StartScreenGate() {
-  const isDismissed = useGameStore((state) => !state.ui.startScreenVisible);
+  const isGateVisible = useGameStore((state) => state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
   const musicRef = useRef<HTMLAudioElement | null>(null);
-  const [isSceneReady, setIsSceneReady] = useState(false);
+  const hasCompletedBootstrapRef = useRef(false);
+  const [isBootstrapVisible, setIsBootstrapVisible] = useState(true);
+  const [showResumeBootstrap, setShowResumeBootstrap] = useState(false);
+  const [isBootstrapReady, setIsBootstrapReady] = useState(false);
+  const [isBootstrapStarting, setIsBootstrapStarting] = useState(false);
+  const [isGateSceneReady, setIsGateSceneReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
-  const [showcaseIndex, setShowcaseIndex] = useState(0);
-  const [showcaseCount, setShowcaseCount] = useState(1);
-  const [isFullscreen, setIsFullscreen] = useState(() => {
-    if (typeof document === 'undefined') {
-      return false;
-    }
+  const [musicEnabled, setMusicEnabled] = useState(true);
 
-    return isDocumentFullscreen(document as FullscreenDocument);
-  });
+  useEffect(() => {
+    const music = new Audio(START_SCREEN_MUSIC_PATH);
+    music.loop = true;
+    music.preload = 'auto';
+    musicRef.current = music;
+
+    return () => {
+      music.pause();
+      music.currentTime = 0;
+      musicRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let isCancelled = false;
-    START_SCREEN_SHOWCASE_COUNT_PROMISE.then((count) => {
+
+    START_SCREEN_SCENE_PROMISE.then(() => {
       if (!isCancelled) {
-        setShowcaseCount(Math.max(1, count));
+        setIsBootstrapReady(true);
       }
     });
+
     return () => {
       isCancelled = true;
     };
@@ -93,138 +106,151 @@ export function StartScreenGate() {
       return undefined;
     }
 
-    const syncFullscreenState = () => {
-      setIsFullscreen(isDocumentFullscreen(document as FullscreenDocument));
+    const handleFullscreenChange = () => {
+      // Once the initial bootstrap has completed, dropping out of fullscreen
+      // should always route the user back through the lightweight entry screen
+      // before they resume the title gate or live game in windowed mode.
+      if (!isDocumentFullscreen(document as FullscreenDocument) && hasCompletedBootstrapRef.current) {
+        const music = musicRef.current;
+        if (music) {
+          music.pause();
+          music.currentTime = 0;
+        }
+        setShowResumeBootstrap(true);
+        setIsBootstrapVisible(true);
+      }
     };
 
-    syncFullscreenState();
-    document.addEventListener('fullscreenchange', syncFullscreenState);
-    document.addEventListener('webkitfullscreenchange', syncFullscreenState as EventListener);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
 
     return () => {
-      document.removeEventListener('fullscreenchange', syncFullscreenState);
-      document.removeEventListener('webkitfullscreenchange', syncFullscreenState as EventListener);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
     };
   }, [mobilePlatform]);
 
   useEffect(() => {
-    if (isDismissed || typeof window === 'undefined') {
-      return undefined;
+    // The intro track only belongs to the title flow. Any return to the live
+    // game or to the bootstrap overlay should leave the app silent.
+    if (isBootstrapVisible || !isGateVisible) {
+      const music = musicRef.current;
+      if (music) {
+        music.pause();
+        music.currentTime = 0;
+      }
+    }
+  }, [isBootstrapVisible, isGateVisible]);
+
+  const handleBootstrapContinue = async () => {
+    if (!isBootstrapReady || isBootstrapStarting) {
+      return;
     }
 
-    const music = new Audio(START_SCREEN_MUSIC_PATH);
-    musicRef.current = music;
-    music.loop = true;
-    music.preload = 'auto';
+    setIsBootstrapStarting(true);
 
-    // Browsers may block autoplay until the first trusted gesture, so the gate
-    // tries immediately and then retries once the player taps or presses a key.
-    let interactionUnlockAttached = false;
-
-    const tryPlayMusic = () => {
-      void music.play().catch(() => {
-        // The retry path below handles browsers that require interaction.
-      });
-    };
-
-    const handleInteractionUnlock = () => {
-      tryPlayMusic();
-      window.removeEventListener('pointerdown', handleInteractionUnlock);
-      window.removeEventListener('keydown', handleInteractionUnlock);
-    };
-
-    tryPlayMusic();
-    window.addEventListener('pointerdown', handleInteractionUnlock);
-    window.addEventListener('keydown', handleInteractionUnlock);
-    interactionUnlockAttached = true;
-
-    return () => {
-      if (interactionUnlockAttached) {
-        window.removeEventListener('pointerdown', handleInteractionUnlock);
-        window.removeEventListener('keydown', handleInteractionUnlock);
+    const shouldRequestFullscreen = mobilePlatform;
+    if (shouldRequestFullscreen) {
+      const enteredFullscreen = await requestDocumentFullscreen().catch(() => false);
+      if (!enteredFullscreen) {
+        setIsBootstrapStarting(false);
+        return;
       }
-      music.pause();
-      music.currentTime = 0;
-      musicRef.current = null;
-    };
-  }, [isDismissed]);
+    }
 
-  if (isDismissed) {
-    return null;
-  }
+    hasCompletedBootstrapRef.current = true;
+    setIsBootstrapVisible(false);
 
-  const handleContinue = () => {
+    if (musicEnabled && isGateVisible) {
+      const music = musicRef.current;
+      if (music) {
+        void music.play().catch(() => {
+          // Playback failure should not trap the user on the bootstrap screen
+          // once the gate has been loaded and their tap already happened.
+        });
+      }
+    }
+
+    setIsBootstrapStarting(false);
+  };
+
+  const handleGateDismiss = () => {
     const music = musicRef.current;
     if (music) {
       music.pause();
       music.currentTime = 0;
     }
+    setStartScreenVisible(false);
+  };
 
-    if (!mobilePlatform || isFullscreen) {
-      setStartScreenVisible(false);
+  const handleGateKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Tab') {
+      return;
+    }
+    if (event.key !== ' ' && event.key !== 'Spacebar' && event.key !== 'Enter') {
       return;
     }
 
-    // Browsers require fullscreen requests to originate from a direct user
-    // gesture, so the title overlay owns the hand-off into the game on touch
-    // devices. Desktop skips fullscreen and simply dismisses the attract mode.
-    requestDocumentFullscreen()
-      .catch(() => {
-        setIsFullscreen(isDocumentFullscreen(document as FullscreenDocument));
-      })
-      .finally(() => {
-        setStartScreenVisible(false);
-      });
+    event.preventDefault();
+    handleGateDismiss();
   };
 
-  const handleShowcaseStep = (direction: -1 | 1) => {
-    // The gallery loops forever so users can cycle ships in either direction
-    // without hitting a hard edge or resetting the start screen.
-    setShowcaseIndex((prevIndex) => (prevIndex + direction + showcaseCount) % showcaseCount);
-  };
+  const bootstrapButtonLabel = isBootstrapReady ? (showResumeBootstrap ? 'Continue' : 'Start') : 'Loading...';
+  const bootstrapHint = showResumeBootstrap
+    ? 'Fullscreen was closed. Continue returns to fullscreen on mobile.'
+    : mobilePlatform
+      ? 'Loading the hangar. Start opens the gate and enters fullscreen on mobile.'
+      : 'Loading the hangar. Start opens the gate in windowed mode.';
 
   return (
-    <div className="mobile-fullscreen-gate" role="presentation">
-      <div className="mobile-fullscreen-gate__button">
-        <span className="mobile-fullscreen-gate__frame">
-          <span className="mobile-fullscreen-gate__title">DISO CODE</span>
-          <Suspense fallback={<StartScreenSceneFallback />}>
-            <StartScreenScene
-              showcaseIndex={showcaseIndex}
-              onShowcaseLabelChange={setShowcaseLabel}
-              onSceneReady={setIsSceneReady}
-            />
-          </Suspense>
-          <span className="mobile-fullscreen-gate__ship-label" aria-live="polite">
-            {showcaseLabel}
-          </span>
-          <button
-            type="button"
-            className="mobile-fullscreen-gate__nav mobile-fullscreen-gate__nav--prev"
-            onClick={() => handleShowcaseStep(-1)}
-            aria-label="Show previous ship"
+    <>
+      {isGateVisible && !isBootstrapVisible ? (
+        <div className="mobile-fullscreen-gate" role="presentation">
+          <div
+            role="button"
+            tabIndex={0}
+            className="mobile-fullscreen-gate__button"
+            onClick={handleGateDismiss}
+            onKeyDown={handleGateKeyDown}
+            aria-label="Press spacebar to start game"
           >
-            Prev
-          </button>
-          <button
-            type="button"
-            className="mobile-fullscreen-gate__start"
-            onClick={handleContinue}
-            aria-label={mobilePlatform ? 'Start game in fullscreen' : 'Start game'}
-          >
-            {isSceneReady ? 'Start' : 'Loading...'}
-          </button>
-          <button
-            type="button"
-            className="mobile-fullscreen-gate__nav mobile-fullscreen-gate__nav--next"
-            onClick={() => handleShowcaseStep(1)}
-            aria-label="Show next ship"
-          >
-            Next
-          </button>
-          <span className="mobile-fullscreen-gate__copyright">© Alexey Korepanov 2026</span>
-        </span>
-      </div>
-    </div>
+            <span className="mobile-fullscreen-gate__frame">
+              <span className="mobile-fullscreen-gate__title">DISO CODE</span>
+              <Suspense fallback={<StartScreenSceneFallback />}>
+                <StartScreenScene showcaseIndex={0} onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsGateSceneReady} />
+              </Suspense>
+              <span className="mobile-fullscreen-gate__ship-label" aria-live="polite">
+                {showcaseLabel}
+              </span>
+              <span className="mobile-fullscreen-gate__prompt">{isGateSceneReady ? 'Press spacebar to start game' : ''}</span>
+              <span className="mobile-fullscreen-gate__copyright">© Alexey Korepanov 2026</span>
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {isBootstrapVisible ? (
+        <div className="start-bootstrap" role="presentation">
+          <div className="start-bootstrap__panel">
+            <span className="start-bootstrap__title">DISO CODE</span>
+            <span className="start-bootstrap__status">{bootstrapHint}</span>
+            <label className="start-bootstrap__toggle">
+              <input type="checkbox" checked={musicEnabled} onChange={(event) => setMusicEnabled(event.target.checked)} />
+              <span>Play music on gate screen</span>
+            </label>
+            <button
+              type="button"
+              className="start-bootstrap__action"
+              onClick={() => {
+                void handleBootstrapContinue();
+              }}
+              disabled={!isBootstrapReady || isBootstrapStarting}
+            >
+              {bootstrapButtonLabel}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
