@@ -262,9 +262,9 @@ export function StartScreenScene({ showcaseIndex, onShowcaseLabelChange, onScene
   }, [onSceneReady, onShowcaseLabelChange]);
 
   return (
-    <span className="mobile-fullscreen-gate__scene" ref={viewportRef} aria-hidden="true">
-      <canvas ref={canvasRef} className="mobile-fullscreen-gate__scene-canvas" />
-      <span className="mobile-fullscreen-gate__scene-overlay" />
+    <span className="start-menu__scene" ref={viewportRef} aria-hidden="true">
+      <canvas ref={canvasRef} className="start-menu__scene-canvas" />
+      <span className="start-menu__scene-overlay" />
     </span>
   );
 }

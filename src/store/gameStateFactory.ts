@@ -35,6 +35,8 @@ export const DOCKED_SESSION_STORAGE_KEY = 'diso-code:docked-session';
 interface PersistedSettings {
   instantTravelEnabled?: boolean;
   showTravelPerfOverlay?: boolean;
+  startMenuMusicEnabled?: boolean;
+  startMenuFullscreenEnabled?: boolean;
 }
 
 interface PersistedDockedSession {
@@ -412,6 +414,69 @@ export function loadTravelPerfOverlayEnabled(): boolean {
  */
 export function persistTravelPerfOverlayEnabled(enabled: boolean) {
   persistSettings({ showTravelPerfOverlay: enabled });
+}
+
+/**
+ * Reads the start-menu music preference from local storage.
+ */
+export function loadStartMenuMusicEnabled(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return true;
+  }
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return true;
+    }
+    const parsed = JSON.parse(raw) as PersistedSettings;
+    return parsed.startMenuMusicEnabled ?? true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Persists the start-menu music preference.
+ */
+export function persistStartMenuMusicEnabled(enabled: boolean) {
+  persistSettings({ startMenuMusicEnabled: enabled });
+}
+
+/**
+ * Reads the start-menu fullscreen preference from local storage.
+ */
+export function loadStartMenuFullscreenEnabled(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return true;
+  }
+  try {
+    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) {
+      return true;
+    }
+    const parsed = JSON.parse(raw) as PersistedSettings;
+    return parsed.startMenuFullscreenEnabled ?? true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Persists the start-menu fullscreen preference.
+ */
+export function persistStartMenuFullscreenEnabled(enabled: boolean) {
+  persistSettings({ startMenuFullscreenEnabled: enabled });
+}
+
+/**
+ * Checks whether browser storage already contains a docked run that can be
+ * resumed from the start menu without going through a manual slot load.
+ */
+export function hasPersistedDockedSession(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return false;
+  }
+  return Boolean(window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY));
 }
 
 /**

@@ -1,14 +1,24 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../appRoutes';
 import { totalCargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
 import { formatCredits } from '../utils/money';
+import { StartScreenGate } from './StartScreenGate';
+import { StartScreenLoader } from './StartScreenLoader';
 
 function NavIcon({ children }: { children: ReactNode }) {
   return (
     <svg className="tab-link__icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
+      {children}
+    </svg>
+  );
+}
+
+function UtilityIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg className="app-shell__utility-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
       {children}
     </svg>
   );
@@ -104,9 +114,11 @@ export function AppShell() {
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
+  const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
   const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
+  const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
 
   if (isTravelRoute) {
     // Travel owns its own full-screen chrome, so the shell strips everything
@@ -120,8 +132,13 @@ export function AppShell() {
     );
   }
 
+  if (startScreenVisible && !hasEnteredStartMenu) {
+    return <StartScreenLoader onContinue={() => setHasEnteredStartMenu(true)} />;
+  }
+
   return (
     <div className="app-shell">
+      <StartScreenGate />
       <header>
         {/* The header surfaces docked-state information only. Travel HUD data is
             rendered by the travel screen itself to avoid duplicated status bars. */}
@@ -145,7 +162,20 @@ export function AppShell() {
           {/* Save/load remains accessible while no longer pretending to be a
               canonical station mode in the primary navigation strip. */}
           <Link className="app-shell__utility-link" to="/save-load" aria-label="Open save and load utilities" title="Save / Load">
-            SAVE
+            <UtilityIcon>
+              {/* The header shortcut now reads as a general menu/settings entry
+                  point rather than a verb-only save action. */}
+              <circle cx="12" cy="12" r="2.4" />
+              <path d="M12 3.8v2.1" />
+              <path d="M12 18.1v2.1" />
+              <path d="M4.8 12h2.1" />
+              <path d="M17.1 12h2.1" />
+              <path d="M6.7 6.7l1.5 1.5" />
+              <path d="M15.8 15.8l1.5 1.5" />
+              <path d="M17.3 6.7l-1.5 1.5" />
+              <path d="M8.2 15.8l-1.5 1.5" />
+            </UtilityIcon>
+            <span className="sr-only">Save / Load</span>
           </Link>
         </div>
         {latestUiEvent ? (

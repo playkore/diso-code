@@ -1,17 +1,21 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  hasPersistedDockedSession,
+  loadStartMenuFullscreenEnabled,
+  loadStartMenuMusicEnabled,
+  persistStartMenuFullscreenEnabled,
+  persistStartMenuMusicEnabled
+} from '../store/gameStateFactory';
 import { useGameStore } from '../store/useGameStore';
-
-type FullscreenDocument = Document & {
-  webkitFullscreenElement?: Element | null;
-};
 
 type FullscreenElement = HTMLElement & {
   requestFullscreen?: () => Promise<void>;
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
-// The title shell must paint immediately because it is the game's first
-// visible screen, so only the heavier Three.js showcase loads lazily.
+// The start menu should appear immediately, so only the decorative scene stays
+// behind a lazy boundary while the menu controls render synchronously.
 const StartScreenScene = lazy(() => import('./StartScreenScene').then((module) => ({ default: module.StartScreenScene })));
 const START_SCREEN_SCENE_PROMISE = import('./StartScreenScene');
 const START_SCREEN_MUSIC_PATH = '/music/intro.mp3';
@@ -27,13 +31,9 @@ function isMobilePlatform(): boolean {
   const isTouchMac = navigator.platform === 'MacIntel' && touches > 1;
   const prefersCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
-  // Fullscreen is only worth requesting on phone-class devices where browser
-  // chrome steals a meaningful slice of the already small viewport.
+  // Fullscreen only matters on phone-sized devices where browser chrome takes
+  // enough space to hurt the in-game viewport.
   return isMobileAgent || (isTouchMac && prefersCoarsePointer);
-}
-
-function isDocumentFullscreen(doc: FullscreenDocument): boolean {
-  return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
 }
 
 async function requestDocumentFullscreen(): Promise<boolean> {
@@ -54,25 +54,26 @@ async function requestDocumentFullscreen(): Promise<boolean> {
 
 function StartScreenSceneFallback() {
   return (
-    <span className="mobile-fullscreen-gate__scene mobile-fullscreen-gate__scene--fallback" aria-hidden="true">
-      <span className="mobile-fullscreen-gate__scene-overlay" />
+    <span className="start-menu__scene start-menu__scene--fallback" aria-hidden="true">
+      <span className="start-menu__scene-overlay" />
     </span>
   );
 }
 
 export function StartScreenGate() {
-  const isGateVisible = useGameStore((state) => state.ui.startScreenVisible);
+  const navigate = useNavigate();
+  const isMenuVisible = useGameStore((state) => state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
+  const startNewGame = useGameStore((state) => state.startNewGame);
+  const saveStates = useGameStore((state) => state.saveStates);
   const mobilePlatform = useMemo(() => isMobilePlatform(), []);
   const musicRef = useRef<HTMLAudioElement | null>(null);
-  const hasCompletedBootstrapRef = useRef(false);
-  const [isBootstrapVisible, setIsBootstrapVisible] = useState(true);
-  const [showResumeBootstrap, setShowResumeBootstrap] = useState(false);
-  const [isBootstrapReady, setIsBootstrapReady] = useState(false);
-  const [isBootstrapStarting, setIsBootstrapStarting] = useState(false);
-  const [isGateSceneReady, setIsGateSceneReady] = useState(false);
+  const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
-  const [musicEnabled, setMusicEnabled] = useState(true);
+  const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
+  const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
+  const [isLaunching, setIsLaunching] = useState(false);
+  const canContinue = Object.keys(saveStates).length > 0 || hasPersistedDockedSession();
 
   useEffect(() => {
     const music = new Audio(START_SCREEN_MUSIC_PATH);
@@ -80,19 +81,42 @@ export function StartScreenGate() {
     music.preload = 'auto';
     musicRef.current = music;
 
+    // Browsers may block autoplay on first paint, so the menu retries once on
+    // the first trusted interaction while the overlay remains visible.
+    const tryPlayMusic = () => {
+      if (!isMenuVisible || !musicEnabled) {
+        return;
+      }
+      void music.play().catch(() => {
+        // The retry path below is enough; failed autoplay should stay silent.
+      });
+    };
+
+    const handleInteractionUnlock = () => {
+      tryPlayMusic();
+      window.removeEventListener('pointerdown', handleInteractionUnlock);
+      window.removeEventListener('keydown', handleInteractionUnlock);
+    };
+
+    tryPlayMusic();
+    window.addEventListener('pointerdown', handleInteractionUnlock);
+    window.addEventListener('keydown', handleInteractionUnlock);
+
     return () => {
+      window.removeEventListener('pointerdown', handleInteractionUnlock);
+      window.removeEventListener('keydown', handleInteractionUnlock);
       music.pause();
       music.currentTime = 0;
       musicRef.current = null;
     };
-  }, []);
+  }, [isMenuVisible, musicEnabled]);
 
   useEffect(() => {
     let isCancelled = false;
 
     START_SCREEN_SCENE_PROMISE.then(() => {
       if (!isCancelled) {
-        setIsBootstrapReady(true);
+        setIsMenuReady(true);
       }
     });
 
@@ -102,79 +126,28 @@ export function StartScreenGate() {
   }, []);
 
   useEffect(() => {
-    if (!mobilePlatform) {
-      return undefined;
-    }
-
-    const handleFullscreenChange = () => {
-      // Once the initial bootstrap has completed, dropping out of fullscreen
-      // should always route the user back through the lightweight entry screen
-      // before they resume the title gate or live game in windowed mode.
-      if (!isDocumentFullscreen(document as FullscreenDocument) && hasCompletedBootstrapRef.current) {
-        const music = musicRef.current;
-        if (music) {
-          music.pause();
-          music.currentTime = 0;
-        }
-        setShowResumeBootstrap(true);
-        setIsBootstrapVisible(true);
-      }
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    document.addEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange as EventListener);
-    };
-  }, [mobilePlatform]);
-
-  useEffect(() => {
-    // The intro track only belongs to the title flow. Any return to the live
-    // game or to the bootstrap overlay should leave the app silent.
-    if (isBootstrapVisible || !isGateVisible) {
-      const music = musicRef.current;
-      if (music) {
-        music.pause();
-        music.currentTime = 0;
-      }
-    }
-  }, [isBootstrapVisible, isGateVisible]);
-
-  const handleBootstrapContinue = async () => {
-    if (!isBootstrapReady || isBootstrapStarting) {
+    persistStartMenuMusicEnabled(musicEnabled);
+    const music = musicRef.current;
+    if (!music) {
       return;
     }
 
-    setIsBootstrapStarting(true);
-
-    const shouldRequestFullscreen = mobilePlatform;
-    if (shouldRequestFullscreen) {
-      const enteredFullscreen = await requestDocumentFullscreen().catch(() => false);
-      if (!enteredFullscreen) {
-        setIsBootstrapStarting(false);
-        return;
-      }
+    if (!isMenuVisible || !musicEnabled) {
+      music.pause();
+      music.currentTime = 0;
+      return;
     }
 
-    hasCompletedBootstrapRef.current = true;
-    setIsBootstrapVisible(false);
+    void music.play().catch(() => {
+      // Some browsers still require an explicit tap before playback begins.
+    });
+  }, [isMenuVisible, musicEnabled]);
 
-    if (musicEnabled && isGateVisible) {
-      const music = musicRef.current;
-      if (music) {
-        void music.play().catch(() => {
-          // Playback failure should not trap the user on the bootstrap screen
-          // once the gate has been loaded and their tap already happened.
-        });
-      }
-    }
+  useEffect(() => {
+    persistStartMenuFullscreenEnabled(fullscreenEnabled);
+  }, [fullscreenEnabled]);
 
-    setIsBootstrapStarting(false);
-  };
-
-  const handleGateDismiss = () => {
+  const closeMenu = () => {
     const music = musicRef.current;
     if (music) {
       music.pause();
@@ -183,74 +156,103 @@ export function StartScreenGate() {
     setStartScreenVisible(false);
   };
 
-  const handleGateKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Tab') {
-      return;
-    }
-    if (event.key !== ' ' && event.key !== 'Spacebar' && event.key !== 'Enter') {
+  const launchIntoGame = async (mode: 'continue' | 'new-game') => {
+    if (!isMenuReady || isLaunching) {
       return;
     }
 
-    event.preventDefault();
-    handleGateDismiss();
+    setIsLaunching(true);
+
+    if (mobilePlatform && fullscreenEnabled) {
+      const enteredFullscreen = await requestDocumentFullscreen().catch(() => false);
+      if (!enteredFullscreen) {
+        setIsLaunching(false);
+        return;
+      }
+    }
+
+    if (mode === 'new-game') {
+      startNewGame();
+    } else {
+      closeMenu();
+    }
+
+    setIsLaunching(false);
   };
 
-  const bootstrapButtonLabel = isBootstrapReady ? (showResumeBootstrap ? 'Continue' : 'Start') : 'Loading...';
-  const bootstrapHint = showResumeBootstrap
-    ? 'Fullscreen was closed. Continue returns to fullscreen on mobile.'
-    : mobilePlatform
-      ? 'Loading the hangar. Start opens the gate and enters fullscreen on mobile.'
-      : 'Loading the hangar. Start opens the gate in windowed mode.';
+  if (!isMenuVisible) {
+    return null;
+  }
 
   return (
-    <>
-      {isGateVisible && !isBootstrapVisible ? (
-        <div className="mobile-fullscreen-gate" role="presentation">
-          <div
-            role="button"
-            tabIndex={0}
-            className="mobile-fullscreen-gate__button"
-            onClick={handleGateDismiss}
-            onKeyDown={handleGateKeyDown}
-            aria-label="Press spacebar to start game"
-          >
-            <span className="mobile-fullscreen-gate__frame">
-              <span className="mobile-fullscreen-gate__title">DISO CODE</span>
-              <Suspense fallback={<StartScreenSceneFallback />}>
-                <StartScreenScene showcaseIndex={0} onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsGateSceneReady} />
-              </Suspense>
-              <span className="mobile-fullscreen-gate__ship-label" aria-live="polite">
-                {showcaseLabel}
-              </span>
-              <span className="mobile-fullscreen-gate__prompt">{isGateSceneReady ? 'Press spacebar to start game' : ''}</span>
-              <span className="mobile-fullscreen-gate__copyright">© Alexey Korepanov 2026</span>
-            </span>
-          </div>
-        </div>
-      ) : null}
-
-      {isBootstrapVisible ? (
-        <div className="start-bootstrap" role="presentation">
-          <div className="start-bootstrap__panel">
-            <span className="start-bootstrap__title">DISO CODE</span>
-            <span className="start-bootstrap__status">{bootstrapHint}</span>
-            <label className="start-bootstrap__toggle">
-              <input type="checkbox" checked={musicEnabled} onChange={(event) => setMusicEnabled(event.target.checked)} />
-              <span>Play music on gate screen</span>
-            </label>
+    <div className="start-menu" role="presentation">
+      <div className="start-menu__panel">
+        <span className="start-menu__frame">
+          <span className="start-menu__title">DISO CODE</span>
+          <Suspense fallback={<StartScreenSceneFallback />}>
+            <StartScreenScene showcaseIndex={0} onShowcaseLabelChange={setShowcaseLabel} onSceneReady={setIsMenuReady} />
+          </Suspense>
+          <span className="start-menu__ship-label" aria-live="polite">
+            {showcaseLabel}
+          </span>
+          <div className="start-menu__controls">
             <button
               type="button"
-              className="start-bootstrap__action"
+              className="start-menu__action"
               onClick={() => {
-                void handleBootstrapContinue();
+                void launchIntoGame('new-game');
               }}
-              disabled={!isBootstrapReady || isBootstrapStarting}
+              disabled={!isMenuReady || isLaunching}
             >
-              {bootstrapButtonLabel}
+              New Game
+            </button>
+            {canContinue ? (
+              <button
+                type="button"
+                className="start-menu__action"
+                onClick={() => {
+                  void launchIntoGame('continue');
+                }}
+                disabled={!isMenuReady || isLaunching}
+              >
+                Continue
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="start-menu__action"
+              onClick={() => {
+                closeMenu();
+                navigate('/save-load');
+              }}
+            >
+              Load
             </button>
           </div>
-        </div>
-      ) : null}
-    </>
+          <div className="start-menu__settings">
+            <label className="start-menu__toggle">
+              <input type="checkbox" checked={musicEnabled} onChange={(event) => setMusicEnabled(event.target.checked)} />
+              <span>Music</span>
+            </label>
+            <label className="start-menu__toggle">
+              <input
+                type="checkbox"
+                checked={fullscreenEnabled}
+                onChange={(event) => setFullscreenEnabled(event.target.checked)}
+              />
+              <span>Full Screen</span>
+            </label>
+          </div>
+          <span className="start-menu__status">
+            {isMenuReady
+              ? mobilePlatform && fullscreenEnabled
+                ? 'Start actions open the game in fullscreen on mobile.'
+                : 'Start actions open the game without fullscreen.'
+              : 'Loading start menu...'}
+          </span>
+          <span className="start-menu__copyright">© Alexey Korepanov 2026</span>
+        </span>
+      </div>
+    </div>
   );
 }

@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
-import { StartScreenGate } from './components/StartScreenGate';
 import { EquipmentScreen } from './screens/EquipmentScreen';
 import { GalaxyChartScreen } from './screens/GalaxyChartScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
@@ -45,10 +44,5 @@ const router = createBrowserRouter([
 ]);
 
 export default function App() {
-  return (
-    <>
-      <RouterProvider router={router} />
-      <StartScreenGate />
-    </>
-  );
+  return <RouterProvider router={router} />;
 }
