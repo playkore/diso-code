@@ -112,6 +112,7 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
 export function AppShell() {
   const location = useLocation();
   const setActiveTab = useGameStore((state) => state.setActiveTab);
+  const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
@@ -159,9 +160,15 @@ export function AppShell() {
               <dd>{universe.currentSystem}</dd>
             </div>
           </dl>
-          {/* Save/load remains accessible while no longer pretending to be a
-              canonical station mode in the primary navigation strip. */}
-          <Link className="app-shell__utility-link" to="/save-load" aria-label="Open save and load utilities" title="Save / Load">
+          {/* The header shortcut now reopens the start menu so the player can
+              reach New Game, Continue, and Load from the same entry point. */}
+          <Link
+            className="app-shell__utility-link"
+            to="/"
+            aria-label="Open start menu"
+            title="Start Menu"
+            onClick={() => setStartScreenVisible(true)}
+          >
             <UtilityIcon>
               {/* The header shortcut now reads as a general menu/settings entry
                   point rather than a verb-only save action. */}
@@ -175,7 +182,7 @@ export function AppShell() {
               <path d="M17.3 6.7l-1.5 1.5" />
               <path d="M8.2 15.8l-1.5 1.5" />
             </UtilityIcon>
-            <span className="sr-only">Save / Load</span>
+            <span className="sr-only">Start Menu</span>
           </Link>
         </div>
         {latestUiEvent ? (
