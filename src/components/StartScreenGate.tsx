@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   hasPersistedDockedSession,
@@ -19,22 +19,6 @@ type FullscreenElement = HTMLElement & {
 // behind a lazy boundary while the menu controls render synchronously.
 const StartScreenScene = lazy(() => import('./StartScreenScene').then((module) => ({ default: module.StartScreenScene })));
 const START_SCREEN_SCENE_PROMISE = import('./StartScreenScene');
-
-function isMobilePlatform(): boolean {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return false;
-  }
-
-  const platform = navigator.userAgent || '';
-  const touches = navigator.maxTouchPoints || 0;
-  const isMobileAgent = /android|iphone|ipad|ipod|mobile/i.test(platform);
-  const isTouchMac = navigator.platform === 'MacIntel' && touches > 1;
-  const prefersCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
-
-  // Fullscreen only matters on phone-sized devices where browser chrome takes
-  // enough space to hurt the in-game viewport.
-  return isMobileAgent || (isTouchMac && prefersCoarsePointer);
-}
 
 async function requestDocumentFullscreen(): Promise<boolean> {
   const root = document.documentElement as FullscreenElement;
@@ -66,7 +50,6 @@ export function StartScreenGate() {
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const startNewGame = useGameStore((state) => state.startNewGame);
   const saveStates = useGameStore((state) => state.saveStates);
-  const mobilePlatform = useMemo(() => isMobilePlatform(), []);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
@@ -126,7 +109,7 @@ export function StartScreenGate() {
 
     setIsLaunching(true);
 
-    if (mobilePlatform && fullscreenEnabled) {
+    if (fullscreenEnabled) {
       const enteredFullscreen = await requestDocumentFullscreen().catch(() => false);
       if (!enteredFullscreen) {
         setIsLaunching(false);
