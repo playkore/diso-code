@@ -81,6 +81,68 @@ function getFaceVertexIndexes(edges: readonly (readonly [number, number, number,
   return [...indexes];
 }
 
+/**
+ * BBC Elite face records can reference decorative feature edges in addition to
+ * the actual filled hull boundary. A naive "all incident vertices belong to
+ * one polygon" rule therefore pulls disconnected antenna/detail segments into
+ * the triangulation and creates flipped or self-crossing fans.
+ *
+ * To recover the intended filled face, we select the largest connected
+ * component of the face-edge graph and triangulate only that boundary. Small
+ * disconnected components still remain visible in `wireEdges`, so details such
+ * as the Cobra nose antenna keep rendering as lines without punching holes
+ * through the solid hull.
+ */
+function getPrimaryFaceVertexIndexes(edges: readonly (readonly [number, number, number, number])[], faceIndex: number) {
+  const faceEdges = edges.filter(([_start, _end, faceA, faceB]) => faceA === faceIndex || faceB === faceIndex);
+  if (faceEdges.length === 0) {
+    return [] as number[];
+  }
+
+  const adjacency = new Map<number, Set<number>>();
+  for (const [start, end] of faceEdges) {
+    if (!adjacency.has(start)) {
+      adjacency.set(start, new Set());
+    }
+    if (!adjacency.has(end)) {
+      adjacency.set(end, new Set());
+    }
+    adjacency.get(start)?.add(end);
+    adjacency.get(end)?.add(start);
+  }
+
+  const unvisited = new Set(adjacency.keys());
+  let bestComponent: number[] = [];
+  while (unvisited.size > 0) {
+    const [seed] = unvisited;
+    if (seed === undefined) {
+      break;
+    }
+    const queue = [seed];
+    const component: number[] = [];
+    unvisited.delete(seed);
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (current === undefined) {
+        continue;
+      }
+      component.push(current);
+      for (const neighbor of adjacency.get(current) ?? []) {
+        if (!unvisited.has(neighbor)) {
+          continue;
+        }
+        unvisited.delete(neighbor);
+        queue.push(neighbor);
+      }
+    }
+    if (component.length > bestComponent.length) {
+      bestComponent = component;
+    }
+  }
+
+  return bestComponent.length > 0 ? bestComponent : getFaceVertexIndexes(edges, faceIndex);
+}
+
 function orderFaceVertices(points: readonly HullPoint[], normal: HullPoint) {
   const center = points.reduce<HullPoint>(
     (sum, point) => [sum[0] + point[0], sum[1] + point[1], sum[2] + point[2]],
@@ -119,7 +181,7 @@ function triangulateFace(
   face: RawFace,
   faceIndex: number
 ) {
-  const vertexIndexes = getFaceVertexIndexes(edges, faceIndex);
+  const vertexIndexes = getPrimaryFaceVertexIndexes(edges, faceIndex);
   if (vertexIndexes.length < 3) {
     return { triangles: [] as Triangle[], label: null };
   }
