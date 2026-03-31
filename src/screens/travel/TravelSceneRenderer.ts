@@ -51,6 +51,10 @@ interface TravelSceneRenderArgs {
     position: { x: number; y: number; z: number };
     lookAt: { x: number; y: number; z: number };
   };
+  showcaseOrientationOverride?: {
+    pitch: number;
+    yaw: number;
+  } | null;
   playerDeathEffect?: {
     elapsedMs: number;
     showGameOver: boolean;
@@ -356,6 +360,7 @@ export class TravelSceneRenderer {
     enemyBankAngles,
     starfieldAnchor,
     cameraOverride,
+    showcaseOrientationOverride = null,
     playerDeathEffect,
     radarInsetTop,
     radarInsetRight
@@ -380,7 +385,14 @@ export class TravelSceneRenderer {
     }
 
     this.buildStarfield(stars, combatState, flightState, starfieldAnchor);
-    this.buildWorld(combatState, playerBankAngle, enemyBankAngles, showSafeZoneRing, playerDeathEffect ?? null);
+    this.buildWorld(
+      combatState,
+      playerBankAngle,
+      enemyBankAngles,
+      showSafeZoneRing,
+      playerDeathEffect ?? null,
+      showcaseOrientationOverride
+    );
     this.buildOverlay(combatState, showTargetLock, showRadar, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
 
@@ -458,7 +470,8 @@ export class TravelSceneRenderer {
     playerBankAngle: number,
     enemyBankAngles: ReadonlyMap<number, number>,
     showSafeZoneRing: boolean,
-    playerDeathEffect: TravelSceneRenderArgs['playerDeathEffect']
+    playerDeathEffect: TravelSceneRenderArgs['playerDeathEffect'],
+    showcaseOrientationOverride: TravelSceneRenderArgs['showcaseOrientationOverride']
   ) {
     if (combatState.station) {
       const station = createStationObject();
@@ -495,8 +508,14 @@ export class TravelSceneRenderer {
       // Enemy heading stays on the outer anchor for the same reason as the
       // player ship: bank should lean the hull onto its side without changing
       // the world-space axis that rotates the ship toward the camera.
-      enemyAnchor.rotation.z = -enemy.angle;
-      ship.rotation.set((enemyBankAngles.get(enemy.id) ?? 0) - presentation.pitch, presentation.yaw, 0);
+      enemyAnchor.rotation.z = showcaseOrientationOverride ? 0 : -enemy.angle;
+      if (showcaseOrientationOverride) {
+        // The start-screen showcase needs direct manual control over pitch and
+        // yaw so horizontal and vertical drags rotate around independent axes.
+        ship.rotation.set(showcaseOrientationOverride.pitch, showcaseOrientationOverride.yaw, 0);
+      } else {
+        ship.rotation.set((enemyBankAngles.get(enemy.id) ?? 0) - presentation.pitch, presentation.yaw, 0);
+      }
       enemyAnchor.add(ship);
       this.worldGroup.add(enemyAnchor);
 
@@ -517,10 +536,14 @@ export class TravelSceneRenderer {
       // Heading stays on the outer anchor so the ship still rotates around the
       // axis from the player toward the camera. The child ship can then bank
       // around its own forward axis without corrupting the heading axis itself.
-      playerAnchor.rotation.z = -combatState.player.angle;
-      // The hull uses +X as its nose direction, so rolling around local X makes
-      // the ship lean onto its left/right side instead of skewing its turn axis.
-      player.rotation.set(playerBankAngle, 0, 0);
+      playerAnchor.rotation.z = showcaseOrientationOverride ? 0 : -combatState.player.angle;
+      if (showcaseOrientationOverride) {
+        player.rotation.set(showcaseOrientationOverride.pitch, showcaseOrientationOverride.yaw, 0);
+      } else {
+        // The hull uses +X as its nose direction, so rolling around local X makes
+        // the ship lean onto its left/right side instead of skewing its turn axis.
+        player.rotation.set(playerBankAngle, 0, 0);
+      }
       playerAnchor.add(player);
       this.worldGroup.add(playerAnchor);
     }

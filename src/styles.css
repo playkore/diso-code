@@ -237,8 +237,11 @@ body {
   top: 10.2rem;
   z-index: 2;
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 0.5rem;
   transform: translateX(-50%);
+  width: min(18rem, calc(100vw - 3rem));
 }
 
 .start-menu__ship-debug-button {

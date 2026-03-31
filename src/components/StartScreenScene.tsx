@@ -10,15 +10,16 @@ import { START_SCREEN_SHOWCASE_COUNT, START_SCREEN_SHOWCASE_SHIP_IDS } from './s
 
 const DEMO_SYSTEM_NAME = 'Lave';
 const DEMO_CAMERA_FOV_DEGREES = 36;
-const DEMO_STATION_SPIN_SPEED = 0.42;
 const DEMO_SHIP_CAMERA_DISTANCE_FACTOR = 0.07;
 const DEMO_STARFIELD_SPEED_X = 42;
 const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
 const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
+const SHOWCASE_PITCH_LIMIT = Math.PI * 0.45;
 export interface StartScreenSceneProps {
   showcaseIndex: number;
   debugFaceLabels?: boolean;
+  debugVertexLabels?: boolean;
   debugDoubleSide?: boolean;
   onShowcaseLabelChange: (label: string) => void;
   onSceneReady?: (ready: boolean) => void;
@@ -34,6 +35,7 @@ function getShowcaseLabel(showcaseShipId: 'player' | BlueprintId): string {
 export function StartScreenScene({
   showcaseIndex,
   debugFaceLabels = false,
+  debugVertexLabels = false,
   debugDoubleSide = false,
   onShowcaseLabelChange,
   onSceneReady
@@ -49,15 +51,17 @@ export function StartScreenScene({
   useEffect(() => {
     setShipPresenterDebugOptions({
       showFaceLabels: debugFaceLabels,
+      showVertexLabels: debugVertexLabels,
       doubleSidedHull: debugDoubleSide
     });
     return () => {
       setShipPresenterDebugOptions({
         showFaceLabels: false,
+        showVertexLabels: false,
         doubleSidedHull: false
       });
     };
-  }, [debugDoubleSide, debugFaceLabels]);
+  }, [debugDoubleSide, debugFaceLabels, debugVertexLabels]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -89,13 +93,13 @@ export function StartScreenScene({
     let showcasedEnemyBlueprintId: BlueprintId | null = null;
     let animationFrameId = 0;
     let lastTimestamp = 0;
-    let elapsedSeconds = 0;
     let viewportWidth = 1;
     let viewportHeight = 1;
     let starfieldOffsetX = 0;
     let dragAnchorX = 0;
     let dragAnchorY = 0;
-    let showcaseAngleOffset = 0;
+    let showcasePitch = 0;
+    let showcaseYaw = 0;
     let activePointerId: number | null = null;
 
     // The attract scene reuses the real travel renderer, but it keeps a frozen
@@ -123,10 +127,8 @@ export function StartScreenScene({
     const renderFrame = (timestamp: number) => {
       const deltaSeconds = lastTimestamp === 0 ? 1 / 60 : Math.min(0.05, (timestamp - lastTimestamp) / 1000);
       lastTimestamp = timestamp;
-      elapsedSeconds += deltaSeconds;
       starfieldOffsetX += deltaSeconds * DEMO_STARFIELD_SPEED_X;
       const showcaseShipId = START_SCREEN_SHOWCASE_SHIP_IDS[showcaseIndexRef.current % START_SCREEN_SHOWCASE_COUNT];
-      const showcaseAngle = elapsedSeconds * DEMO_STATION_SPIN_SPEED + showcaseAngleOffset;
       const showcaseLabel = getShowcaseLabel(showcaseShipId);
 
       // The overlay label only needs to update when the carousel advances to a
@@ -146,7 +148,7 @@ export function StartScreenScene({
       if (showcaseShipId === 'player') {
         combatState.player.x = DEMO_PLAYER_SHOWCASE_DISTANCE;
         combatState.player.y = 0;
-        combatState.player.angle = showcaseAngle;
+        combatState.player.angle = 0;
       }
 
       if (showcaseShipId !== 'player') {
@@ -162,14 +164,14 @@ export function StartScreenScene({
           y: 0,
           vx: 0,
           vy: 0,
-          angle: showcaseAngle,
+          angle: 0,
           aggression: 0,
           baseAggression: 0,
           fireCooldown: Number.POSITIVE_INFINITY,
           missileCooldown: Number.POSITIVE_INFINITY,
           lifetime: 0
         });
-        enemyBankAngles.set(showcasedEnemy.id, showcaseAngle);
+        enemyBankAngles.set(showcasedEnemy.id, 0);
       } else {
         showcasedEnemyBlueprintId = null;
         showcasedEnemyId = null;
@@ -187,7 +189,7 @@ export function StartScreenScene({
         showRadar: false,
         showSafeZoneRing: false,
         showTargetLock: false,
-        playerBankAngle: showcaseShipId === 'player' ? showcaseAngle : 0,
+        playerBankAngle: 0,
         enemyBankAngles,
         starfieldAnchor: {
           x: starfieldOffsetX,
@@ -207,6 +209,10 @@ export function StartScreenScene({
             z: 0
           }
         },
+        showcaseOrientationOverride: {
+          pitch: showcasePitch,
+          yaw: showcaseYaw
+        },
         radarInsetTop: 0,
         radarInsetRight: 0
       });
@@ -214,9 +220,8 @@ export function StartScreenScene({
       animationFrameId = window.requestAnimationFrame(renderFrame);
     };
 
-    // Drag gestures can start in any direction. Horizontal and vertical deltas
-    // both contribute to the same bank angle so users can rotate the ship by
-    // swiping naturally with one finger.
+    // The showcase keeps pitch and yaw separate so debugging a missing face
+    // does not require fighting an automatic spin or a mixed-axis gesture.
     const handlePointerDown = (event: PointerEvent) => {
       if (activePointerId !== null) {
         return;
@@ -233,8 +238,8 @@ export function StartScreenScene({
       }
       const deltaX = event.clientX - dragAnchorX;
       const deltaY = event.clientY - dragAnchorY;
-      const rotationFromDrag = (deltaX - deltaY) * 0.008;
-      showcaseAngleOffset += rotationFromDrag;
+      showcaseYaw += deltaX * 0.008;
+      showcasePitch = Math.max(-SHOWCASE_PITCH_LIMIT, Math.min(SHOWCASE_PITCH_LIMIT, showcasePitch + deltaY * 0.008));
       dragAnchorX = event.clientX;
       dragAnchorY = event.clientY;
     };

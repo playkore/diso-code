@@ -55,6 +55,7 @@ export function StartScreenGate() {
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [showcaseIndex, setShowcaseIndex] = useState(0);
   const [debugFaceLabels, setDebugFaceLabels] = useState(false);
+  const [debugVertexLabels, setDebugVertexLabels] = useState(false);
   const [debugDoubleSide, setDebugDoubleSide] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
@@ -155,6 +156,7 @@ export function StartScreenGate() {
             <StartScreenScene
               showcaseIndex={showcaseIndex}
               debugFaceLabels={debugFaceLabels}
+              debugVertexLabels={debugVertexLabels}
               debugDoubleSide={debugDoubleSide}
               onShowcaseLabelChange={setShowcaseLabel}
               onSceneReady={setIsMenuReady}
@@ -191,6 +193,14 @@ export function StartScreenGate() {
               disabled={!isMenuReady}
             >
               Face IDs
+            </button>
+            <button
+              type="button"
+              className={`start-menu__ship-debug-button${debugVertexLabels ? ' start-menu__ship-debug-button--active' : ''}`}
+              onClick={() => setDebugVertexLabels((current) => !current)}
+              disabled={!isMenuReady}
+            >
+              Vertex IDs
             </button>
             <button
               type="button"

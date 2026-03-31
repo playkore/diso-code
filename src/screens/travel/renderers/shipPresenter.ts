@@ -9,11 +9,13 @@ export type EnemyShipMeshId = BlueprintId;
 
 interface ShipDebugOptions {
   showFaceLabels: boolean;
+  showVertexLabels: boolean;
   doubleSidedHull: boolean;
 }
 
 const shipDebugOptions: ShipDebugOptions = {
   showFaceLabels: false,
+  showVertexLabels: false,
   doubleSidedHull: false
 };
 
@@ -78,12 +80,48 @@ function createFaceLabelSprite(text: string) {
   return sprite;
 }
 
+function createVertexLabelSprite(text: string) {
+  const canvas = document.createElement('canvas');
+  const bootstrap = canvas.getContext('2d');
+  if (!bootstrap) {
+    return null;
+  }
+  bootstrap.font = 'bold 64px "Courier New", monospace';
+  const metrics = bootstrap.measureText(text);
+  canvas.width = Math.max(48, Math.ceil(metrics.width) + 24);
+  canvas.height = 84;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return null;
+  }
+  ctx.font = 'bold 64px "Courier New", monospace';
+  ctx.fillStyle = CGA_YELLOW;
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, 12, 4);
+  const texture = new Texture(canvas);
+  texture.flipY = false;
+  texture.needsUpdate = true;
+  const sprite = new Sprite(
+    new SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false
+    })
+  );
+  sprite.center.set(0.5, 0.5);
+  sprite.scale.set(canvas.width * 0.045, canvas.height * 0.045, 1);
+  return sprite;
+}
+
 function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: string) {
+  const showLabelDebug = shipDebugOptions.showFaceLabels || shipDebugOptions.showVertexLabels;
   const hull = new Mesh(
     createTriangleGeometry(definition.hullTriangles),
     new MeshBasicMaterial({
       color: CGA_BLACK,
       side: shipDebugOptions.doubleSidedHull ? DoubleSide : FrontSide,
+      transparent: showLabelDebug,
+      opacity: showLabelDebug ? 0.35 : 1,
       // Faces stay slightly behind the edge overlay so role-colored outlines do
       // not flicker or break when the camera compresses diagonal segments.
       polygonOffset: true,
@@ -127,12 +165,26 @@ function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: st
       ship.add(sprite);
     }
   }
+  if (shipDebugOptions.showVertexLabels) {
+    for (const label of definition.vertexLabels) {
+      const sprite = createVertexLabelSprite(String(label.index));
+      if (!sprite) {
+        continue;
+      }
+      // Vertex labels sit slightly above and to the starboard/up side so they
+      // stay readable without being mistaken for the vertex position itself.
+      sprite.position.set(label.position[0], label.position[1] + 0.18, label.position[2] + 0.18);
+      sprite.renderOrder = 3;
+      ship.add(sprite);
+    }
+  }
   return ship;
 }
 
 const STATION_MESH: ShipMeshDefinition = {
   ...STATION_MESH_DEFINITION,
-  faceLabels: []
+  faceLabels: [],
+  vertexLabels: []
 };
 
 /**
@@ -189,5 +241,6 @@ export function selectShipPresenter(requested: RequestedShipPresenter = 'low-pol
  */
 export function setShipPresenterDebugOptions(options: Partial<ShipDebugOptions>) {
   shipDebugOptions.showFaceLabels = options.showFaceLabels ?? shipDebugOptions.showFaceLabels;
+  shipDebugOptions.showVertexLabels = options.showVertexLabels ?? shipDebugOptions.showVertexLabels;
   shipDebugOptions.doubleSidedHull = options.doubleSidedHull ?? shipDebugOptions.doubleSidedHull;
 }
