@@ -119,6 +119,7 @@ export function AppShell() {
   const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
+  const isMenuFlowRoute = location.pathname === '/save' || location.pathname === '/load' || location.pathname === '/debug';
   const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
 
   if (isTravelRoute) {
@@ -140,78 +141,82 @@ export function AppShell() {
   return (
     <div className="app-shell">
       <StartScreenGate />
-      <header>
-        {/* The header surfaces docked-state information only. Travel HUD data is
-            rendered by the travel screen itself to avoid duplicated status bars. */}
-        <div className="app-shell__header-row">
-          <dl className="hud-grid" aria-label="Commander status">
-            <div>
-              <dt>Credits</dt>
-              <dd>{formatCredits(commander.cash)}</dd>
-            </div>
-            <div>
-              <dt>Cargo</dt>
-              <dd>
-                {cargoUsed} / {commander.cargoCapacity} t
-              </dd>
-            </div>
-            <div>
-              <dt>System</dt>
-              <dd>{universe.currentSystem}</dd>
-            </div>
-          </dl>
-          {/* The header shortcut now reopens the start menu so the player can
-              reach New Game, Continue, and Load from the same entry point. */}
-          <Link
-            className="app-shell__utility-link"
-            to="/"
-            aria-label="Open start menu"
-            title="Start Menu"
-            onClick={() => setStartScreenVisible(true)}
-          >
-            <UtilityIcon>
-              {/* The header shortcut now reads as a general menu/settings entry
-                  point rather than a verb-only save action. */}
-              <circle cx="12" cy="12" r="2.4" />
-              <path d="M12 3.8v2.1" />
-              <path d="M12 18.1v2.1" />
-              <path d="M4.8 12h2.1" />
-              <path d="M17.1 12h2.1" />
-              <path d="M6.7 6.7l1.5 1.5" />
-              <path d="M15.8 15.8l1.5 1.5" />
-              <path d="M17.3 6.7l-1.5 1.5" />
-              <path d="M8.2 15.8l-1.5 1.5" />
-            </UtilityIcon>
-            <span className="sr-only">Start Menu</span>
-          </Link>
-        </div>
-        {latestUiEvent ? (
-          <div className="mission-notice" role="status" aria-live="polite">
-            <strong>{latestUiEvent.title}</strong>
-            <span>{latestUiEvent.body}</span>
+      {isMenuFlowRoute ? null : (
+        <header>
+          {/* The header surfaces docked-state information only. Travel HUD data is
+              rendered by the travel screen itself to avoid duplicated status bars. */}
+          <div className="app-shell__header-row">
+            <dl className="hud-grid" aria-label="Commander status">
+              <div>
+                <dt>Credits</dt>
+                <dd>{formatCredits(commander.cash)}</dd>
+              </div>
+              <div>
+                <dt>Cargo</dt>
+                <dd>
+                  {cargoUsed} / {commander.cargoCapacity} t
+                </dd>
+              </div>
+              <div>
+                <dt>System</dt>
+                <dd>{universe.currentSystem}</dd>
+              </div>
+            </dl>
+            {/* The header shortcut now reopens the start menu so the player can
+                reach New Game, Continue, and Load from the same entry point. */}
+            <Link
+              className="app-shell__utility-link"
+              to="/"
+              aria-label="Open start menu"
+              title="Start Menu"
+              onClick={() => setStartScreenVisible(true)}
+            >
+              <UtilityIcon>
+                {/* The header shortcut now reads as a general menu/settings entry
+                    point rather than a verb-only save action. */}
+                <circle cx="12" cy="12" r="2.4" />
+                <path d="M12 3.8v2.1" />
+                <path d="M12 18.1v2.1" />
+                <path d="M4.8 12h2.1" />
+                <path d="M17.1 12h2.1" />
+                <path d="M6.7 6.7l1.5 1.5" />
+                <path d="M15.8 15.8l1.5 1.5" />
+                <path d="M17.3 6.7l-1.5 1.5" />
+                <path d="M8.2 15.8l-1.5 1.5" />
+              </UtilityIcon>
+              <span className="sr-only">Start Menu</span>
+            </Link>
           </div>
-        ) : null}
-      </header>
+          {latestUiEvent ? (
+            <div className="mission-notice" role="status" aria-live="polite">
+              <strong>{latestUiEvent.title}</strong>
+              <span>{latestUiEvent.body}</span>
+            </div>
+          ) : null}
+        </header>
+      )}
 
       <main>
         <Outlet />
       </main>
 
-      <nav className="tab-nav" aria-label="Primary">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.tab}
-            to={item.to}
-            className={({ isActive }) => `tab-link ${isActive ? 'is-active' : ''}`}
-            onClick={() => setActiveTab(item.tab)}
-            aria-label={item.label}
-            title={item.label}
-          >
-            {item.icon}
-            <span className="sr-only">{item.label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      {isMenuFlowRoute ? null : (
+        <nav className="tab-nav" aria-label="Primary">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.tab}
+              to={item.to}
+              className={({ isActive }) => `tab-link ${isActive ? 'is-active' : ''}`}
+              onClick={() => setActiveTab(item.tab)}
+              aria-label={item.label}
+              title={item.label}
+            >
+              {item.icon}
+              <span className="sr-only">{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }

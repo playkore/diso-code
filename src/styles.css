@@ -367,6 +367,16 @@ header {
   border: 2px solid var(--cga-yellow);
 }
 
+.screen__toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.screen__back {
+  min-width: 5rem;
+}
+
 main {
   min-height: 0;
   overflow-y: auto;
@@ -641,6 +651,10 @@ main {
   gap: 0.35rem;
 }
 
+.save-slot__actions--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .fuel-actions {
   margin-top: 1rem;
   display: grid;
@@ -722,6 +736,10 @@ button:disabled {
 .dialog-actions {
   margin-top: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dialog-actions--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .market-dialog__details {

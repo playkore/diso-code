@@ -1,0 +1,121 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { cargoUsedTonnes } from '../domain/commander';
+import { SAVE_SLOT_IDS } from '../store/gameStateFactory';
+import { useGameStore } from '../store/useGameStore';
+import { formatLightYears } from '../utils/distance';
+import { formatCredits } from '../utils/money';
+
+export function SaveScreen() {
+  const navigate = useNavigate();
+  const saveToSlot = useGameStore((state) => state.saveToSlot);
+  const saveStates = useGameStore((state) => state.saveStates);
+  const commander = useGameStore((state) => state.commander);
+  const universe = useGameStore((state) => state.universe);
+  const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
+  const [savedSlotId, setSavedSlotId] = useState<(typeof SAVE_SLOT_IDS)[number] | null>(null);
+  const currentCargo = cargoUsedTonnes(commander.cargo);
+
+  return (
+    <section className="screen">
+      <div className="screen__toolbar">
+        <button
+          type="button"
+          className="screen__back"
+          onClick={() => {
+            setStartScreenVisible(true);
+            navigate('/', { replace: true });
+          }}
+        >
+          Back
+        </button>
+      </div>
+      <h2>Save</h2>
+      <div className="save-panels">
+        {/* Saving always starts from the live commander so the user can confirm
+            which run will be written into the destination slot. */}
+        <section className="save-panel">
+          <p className="dialog-kicker">Current Commander</p>
+          <dl className="detail-grid">
+            <dt>Name</dt>
+            <dd>{commander.name}</dd>
+            <dt>System</dt>
+            <dd>{commander.currentSystem}</dd>
+            <dt>Credits</dt>
+            <dd>{formatCredits(commander.cash)}</dd>
+            <dt>Fuel</dt>
+            <dd>{formatLightYears(commander.fuel)}</dd>
+            <dt>Cargo</dt>
+            <dd>
+              {currentCargo} / {commander.cargoCapacity} t
+            </dd>
+            <dt>Stardate</dt>
+            <dd>{universe.stardate}</dd>
+          </dl>
+        </section>
+        {SAVE_SLOT_IDS.map((slotId) => {
+          const saveState = saveStates[slotId];
+          const savedCommander = saveState?.snapshot.commander;
+          const savedUniverse = saveState?.snapshot.universe;
+          const savedCargo = savedCommander ? cargoUsedTonnes(savedCommander.cargo) : 0;
+
+          return (
+            <section key={slotId} className="save-panel">
+              <div className="save-slot__header">
+                <p className="dialog-kicker">Slot {slotId}</p>
+                <div className="save-slot__actions save-slot__actions--single">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      saveToSlot(slotId);
+                      setSavedSlotId(slotId);
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+              {savedCommander && savedUniverse ? (
+                <>
+                  <p className="muted">Saved {new Date(saveState.savedAt).toLocaleString()}</p>
+                  <dl className="detail-grid">
+                    <dt>Name</dt>
+                    <dd>{savedCommander.name}</dd>
+                    <dt>System</dt>
+                    <dd>{savedCommander.currentSystem}</dd>
+                    <dt>Credits</dt>
+                    <dd>{formatCredits(savedCommander.cash)}</dd>
+                    <dt>Fuel</dt>
+                    <dd>{formatLightYears(savedCommander.fuel)}</dd>
+                    <dt>Cargo</dt>
+                    <dd>
+                      {savedCargo} / {savedCommander.cargoCapacity} t
+                    </dd>
+                    <dt>Stardate</dt>
+                    <dd>{savedUniverse.stardate}</dd>
+                  </dl>
+                </>
+              ) : (
+                <p className="muted">Empty slot.</p>
+              )}
+            </section>
+          );
+        })}
+      </div>
+      {savedSlotId ? (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="save-success-title">
+            <p className="dialog-kicker">Save Complete</p>
+            <h3 id="save-success-title">Slot {savedSlotId} saved successfully</h3>
+            <p>Commander snapshot stored locally.</p>
+            <div className="dialog-actions dialog-actions--single">
+              <button type="button" onClick={() => setSavedSlotId(null)}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}

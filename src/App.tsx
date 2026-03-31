@@ -1,11 +1,13 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './components/AppShell';
+import { DebugScreen } from './screens/DebugScreen';
 import { EquipmentScreen } from './screens/EquipmentScreen';
 import { GalaxyChartScreen } from './screens/GalaxyChartScreen';
 import { InventoryScreen } from './screens/InventoryScreen';
+import { LoadScreen } from './screens/LoadScreen';
 import { MarketScreen } from './screens/MarketScreen';
-import { SaveLoadScreen } from './screens/SaveLoadScreen';
+import { SaveScreen } from './screens/SaveScreen';
 import { SystemDataScreen } from './screens/SystemDataScreen';
 import { StarMapScreen } from './screens/StarMapScreen';
 
@@ -37,7 +39,9 @@ const router = createBrowserRouter([
           </Suspense>
         )
       },
-      { path: 'save-load', element: <SaveLoadScreen /> },
+      { path: 'save', element: <SaveScreen /> },
+      { path: 'load', element: <LoadScreen /> },
+      { path: 'debug', element: <DebugScreen /> },
       { path: '*', element: <Navigate to="/" replace /> }
     ]
   }

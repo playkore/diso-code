@@ -169,10 +169,30 @@ export function StartScreenGate() {
               className="start-menu__action"
               onClick={() => {
                 closeMenu();
-                navigate('/save-load');
+                navigate('/save');
+              }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="start-menu__action"
+              onClick={() => {
+                closeMenu();
+                navigate('/load');
               }}
             >
               Load
+            </button>
+            <button
+              type="button"
+              className="start-menu__action"
+              onClick={() => {
+                closeMenu();
+                navigate('/debug');
+              }}
+            >
+              Debug
             </button>
           </div>
           <div className="start-menu__settings">
