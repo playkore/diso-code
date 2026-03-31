@@ -55,6 +55,7 @@ export function StartScreenGate() {
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isConfirmingNewGame, setIsConfirmingNewGame] = useState(false);
   const hasResumeSession = hasPersistedDockedSession();
   const hasManualSave = Object.keys(saveStates).length > 0;
   const canContinue = hasResumeSession;
@@ -150,7 +151,7 @@ export function StartScreenGate() {
               type="button"
               className="start-menu__action"
               onClick={() => {
-                void launchIntoGame('new-game');
+                setIsConfirmingNewGame(true);
               }}
               disabled={!isMenuReady || isLaunching}
             >
@@ -216,6 +217,30 @@ export function StartScreenGate() {
           <span className="start-menu__copyright">© Alexey Korepanov 2026</span>
         </span>
       </div>
+      {isConfirmingNewGame ? (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="new-game-confirm-title">
+            <p className="dialog-kicker">New Commander</p>
+            <h3 id="new-game-confirm-title">Start a new game?</h3>
+            <p>This will replace the current run with a fresh commander in Lave.</p>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setIsConfirmingNewGame(false)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="button-danger"
+                onClick={() => {
+                  setIsConfirmingNewGame(false);
+                  void launchIntoGame('new-game');
+                }}
+              >
+                Start New Game
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
