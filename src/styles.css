@@ -88,6 +88,9 @@ body {
   min-height: 100%;
   overflow: hidden;
   background: var(--cga-black);
+  /* Drag rotation relies on pointer deltas, so browser panning must be
+     disabled inside the preview viewport. */
+  touch-action: none;
 }
 
 .mobile-fullscreen-gate__scene-canvas,
@@ -147,6 +150,52 @@ body {
   pointer-events: none;
 }
 
+.mobile-fullscreen-gate__start,
+.mobile-fullscreen-gate__nav {
+  position: absolute;
+  z-index: 3;
+  min-width: 4.8rem;
+  min-height: 2.2rem;
+  border: 2px solid var(--cga-yellow);
+  border-radius: 0;
+  background: var(--cga-black);
+  color: var(--cga-yellow);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mobile-fullscreen-gate__start {
+  left: 50%;
+  bottom: 5.1rem;
+  transform: translateX(-50%);
+  padding: 0.5rem 1.1rem;
+}
+
+.mobile-fullscreen-gate__nav {
+  bottom: 5.1rem;
+  padding: 0.5rem 0.8rem;
+}
+
+.mobile-fullscreen-gate__nav--prev {
+  left: 1.2rem;
+}
+
+.mobile-fullscreen-gate__nav--next {
+  right: 1.2rem;
+}
+
+.mobile-fullscreen-gate__start:hover,
+.mobile-fullscreen-gate__start:focus-visible,
+.mobile-fullscreen-gate__nav:hover,
+.mobile-fullscreen-gate__nav:focus-visible {
+  outline: none;
+  background: var(--cga-yellow);
+  color: var(--cga-black);
+}
+
 @media (min-width: 768px) {
   .mobile-fullscreen-gate__frame {
     padding: 1.6rem 1.4rem;
@@ -166,6 +215,11 @@ body {
 
   .mobile-fullscreen-gate__copyright {
     bottom: 2.2rem;
+  }
+
+  .mobile-fullscreen-gate__start,
+  .mobile-fullscreen-gate__nav {
+    bottom: 5.7rem;
   }
 }
 
