@@ -7,29 +7,52 @@ const DEFAULT_START_SYSTEM = DEFAULT_COMMANDER.currentSystem.toUpperCase();
 const DEFAULT_CREDIT_BALANCE = formatCredits(DEFAULT_COMMANDER.cash).toUpperCase();
 const DEFAULT_LEGAL_STATUS = 'CLEAN';
 
-const BOOT_LINES = [
-  'LOADING CORE SYSTEMS...',
-  'MEMORY RESTORE: NO SNAPSHOT AVAILABLE',
-  'NAVIGATION: OK',
-  `CURRENT SYSTEM: ${DEFAULT_START_SYSTEM}`,
-  `CREDIT BALANCE: ${DEFAULT_CREDIT_BALANCE}`,
-  `LEGAL STATUS: ${DEFAULT_LEGAL_STATUS}`,
-  'PRIORITY PROFILE: DEFAULT'
-] as const;
+interface BootLine {
+  label: string;
+  value?: string;
+}
+
+const BOOT_LINES: BootLine[] = [
+  { label: 'LOADING CORE SYSTEMS...', value: 'DONE' },
+  { label: 'MEMORY RESTORE:', value: 'NO SNAPSHOT AVAILABLE' },
+  { label: 'NAVIGATION:', value: 'OK' },
+  { label: 'CURRENT SYSTEM:', value: DEFAULT_START_SYSTEM },
+  { label: 'CREDIT BALANCE:', value: DEFAULT_CREDIT_BALANCE },
+  { label: 'LEGAL STATUS:', value: DEFAULT_LEGAL_STATUS },
+  { label: 'PRIORITY PROFILE:', value: 'DEFAULT' }
+];
 
 const LINE_REVEAL_DELAY_MS = 360;
 const CONTINUE_PROMPT_DELAY_MS = 520;
 const CONTINUE_PROMPT = 'PRESS ANY KEY TO CONTINUE';
+const TOTAL_BOOT_STEPS = BOOT_LINES.reduce((sum, line) => sum + (line.value ? 2 : 1), 0);
 
 export interface NewGameBootScreenProps {
   onComplete: () => void;
 }
 
 export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
-  const [visibleLineCount, setVisibleLineCount] = useState(0);
+  const [visibleStepCount, setVisibleStepCount] = useState(0);
   const [showContinuePrompt, setShowContinuePrompt] = useState(false);
-  const visibleLines = useMemo(() => BOOT_LINES.slice(0, visibleLineCount), [visibleLineCount]);
-  const hasFinishedBootLines = visibleLineCount >= BOOT_LINES.length;
+  const visibleLines = useMemo(() => {
+    let remainingSteps = visibleStepCount;
+    return BOOT_LINES.flatMap((line) => {
+      if (remainingSteps <= 0) {
+        return [];
+      }
+      if (!line.value) {
+        remainingSteps -= 1;
+        return [line.label];
+      }
+      if (remainingSteps === 1) {
+        remainingSteps = 0;
+        return [line.label];
+      }
+      remainingSteps -= 2;
+      return [`${line.label} ${line.value}`];
+    });
+  }, [visibleStepCount]);
+  const hasFinishedBootLines = visibleStepCount >= TOTAL_BOOT_STEPS;
   const isAwaitingContinue = hasFinishedBootLines && showContinuePrompt;
 
   useEffect(() => {
@@ -41,10 +64,10 @@ export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
     }
 
     const revealTimer = window.setTimeout(() => {
-      setVisibleLineCount((current) => current + 1);
+      setVisibleStepCount((current) => current + 1);
     }, LINE_REVEAL_DELAY_MS);
     return () => window.clearTimeout(revealTimer);
-  }, [hasFinishedBootLines, visibleLineCount]);
+  }, [hasFinishedBootLines, visibleStepCount]);
 
   useEffect(() => {
     if (isAwaitingContinue) {
