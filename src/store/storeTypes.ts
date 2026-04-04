@@ -76,6 +76,7 @@ export interface GameStore {
   setActiveTab: (tab: AppTab) => void;
   setStartScreenVisible: (visible: boolean) => void;
   setNewGameBootVisible: (visible: boolean) => void;
+  setNewGamePowerOnVisible: (visible: boolean) => void;
   setSelectedChartSystem: (systemName: string | null) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
   setShowTravelPerfOverlay: (enabled: boolean) => void;

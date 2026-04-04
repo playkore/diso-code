@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createDefaultCommander } from '../domain/commander';
 import { formatCredits } from '../utils/money';
 
@@ -55,6 +55,13 @@ export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
   const hasFinishedBootLines = visibleStepCount >= TOTAL_BOOT_STEPS;
   const isAwaitingContinue = hasFinishedBootLines && showContinuePrompt;
 
+  const beginPowerOn = useCallback(() => {
+    if (!isAwaitingContinue) {
+      return;
+    }
+    onComplete();
+  }, [isAwaitingContinue, onComplete]);
+
   useEffect(() => {
     if (hasFinishedBootLines) {
       const promptTimer = window.setTimeout(() => {
@@ -72,7 +79,7 @@ export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
   useEffect(() => {
     if (isAwaitingContinue) {
       const handleContinue = () => {
-        onComplete();
+        beginPowerOn();
       };
 
       window.addEventListener('keydown', handleContinue);
@@ -80,16 +87,14 @@ export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
         window.removeEventListener('keydown', handleContinue);
       };
     }
-  }, [isAwaitingContinue, onComplete]);
+  }, [beginPowerOn, isAwaitingContinue]);
 
   return (
     <section
       className="new-game-boot"
       aria-label="New game boot sequence"
       onClick={() => {
-        if (isAwaitingContinue) {
-          onComplete();
-        }
+        beginPowerOn();
       }}
     >
       <div className="new-game-boot__panel">

@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../appRoutes';
 import { totalCargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
@@ -111,19 +111,38 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
 ];
 
 export function AppShell() {
+  const CRT_POWER_ON_DURATION_MS = 320;
   const location = useLocation();
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
+  const setNewGamePowerOnVisible = useGameStore((state) => state.setNewGamePowerOnVisible);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
   const newGameBootVisible = useGameStore((state) => state.ui.newGameBootVisible);
+  const newGamePowerOnVisible = useGameStore((state) => state.ui.newGamePowerOnVisible);
   const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
   const finishNewGame = useGameStore((state) => state.startNewGame);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
   const isMenuFlowRoute = location.pathname === '/save' || location.pathname === '/load' || location.pathname === '/debug';
   const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
+
+  useEffect(() => {
+    if (!newGamePowerOnVisible) {
+      return undefined;
+    }
+
+    // The CRT reveal belongs to the live docked UI so the player sees the
+    // actual market/status shell bloom onto the screen instead of a fake fill.
+    const timer = window.setTimeout(() => {
+      setNewGamePowerOnVisible(false);
+    }, CRT_POWER_ON_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [newGamePowerOnVisible, setNewGamePowerOnVisible]);
 
   if (isTravelRoute) {
     // Travel owns its own full-screen chrome, so the shell strips everything
@@ -146,7 +165,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${newGamePowerOnVisible ? ' app-shell--power-on' : ''}`}>
       <StartScreenGate />
       {isMenuFlowRoute ? null : (
         <header>

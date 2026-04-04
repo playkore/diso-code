@@ -38,7 +38,14 @@ export const createSaveLoadSlice: GameSlice<
         travelSession: null,
         saveStates: state.saveStates,
         ui: withUiMessage(
-          { ...current.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false, newGameBootVisible: false },
+          {
+            ...current.ui,
+            activeTab: 'market',
+            selectedChartSystem: null,
+            startScreenVisible: false,
+            newGameBootVisible: false,
+            newGamePowerOnVisible: false
+          },
           createUiMessage('info', `Slot ${slotId} loaded`, `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`)
         )
       }));
@@ -49,6 +56,7 @@ export const createSaveLoadSlice: GameSlice<
         ...state.ui,
         startScreenVisible: false,
         newGameBootVisible: true,
+        newGamePowerOnVisible: false,
         latestEvent: undefined,
         activityLog: []
       }
@@ -62,7 +70,14 @@ export const createSaveLoadSlice: GameSlice<
       travelSession: null,
       priority: createDefaultPriority(freshState.commander.cash),
       ui: withUiMessage(
-        { ...state.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false, newGameBootVisible: false },
+        {
+          ...state.ui,
+          activeTab: 'market',
+          selectedChartSystem: null,
+          startScreenVisible: false,
+          newGameBootVisible: false,
+          newGamePowerOnVisible: true
+        },
         createUiMessage('info', 'New game started', 'Fresh commander created. Save when you want to overwrite Slot 1.')
       )
     }));
@@ -81,6 +96,7 @@ export const createSaveLoadSlice: GameSlice<
         selectedChartSystem: null,
         startScreenVisible: true,
         newGameBootVisible: false,
+        newGamePowerOnVisible: false,
         latestEvent: undefined,
         activityLog: []
       }

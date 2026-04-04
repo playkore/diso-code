@@ -85,6 +85,7 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
       showTravelPerfOverlay,
       startScreenVisible: true,
       newGameBootVisible: false,
+      newGamePowerOnVisible: false,
       activityLog: []
     },
 
@@ -103,6 +104,13 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
         ui: {
           ...state.ui,
           newGameBootVisible: visible
+        }
+      })),
+    setNewGamePowerOnVisible: (visible) =>
+      set((state) => ({
+        ui: {
+          ...state.ui,
+          newGamePowerOnVisible: visible
         }
       })),
     setSelectedChartSystem: (systemName) =>
