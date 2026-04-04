@@ -1,14 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createDefaultCommander } from '../domain/commander';
+import { formatCredits } from '../utils/money';
+
+const DEFAULT_COMMANDER = createDefaultCommander();
+const DEFAULT_START_SYSTEM = DEFAULT_COMMANDER.currentSystem.toUpperCase();
+const DEFAULT_CREDIT_BALANCE = formatCredits(DEFAULT_COMMANDER.cash).toUpperCase();
+const DEFAULT_LEGAL_STATUS = 'CLEAN';
 
 const BOOT_LINES = [
   'LOADING CORE SYSTEMS...',
-  'NAVIGATION: OK',
   'MEMORY RESTORE: NO SNAPSHOT AVAILABLE',
-  'LEARNING MODE: ACTIVE',
+  'NAVIGATION: OK',
+  `CURRENT SYSTEM: ${DEFAULT_START_SYSTEM}`,
+  `CREDIT BALANCE: ${DEFAULT_CREDIT_BALANCE}`,
+  `LEGAL STATUS: ${DEFAULT_LEGAL_STATUS}`,
   'PRIORITY PROFILE: DEFAULT'
 ] as const;
 
 const LINE_REVEAL_DELAY_MS = 360;
+const CONTINUE_PROMPT_DELAY_MS = 520;
 const CONTINUE_PROMPT = 'PRESS ANY KEY TO CONTINUE';
 
 export interface NewGameBootScreenProps {
@@ -17,8 +27,24 @@ export interface NewGameBootScreenProps {
 
 export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
   const [visibleLineCount, setVisibleLineCount] = useState(0);
+  const [showContinuePrompt, setShowContinuePrompt] = useState(false);
   const visibleLines = useMemo(() => BOOT_LINES.slice(0, visibleLineCount), [visibleLineCount]);
-  const isAwaitingContinue = visibleLineCount >= BOOT_LINES.length;
+  const hasFinishedBootLines = visibleLineCount >= BOOT_LINES.length;
+  const isAwaitingContinue = hasFinishedBootLines && showContinuePrompt;
+
+  useEffect(() => {
+    if (hasFinishedBootLines) {
+      const promptTimer = window.setTimeout(() => {
+        setShowContinuePrompt(true);
+      }, CONTINUE_PROMPT_DELAY_MS);
+      return () => window.clearTimeout(promptTimer);
+    }
+
+    const revealTimer = window.setTimeout(() => {
+      setVisibleLineCount((current) => current + 1);
+    }, LINE_REVEAL_DELAY_MS);
+    return () => window.clearTimeout(revealTimer);
+  }, [hasFinishedBootLines, visibleLineCount]);
 
   useEffect(() => {
     if (isAwaitingContinue) {
@@ -31,12 +57,7 @@ export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
         window.removeEventListener('keydown', handleContinue);
       };
     }
-
-    const revealTimer = window.setTimeout(() => {
-      setVisibleLineCount((current) => current + 1);
-    }, LINE_REVEAL_DELAY_MS);
-    return () => window.clearTimeout(revealTimer);
-  }, [isAwaitingContinue, onComplete, visibleLineCount]);
+  }, [isAwaitingContinue, onComplete]);
 
   return (
     <section
@@ -54,7 +75,7 @@ export function NewGameBootScreen({ onComplete }: NewGameBootScreenProps) {
             {line}
           </p>
         ))}
-        {isAwaitingContinue ? <p className="new-game-boot__continue">{CONTINUE_PROMPT}</p> : null}
+        {showContinuePrompt ? <p className="new-game-boot__continue">{CONTINUE_PROMPT}</p> : null}
       </div>
     </section>
   );
