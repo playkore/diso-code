@@ -1,10 +1,13 @@
 import { createDefaultCommander } from '../../domain/commander';
 import { createFreshGameState, createSaveState, createSnapshot, persistSaveStates, restoreSnapshot } from '../gameStateFactory';
+import { createDefaultPriority } from '../priority';
 import { createUiMessage, withUiMessage } from '../uiMessages';
 import type { GameSlice, GameStore } from '../storeTypes';
 import { formatCredits } from '../../utils/money';
 
-export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'loadFromSlot' | 'startNewGame' | 'resetAfterDeath'>> = (set, get) => ({
+export const createSaveLoadSlice: GameSlice<
+  Pick<GameStore, 'saveToSlot' | 'loadFromSlot' | 'beginNewGameBoot' | 'startNewGame' | 'resetAfterDeath'>
+> = (set, get) => ({
   saveToSlot: (slotId) => {
     const state = get();
     // Slots store a full snapshot so loading can rebuild every docked subsystem
@@ -35,11 +38,21 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
         travelSession: null,
         saveStates: state.saveStates,
         ui: withUiMessage(
-          { ...current.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false },
+          { ...current.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false, newGameBootVisible: false },
           createUiMessage('info', `Slot ${slotId} loaded`, `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`)
         )
       }));
   },
+  beginNewGameBoot: () =>
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        startScreenVisible: false,
+        newGameBootVisible: true,
+        latestEvent: undefined,
+        activityLog: []
+      }
+    })),
   startNewGame: () => {
     createDefaultCommander();
     const freshState = createFreshGameState();
@@ -47,8 +60,9 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
       ...freshState,
       // A new game always returns to the docked market tab with no active trip.
       travelSession: null,
+      priority: createDefaultPriority(freshState.commander.cash),
       ui: withUiMessage(
-        { ...state.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false },
+        { ...state.ui, activeTab: 'market', selectedChartSystem: null, startScreenVisible: false, newGameBootVisible: false },
         createUiMessage('info', 'New game started', 'Fresh commander created. Save when you want to overwrite Slot 1.')
       )
     }));
@@ -66,6 +80,7 @@ export const createSaveLoadSlice: GameSlice<Pick<GameStore, 'saveToSlot' | 'load
         activeTab: 'market',
         selectedChartSystem: null,
         startScreenVisible: true,
+        newGameBootVisible: false,
         latestEvent: undefined,
         activityLog: []
       }

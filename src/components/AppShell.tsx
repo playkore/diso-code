@@ -5,6 +5,7 @@ import { totalCargoUsedTonnes } from '../domain/commander';
 import { useGameStore } from '../store/useGameStore';
 import type { AppTab } from '../store/types';
 import { formatCredits } from '../utils/money';
+import { NewGameBootScreen } from './NewGameBootScreen';
 import { StartScreenGate } from './StartScreenGate';
 import { StartScreenLoader } from './StartScreenLoader';
 
@@ -116,7 +117,9 @@ export function AppShell() {
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
+  const newGameBootVisible = useGameStore((state) => state.ui.newGameBootVisible);
   const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
+  const finishNewGame = useGameStore((state) => state.startNewGame);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
   const isMenuFlowRoute = location.pathname === '/save' || location.pathname === '/load' || location.pathname === '/debug';
@@ -136,6 +139,10 @@ export function AppShell() {
 
   if (startScreenVisible && !hasEnteredStartMenu) {
     return <StartScreenLoader onContinue={() => setHasEnteredStartMenu(true)} />;
+  }
+
+  if (newGameBootVisible) {
+    return <NewGameBootScreen onComplete={finishNewGame} />;
   }
 
   return (

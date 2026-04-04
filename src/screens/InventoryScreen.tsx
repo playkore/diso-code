@@ -6,6 +6,7 @@ import { formatLightYears } from '../utils/distance';
 export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
   const galaxyIndex = useGameStore((state) => state.universe.galaxyIndex);
+  const priority = useGameStore((state) => state.priority);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const ratingProgress = getDosCombatRatingProgress(commander.combatRatingScore);
 
@@ -47,6 +48,8 @@ export function InventoryScreen() {
         <dd>
           {commander.missilesInstalled} / {commander.missileCapacity}
         </dd>
+        <dt>Priority</dt>
+        <dd>{priority.label}</dd>
       </dl>
     </section>
   );

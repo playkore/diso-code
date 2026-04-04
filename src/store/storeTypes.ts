@@ -1,7 +1,7 @@
 import type { StateCreator } from 'zustand';
 import type { EquipmentId, LaserId, LaserMountPosition } from '../domain/shipCatalog';
 import type { GameSnapshot } from '../domain/gamePersistence';
-import type { AppTab, CommanderState, MarketState, TravelState, UiState, UniverseState } from './types';
+import type { AppTab, CommanderState, MarketState, PriorityState, TravelState, UiState, UniverseState } from './types';
 
 /**
  * Store contract overview
@@ -54,6 +54,7 @@ export interface TravelCompletionReport {
  * - `commander`: player progression, cargo, equipment and money
  * - `market`: current docked market session
  * - `travelSession`: active route being flown, if any
+ * - `priority`: one compact hidden goal surfaced in the status UI
  * - `ui`: lightweight UI preferences and recent messages
  * - `saveStates`: loaded save slots
  *
@@ -69,13 +70,17 @@ export interface GameStore {
   commander: CommanderState;
   market: MarketState;
   travelSession: TravelState | null;
+  priority: PriorityState;
   ui: UiState;
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
   setStartScreenVisible: (visible: boolean) => void;
+  setNewGameBootVisible: (visible: boolean) => void;
   setSelectedChartSystem: (systemName: string | null) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
   setShowTravelPerfOverlay: (enabled: boolean) => void;
+  setPriority: (priority: PriorityState, options?: { announce?: boolean }) => void;
+  acknowledgePriorityAnnouncement: () => void;
   grantDebugCredits: (amount: number) => void;
   grantCombatCredits: (amount: number) => void;
   beginTravel: (systemName: string) => boolean;
@@ -91,6 +96,7 @@ export interface GameStore {
   useGalacticHyperdrive: () => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
+  beginNewGameBoot: () => void;
   startNewGame: () => void;
   resetAfterDeath: () => void;
 }

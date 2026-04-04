@@ -62,6 +62,33 @@ body {
   accent-color: var(--cga-yellow);
 }
 
+.new-game-boot {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: var(--cga-black);
+}
+
+.new-game-boot__panel {
+  width: min(100%, 34rem);
+  min-height: min(24rem, calc(100vh - 2rem));
+  padding: 1.25rem 1rem;
+  border: 2px solid var(--cga-yellow);
+  background: var(--cga-black);
+  color: var(--cga-green);
+  display: grid;
+  align-content: start;
+  gap: 0.55rem;
+}
+
+.new-game-boot__line {
+  margin: 0;
+  font-size: clamp(0.95rem, 3vw, 1.15rem);
+  line-height: 1.35;
+  letter-spacing: 0.05em;
+}
+
 .start-menu {
   position: fixed;
   inset: 0;
@@ -1247,6 +1274,7 @@ button:disabled {
 }
 
 .travel-screen__message {
+  white-space: pre-line;
   position: absolute;
   /* Keep transient alerts below the upper-right radar across short and tall viewports. */
   top: clamp(15.5rem, 31%, 21rem);

@@ -26,6 +26,18 @@ export interface UiMessage {
   body: string;
 }
 
+/**
+ * One hidden long-term system goal exposed to the player only as a compact
+ * status-line priority rather than as a full quest log.
+ */
+export interface PriorityState {
+  label: string;
+  targetCredits: number;
+  baselineCredits: number;
+  progressCredits: number;
+  pendingAnnouncement: boolean;
+}
+
 export interface TravelState {
   originSystem: string;
   destinationSystem: string;
@@ -43,6 +55,7 @@ export interface UiState {
   instantTravelEnabled: boolean;
   showTravelPerfOverlay: boolean;
   startScreenVisible: boolean;
+  newGameBootVisible: boolean;
   latestEvent?: UiMessage;
   activityLog: UiMessage[];
 }

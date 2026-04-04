@@ -4,6 +4,7 @@ import { loadGameJson, serializeGameJson, type GameSnapshot } from '../domain/ga
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelUnits } from '../domain/fuel';
 import { getGalaxySystems, getNearbySystemNames, getSystemByName, getSystemDistance } from '../domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../domain/market';
+import { createDefaultPriority, syncPriorityProgress } from './priority';
 import { createUiMessage, withUiMessage } from './uiMessages';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
 import type { AppTab, MarketState } from './types';
@@ -92,18 +93,20 @@ export function createInitialGameState(commander: CommanderState) {
       marketFluctuation: 0
     },
     commander: normalizedCommander,
-    market: createMarketState(normalizedCommander.currentSystem, economy, 0)
+    market: createMarketState(normalizedCommander.currentSystem, economy, 0),
+    priority: createDefaultPriority(normalizedCommander.cash)
   };
 }
 
 /**
  * Reduces live store state to the subset that belongs in a save file.
  */
-export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market'>): GameSnapshot {
+export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'priority'>): GameSnapshot {
   return {
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session
+    marketSession: state.market.session,
+    priority: state.priority
   };
 }
 
@@ -236,6 +239,7 @@ export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander'
  */
 export function restoreSnapshot(snapshot: GameSnapshot) {
   const commander = normalizeCommanderState(snapshot.commander);
+  const restoredPriority = snapshot.priority ? syncPriorityProgress(snapshot.priority, commander.cash) : createDefaultPriority(commander.cash);
   return {
     commander,
     universe: {
@@ -244,7 +248,8 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
       galaxyIndex: snapshot.universe.galaxyIndex ?? 0,
       nearbySystems: getNearbySystemNames(commander.currentSystem, snapshot.universe.galaxyIndex ?? 0)
     },
-    market: refreshItems(snapshot.marketSession)
+    market: refreshItems(snapshot.marketSession),
+    priority: restoredPriority
   };
 }
 
@@ -269,7 +274,7 @@ function isAppTab(value: unknown): value is AppTab {
  * because the flight runtime is an in-memory simulation rather than a stable
  * snapshot format.
  */
-export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'ui'>) {
+export function persistDockedSession(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'priority' | 'ui'>) {
   if (typeof window === 'undefined' || !window.localStorage) {
     return;
   }

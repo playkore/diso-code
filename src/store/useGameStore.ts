@@ -14,6 +14,7 @@ import { createOutfittingSlice } from './slices/outfittingSlice';
 import { createSaveLoadSlice } from './slices/saveLoadSlice';
 import { createTradeSlice } from './slices/tradeSlice';
 import { createTravelSlice } from './slices/travelSlice';
+import { syncPriorityProgress } from './priority';
 import type { GameStore } from './storeTypes';
 import { createUiMessage, withUiMessage } from './uiMessages';
 
@@ -24,7 +25,7 @@ export type { GameStore, SaveSlotId, SaveState, TravelCompletionReport } from '.
  * refresh-restorable session. Activity log chatter is intentionally excluded so
  * notification spam does not trigger extra writes.
  */
-function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'travelSession' | 'ui'>) {
+function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'priority' | 'travelSession' | 'ui'>) {
   if (state.travelSession) {
     return null;
   }
@@ -32,7 +33,8 @@ function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'univers
     activeTab: state.ui.activeTab,
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session
+    marketSession: state.market.session,
+    priority: state.priority
   });
 }
 
@@ -73,6 +75,7 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
     commander: bootState.commander,
     market: bootState.market,
     travelSession: null,
+    priority: bootState.priority,
     saveStates: persistedSaveStates,
     ui: {
       activeTab: persistedDockedSession?.activeTab ?? 'market',
@@ -81,6 +84,7 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
       instantTravelEnabled,
       showTravelPerfOverlay,
       startScreenVisible: true,
+      newGameBootVisible: false,
       activityLog: []
     },
 
@@ -92,6 +96,13 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
         ui: {
           ...state.ui,
           startScreenVisible: visible
+        }
+      })),
+    setNewGameBootVisible: (visible) =>
+      set((state) => ({
+        ui: {
+          ...state.ui,
+          newGameBootVisible: visible
         }
       })),
     setSelectedChartSystem: (systemName) =>
@@ -115,6 +126,20 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
           )
         };
       }),
+    setPriority: (priority, options) =>
+      set(() => ({
+        priority: {
+          ...priority,
+          pendingAnnouncement: options?.announce ?? true
+        }
+      })),
+    acknowledgePriorityAnnouncement: () =>
+      set((state) => ({
+        priority: {
+          ...state.priority,
+          pendingAnnouncement: false
+        }
+      })),
     setShowTravelPerfOverlay: (enabled) =>
       set((state) => {
         persistTravelPerfOverlayEnabled(enabled);
@@ -148,4 +173,12 @@ useGameStore.subscribe((state) => {
   }
   lastDockedSessionSignature = nextDockedSessionSignature;
   persistDockedSession(state);
+});
+
+useGameStore.subscribe((state) => {
+  const syncedPriority = syncPriorityProgress(state.priority, state.commander.cash);
+  if (syncedPriority.progressCredits === state.priority.progressCredits) {
+    return;
+  }
+  useGameStore.setState({ priority: syncedPriority });
 });

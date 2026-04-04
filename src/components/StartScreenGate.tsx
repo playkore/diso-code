@@ -49,7 +49,7 @@ export function StartScreenGate() {
   const navigate = useNavigate();
   const isMenuVisible = useGameStore((state) => state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
-  const startNewGame = useGameStore((state) => state.startNewGame);
+  const beginNewGameBoot = useGameStore((state) => state.beginNewGameBoot);
   const saveStates = useGameStore((state) => state.saveStates);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
@@ -135,7 +135,7 @@ export function StartScreenGate() {
     }
 
     if (mode === 'new-game') {
-      startNewGame();
+      beginNewGameBoot();
     } else {
       closeMenu();
     }

@@ -1,13 +1,14 @@
 import type { CommanderState } from './commander';
 import type { DockedMarketSession } from './market';
-import type { UniverseState } from '../store/types';
+import type { PriorityState, UniverseState } from '../store/types';
 
-export const GAME_SAVE_SCHEMA_VERSION = 2;
+export const GAME_SAVE_SCHEMA_VERSION = 3;
 
 export interface GameSnapshot {
   commander: CommanderState;
   universe: UniverseState;
   marketSession: DockedMarketSession;
+  priority: PriorityState;
 }
 
 export interface GameSaveFile {

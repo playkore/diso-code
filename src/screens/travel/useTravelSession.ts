@@ -27,6 +27,7 @@ import { createAutoDockState, stepAutoDockState, type AutoDockState } from '../.
 import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
 import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
+import type { PriorityState } from '../../store/types';
 
 interface PlayerDeathState {
   elapsedMs: number;
@@ -218,10 +219,12 @@ export function getJoystickProjectedThrust(vectorX: number, vectorY: number, shi
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
+  priority: PriorityState,
   commander: CombatCommanderSnapshot,
   grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: Parameters<ReturnType<typeof import('../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
   resetAfterDeath: () => void,
+  acknowledgePriorityAnnouncement: () => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
   const [hud, setHud] = useState(INITIAL_HUD);
@@ -304,6 +307,22 @@ export function useTravelSession(
     messageRef.current = next;
     setMessage(next);
   };
+
+  useEffect(() => {
+    if (!session || !priority.pendingAnnouncement) {
+      return undefined;
+    }
+
+    const priorityMessage = `PRIORITY UPDATED\n${priority.label}`;
+    setMessageState(priorityMessage);
+    acknowledgePriorityAnnouncement();
+    const clearTimer = window.setTimeout(() => {
+      if (messageRef.current === priorityMessage) {
+        setMessageState('');
+      }
+    }, 1800);
+    return () => window.clearTimeout(clearTimer);
+  }, [acknowledgePriorityAnnouncement, priority.label, priority.pendingAnnouncement, session]);
 
   const setHyperspaceHiddenState = (next: boolean) => {
     if (hyperspaceHiddenRef.current === next) {
