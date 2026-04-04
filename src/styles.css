@@ -380,11 +380,50 @@ body {
      for mobile browser bars and device cutouts. */
   padding: var(--app-safe-area-top) 0.75rem var(--app-safe-area-bottom);
   gap: 0.75rem;
+  position: relative;
 }
 
 .app-shell--power-on {
   overflow: hidden;
-  animation: app-shell-crt-power-on 320ms steps(5, end) forwards;
+  background: var(--cga-black);
+}
+
+.app-shell__power-on-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 20;
+  display: block;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  background: var(--cga-yellow);
+  box-shadow: 0 0 10px var(--cga-yellow);
+}
+
+.app-shell--power-on > :not(.app-shell__power-on-overlay) {
+  opacity: 0;
+}
+
+.app-shell__power-on-overlay--dot {
+  width: 0.45rem;
+  height: 0.45rem;
+}
+
+.app-shell__power-on-overlay--line {
+  width: calc(100% - 1.5rem);
+  height: 0.22rem;
+}
+
+.app-shell--power-on-reveal > :not(.app-shell__power-on-overlay) {
+  opacity: 1;
+  clip-path: inset(50% 0 50% 0);
+  animation: app-shell-crt-reveal-content 900ms linear forwards;
+}
+
+.app-shell__power-on-overlay--reveal {
+  width: calc(100% - 1.5rem);
+  height: 0.22rem;
+  animation: app-shell-crt-reveal-overlay 900ms linear forwards;
 }
 
 .app-shell--travel {
@@ -395,17 +434,33 @@ body {
   gap: 0;
 }
 
-@keyframes app-shell-crt-power-on {
+@keyframes app-shell-crt-reveal-content {
   0% {
-    clip-path: inset(50% 50% 50% 50%);
-  }
-
-  35% {
     clip-path: inset(50% 0 50% 0);
   }
 
   100% {
     clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes app-shell-crt-reveal-overlay {
+  0% {
+    width: calc(100% - 1.5rem);
+    height: 0.22rem;
+    opacity: 1;
+  }
+
+  90% {
+    width: calc(100% - 1.5rem);
+    height: calc(100% - var(--app-safe-area-top) - var(--app-safe-area-bottom));
+    opacity: 1;
+  }
+
+  100% {
+    width: calc(100% - 1.5rem);
+    height: calc(100% - var(--app-safe-area-top) - var(--app-safe-area-bottom));
+    opacity: 0;
   }
 }
 

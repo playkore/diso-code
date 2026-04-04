@@ -111,7 +111,9 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
 ];
 
 export function AppShell() {
-  const CRT_POWER_ON_DURATION_MS = 320;
+  const CRT_DOT_DURATION_MS = 450;
+  const CRT_LINE_DURATION_MS = 450;
+  const CRT_REVEAL_DURATION_MS = 900;
   const location = useLocation();
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
@@ -127,20 +129,33 @@ export function AppShell() {
   const isTravelRoute = location.pathname === '/travel';
   const isMenuFlowRoute = location.pathname === '/save' || location.pathname === '/load' || location.pathname === '/debug';
   const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
+  const [powerOnPhase, setPowerOnPhase] = useState<'dot' | 'line' | 'reveal' | null>(null);
 
   useEffect(() => {
     if (!newGamePowerOnVisible) {
+      setPowerOnPhase(null);
       return undefined;
     }
 
-    // The CRT reveal belongs to the live docked UI so the player sees the
-    // actual market/status shell bloom onto the screen instead of a fake fill.
-    const timer = window.setTimeout(() => {
+    // The boot handoff is staged explicitly as point -> scan line -> reveal so
+    // each CRT phase remains visible and debuggable instead of relying on one
+    // dense keyframe animation to communicate three separate moments.
+    setPowerOnPhase('dot');
+    const lineTimer = window.setTimeout(() => {
+      setPowerOnPhase('line');
+    }, CRT_DOT_DURATION_MS);
+    const revealTimer = window.setTimeout(() => {
+      setPowerOnPhase('reveal');
+    }, CRT_DOT_DURATION_MS + CRT_LINE_DURATION_MS);
+    const completionTimer = window.setTimeout(() => {
+      setPowerOnPhase(null);
       setNewGamePowerOnVisible(false);
-    }, CRT_POWER_ON_DURATION_MS);
+    }, CRT_DOT_DURATION_MS + CRT_LINE_DURATION_MS + CRT_REVEAL_DURATION_MS);
 
     return () => {
-      window.clearTimeout(timer);
+      window.clearTimeout(lineTimer);
+      window.clearTimeout(revealTimer);
+      window.clearTimeout(completionTimer);
     };
   }, [newGamePowerOnVisible, setNewGamePowerOnVisible]);
 
@@ -165,7 +180,17 @@ export function AppShell() {
   }
 
   return (
-    <div className={`app-shell${newGamePowerOnVisible ? ' app-shell--power-on' : ''}`}>
+    <div
+      className={`app-shell${
+        powerOnPhase ? ` app-shell--power-on app-shell--power-on-${powerOnPhase}` : ''
+      }`}
+    >
+      {powerOnPhase ? (
+        <span
+          className={`app-shell__power-on-overlay app-shell__power-on-overlay--${powerOnPhase}`}
+          aria-hidden="true"
+        />
+      ) : null}
       <StartScreenGate />
       {isMenuFlowRoute ? null : (
         <header>
