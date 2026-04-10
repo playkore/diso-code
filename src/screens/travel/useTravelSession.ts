@@ -217,6 +217,46 @@ function toDegrees(angle: number) {
   return (angle * 180) / Math.PI;
 }
 
+function getStationClampedCameraOverride(
+  combatState: ReturnType<typeof createTravelCombatState>,
+  cameraDistance: number
+) {
+  if (!combatState.station) {
+    return null;
+  }
+
+  const cameraPosition = { x: combatState.player.x, y: combatState.player.y, z: cameraDistance };
+  const stationOffsetX = cameraPosition.x - combatState.station.x;
+  const stationOffsetY = cameraPosition.y - combatState.station.y;
+  const stationDistance = Math.hypot(stationOffsetX, stationOffsetY);
+  const clampRadius = combatState.station.safeZoneRadius;
+  if (stationDistance >= clampRadius) {
+    return null;
+  }
+
+  const fallbackAngle = combatState.player.angle + Math.PI;
+  const radialDirection =
+    stationDistance > 1e-6
+      ? { x: stationOffsetX / stationDistance, y: stationOffsetY / stationDistance }
+      : { x: Math.cos(fallbackAngle), y: Math.sin(fallbackAngle) };
+
+  return {
+    position: {
+      x: combatState.station.x + radialDirection.x * clampRadius,
+      y: combatState.station.y + radialDirection.y * clampRadius,
+      z: cameraDistance
+    },
+    // The camera still frames the ship itself; only the viewpoint slides onto
+    // the safe-zone ring once the usual follow camera would dive too close to
+    // the station.
+    lookAt: {
+      x: combatState.player.x,
+      y: combatState.player.y,
+      z: 0
+    }
+  };
+}
+
 function getJoystickTurnCommand(currentAngle: number, targetAngle: number) {
   return clampUnit(clampAngle(targetAngle - currentAngle) / JOYSTICK_TARGET_TURN_ANGLE);
 }
@@ -1236,6 +1276,7 @@ export function useTravelSession(
 
       updateHud();
       setGameOverOverlay({ visible: false });
+      const defaultCameraDistance = getPerspectiveCameraDistance(ch, 36);
       travelSceneRenderer.renderFrame({
         combatState,
         stars,
@@ -1245,6 +1286,7 @@ export function useTravelSession(
         playerBankAngle: playerBankState.visualAngle,
         enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
         playerDeathEffect: null,
+        cameraOverride: getStationClampedCameraOverride(combatState, defaultCameraDistance) ?? undefined,
         radarInsetTop,
         radarInsetRight
       });
