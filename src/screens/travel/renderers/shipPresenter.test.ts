@@ -1,10 +1,13 @@
 import { Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { createLowPolyPlayerObject, createStationObject, selectShipPresenter } from './shipPresenter';
+import { createLowPolyPlayerObject, createStationObject, selectShipPresenter, setShipPresenterDebugOptions } from './shipPresenter';
 import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
 
 describe('createLowPolyPlayerObject', () => {
   it('builds a black-faced ship with a yellow wireframe edge overlay', () => {
+    // The presenter keeps debug label toggles in module state for the showcase,
+    // so tests must reset them explicitly before asserting the base mesh shape.
+    setShipPresenterDebugOptions({ showFaceLabels: false, showVertexLabels: false, doubleSidedHull: false });
     const ship = createLowPolyPlayerObject();
     const hull = ship.children[0] as Mesh;
     const edges = ship.children[1] as LineSegments;
@@ -52,7 +55,7 @@ describe('selectShipPresenter geometry split', () => {
 });
 
 describe('createStationObject', () => {
-  it('builds an authored cube station mesh with a docking tunnel', () => {
+  it('builds the authored Coriolis station mesh from the original Elite outline', () => {
     const station = createStationObject();
     const hull = station.children[0] as Mesh;
     const edges = station.children[1] as LineSegments;
@@ -62,6 +65,6 @@ describe('createStationObject', () => {
     expect(edges).toBeInstanceOf(LineSegments);
     expect(((hull.material as MeshBasicMaterial).color.getHexString())).toBe(CGA_BLACK.slice(1));
     expect(((edges.material as LineBasicMaterial).color.getHexString())).toBe(CGA_YELLOW.slice(1));
-    expect(edges.geometry.getAttribute('position').count).toBe(48);
+    expect(edges.geometry.getAttribute('position').count).toBe(56);
   });
 });

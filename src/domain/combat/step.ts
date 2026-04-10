@@ -14,6 +14,11 @@ import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCo
 
 const MAX_ACTIVE_ENEMIES = 12;
 const ENEMY_DESPAWN_DISTANCE = RADAR_SHIP_RANGE * 3;
+const PLAYER_ENGINE_EXHAUST_DISTANCE = 11;
+const PLAYER_ENGINE_NOZZLE_OFFSET = 5;
+const PLAYER_ENGINE_EXHAUST_COLOR = '#ff5555';
+const PLAYER_ENGINE_EXHAUST_LIFE = 1.2;
+const PLAYER_ENGINE_EXHAUST_SIZE = 0.18;
 
 /**
  * Ambient contacts may leave the encounter once they drift far enough away,
@@ -30,6 +35,34 @@ function shouldDespawnEnemy(state: TravelCombatState, enemy: TravelCombatState['
 
   const distanceFromPlayer = Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y);
   return distanceFromPlayer > ENEMY_DESPAWN_DISTANCE;
+}
+
+/**
+ * The Cobra stern has two separate engine nozzles. Exhaust particles therefore
+ * spawn from two mirrored offsets behind the ship instead of from the center
+ * line, which keeps the trail aligned with the visible hull silhouette.
+ *
+ * The plume is intentionally compact: short-lived, small particles keep the
+ * exhaust tucked close to the hull instead of reading like a long booster trail.
+ */
+function emitPlayerEngineExhaust(state: TravelCombatState) {
+  const forwardX = Math.cos(state.player.angle);
+  const forwardY = Math.sin(state.player.angle);
+  const lateralX = -forwardY;
+  const lateralY = forwardX;
+
+  for (const nozzleOffset of [-PLAYER_ENGINE_NOZZLE_OFFSET, PLAYER_ENGINE_NOZZLE_OFFSET]) {
+    state.particles.push({
+      x: state.player.x - forwardX * PLAYER_ENGINE_EXHAUST_DISTANCE + lateralX * nozzleOffset,
+      y: state.player.y - forwardY * PLAYER_ENGINE_EXHAUST_DISTANCE + lateralY * nozzleOffset,
+      vx: -state.player.vx * 0.5,
+      vy: -state.player.vy * 0.5,
+      life: PLAYER_ENGINE_EXHAUST_LIFE,
+      maxLife: PLAYER_ENGINE_EXHAUST_LIFE,
+      color: PLAYER_ENGINE_EXHAUST_COLOR,
+      size: PLAYER_ENGINE_EXHAUST_SIZE
+    });
+  }
 }
 
 /**
@@ -102,16 +135,7 @@ export function stepTravelCombat(
     if (input.thrust > 0 && !jumpActive) {
       state.player.vx += Math.cos(state.player.angle) * input.thrust * 0.2 * dt;
       state.player.vy += Math.sin(state.player.angle) * input.thrust * 0.2 * dt;
-      state.particles.push({
-        x: state.player.x - Math.cos(state.player.angle) * 15,
-        y: state.player.y - Math.sin(state.player.angle) * 15,
-        vx: -state.player.vx * 0.5,
-        vy: -state.player.vy * 0.5,
-        life: 10,
-        maxLife: 10,
-        color: '#55ff55',
-        size: 1.4
-      });
+      emitPlayerEngineExhaust(state);
     }
 
     state.player.vx *= 0.99;

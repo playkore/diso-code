@@ -181,6 +181,11 @@ function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: st
   return ship;
 }
 
+/**
+ * The player Cobra has two engine nozzles on the stern. Rendering each plume
+ * as its own narrow wedge keeps the silhouette aligned with the authored hull
+ * instead of collapsing both engines into one centered exhaust streak.
+ */
 const STATION_MESH: ShipMeshDefinition = {
   ...STATION_MESH_DEFINITION,
   faceLabels: [],
@@ -205,9 +210,9 @@ export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: str
 }
 
 /**
- * The station uses a simple cube hull plus a short square docking tunnel on
- * the +X face. The tunnel keeps the target readable in motion without forcing
- * the renderer to cut a more complex opening through the whole station body.
+ * The station mesh follows the original BBC Elite Coriolis blueprint: a
+ * rotating octagonal body with a rectangular docking slot cut into the front
+ * face rather than a synthetic protruding tunnel.
  */
 export function createStationObject() {
   return createWireframeMeshObject(STATION_MESH, CGA_YELLOW);

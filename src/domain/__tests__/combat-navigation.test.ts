@@ -36,6 +36,21 @@ describe('travel combat navigation rules', () => {
     expect(Math.hypot(state.player.vx, state.player.vy)).toBeCloseTo(4.8, 5);
   });
 
+  it('spawns two red exhaust particles from the player stern nozzles while thrusting', () => {
+    const state = createCombatState([0, 0, 0, 0]);
+    state.player.x = 10;
+    state.player.y = 20;
+    state.player.angle = 0;
+
+    stepTravelCombat(state, { thrust: 1, turn: 0 }, 1, 'PLAYING', {}, { nextByte: () => 0, nextFloat: () => 0 });
+
+    expect(state.particles).toHaveLength(2);
+    expect(state.particles.map((particle) => particle.color)).toEqual(['#ff5555', '#ff5555']);
+    expect(state.particles[0]?.x).toBeCloseTo(-1.1, 6);
+    expect(state.particles[1]?.x).toBeCloseTo(-1.1, 6);
+    expect(state.particles.map((particle) => particle.y)).toEqual([15, 25]);
+  });
+
   it('limits radar ship contacts to the configured range', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.enemies.push(

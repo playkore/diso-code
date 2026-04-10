@@ -13,11 +13,52 @@ export interface StationMeshDefinition {
   wireEdges: readonly StationEdge[];
 }
 
-export const STATION_BASE_HALF_EXTENT = 18;
-export const STATION_TUNNEL_HALF_WIDTH = 8;
-export const STATION_TUNNEL_START_X = 18;
-export const STATION_TUNNEL_END_X = 32;
-export const STATION_DOCK_POINT_X = 31;
+export const STATION_BASE_HALF_EXTENT = 160;
+export const STATION_TUNNEL_HALF_WIDTH = 10;
+export const STATION_TUNNEL_START_X = 160;
+export const STATION_TUNNEL_END_X = 160;
+export const STATION_DOCK_POINT_X = 148;
+
+const RAW_CORIOLIS_VERTICES = [
+  [160, 0, 160],
+  [0, 160, 160],
+  [-160, 0, 160],
+  [0, -160, 160],
+  [160, -160, 0],
+  [160, 160, 0],
+  [-160, 160, 0],
+  [-160, -160, 0],
+  [160, 0, -160],
+  [0, 160, -160],
+  [-160, 0, -160],
+  [0, -160, -160],
+  [10, -30, 160],
+  [10, 30, 160],
+  [-10, 30, 160],
+  [-10, -30, 160]
+] as const satisfies readonly StationPoint3[];
+
+/**
+ * BBC Elite stores station blueprints as `x right, y up, z nose`. The combat
+ * and docking code in this project assumes `+X` points through the docking
+ * slot, `+Y` is the horizontal opening axis, and `+Z` is vertical height.
+ *
+ * The Coriolis slot sits on the original `z = 160` face, so remapping the
+ * original blueprint to `[z, x, y]` preserves the docking axis and keeps the
+ * authored slot width/height intact for collision and rendering.
+ *
+ * Source blueprint:
+ * https://elite.bbcelite.com/master/all/elite_ships.html#ship_coriolis
+ */
+function toStationPoint([x, y, z]: StationPoint3): StationPoint3 {
+  return [z, x, y];
+}
+
+const STATION_VERTICES = RAW_CORIOLIS_VERTICES.map(toStationPoint) as readonly StationPoint3[];
+
+function getVertex(index: number) {
+  return STATION_VERTICES[index];
+}
 
 /**
  * Station geometry is shared between rendering and gameplay. The authored mesh
@@ -26,58 +67,66 @@ export const STATION_DOCK_POINT_X = 31;
  */
 export const STATION_MESH_DEFINITION: StationMeshDefinition = {
   hullTriangles: [
-    [[-18, 18, 18], [-18, -18, -18], [-18, -18, 18]],
-    [[-18, 18, 18], [-18, 18, -18], [-18, -18, -18]],
-    [[18, 18, 18], [18, 18, -18], [-18, 18, -18]],
-    [[18, 18, 18], [-18, 18, -18], [-18, 18, 18]],
-    [[18, -18, 18], [-18, -18, 18], [-18, -18, -18]],
-    [[18, -18, 18], [-18, -18, -18], [18, -18, -18]],
-    [[18, 18, 18], [-18, 18, 18], [-18, -18, 18]],
-    [[18, 18, 18], [-18, -18, 18], [18, -18, 18]],
-    [[18, 18, -18], [18, -18, -18], [-18, -18, -18]],
-    [[18, 18, -18], [-18, -18, -18], [-18, 18, -18]],
-    [[18, 18, 18], [18, -18, 18], [18, -8, 8]],
-    [[18, 18, 18], [18, -8, 8], [18, 8, 8]],
-    [[18, -18, 18], [18, -18, -18], [18, -8, -8]],
-    [[18, -18, 18], [18, -8, -8], [18, -8, 8]],
-    [[18, 18, -18], [18, 8, -8], [18, -8, -8]],
-    [[18, 18, -18], [18, -8, -8], [18, -18, -18]],
-    [[18, 18, 18], [18, 8, 8], [18, 8, -8]],
-    [[18, 18, 18], [18, 8, -8], [18, 18, -18]],
-    [[18, 8, 8], [32, -8, 8], [32, 8, 8]],
-    [[18, 8, 8], [18, -8, 8], [32, -8, 8]],
-    [[18, -8, -8], [32, 8, -8], [32, -8, -8]],
-    [[18, -8, -8], [18, 8, -8], [32, 8, -8]],
-    [[18, -8, 8], [32, -8, -8], [32, -8, 8]],
-    [[18, -8, 8], [18, -8, -8], [32, -8, -8]],
-    [[18, 8, -8], [32, 8, 8], [32, 8, -8]],
-    [[18, 8, -8], [18, 8, 8], [32, 8, 8]]
+    // Face 0 in the original blueprint is a diamond with a rectangular docking
+    // slot cut from it. Splitting the front ring into eight triangles keeps the
+    // slot genuinely open in the gameplay slice instead of rendering it as a
+    // painted rectangle on a solid face.
+    [getVertex(0), getVertex(1), getVertex(13)],
+    [getVertex(0), getVertex(13), getVertex(12)],
+    [getVertex(1), getVertex(14), getVertex(13)],
+    [getVertex(1), getVertex(2), getVertex(14)],
+    [getVertex(2), getVertex(15), getVertex(14)],
+    [getVertex(2), getVertex(3), getVertex(15)],
+    [getVertex(3), getVertex(12), getVertex(15)],
+    [getVertex(3), getVertex(0), getVertex(12)],
+    [getVertex(0), getVertex(3), getVertex(4)],
+    [getVertex(0), getVertex(5), getVertex(1)],
+    [getVertex(1), getVertex(6), getVertex(2)],
+    [getVertex(2), getVertex(7), getVertex(3)],
+    [getVertex(3), getVertex(4), getVertex(11)],
+    [getVertex(3), getVertex(11), getVertex(7)],
+    [getVertex(0), getVertex(4), getVertex(8)],
+    [getVertex(0), getVertex(8), getVertex(5)],
+    [getVertex(2), getVertex(6), getVertex(10)],
+    [getVertex(2), getVertex(10), getVertex(7)],
+    [getVertex(1), getVertex(5), getVertex(9)],
+    [getVertex(1), getVertex(9), getVertex(6)],
+    [getVertex(7), getVertex(10), getVertex(11)],
+    [getVertex(4), getVertex(11), getVertex(8)],
+    [getVertex(5), getVertex(8), getVertex(9)],
+    [getVertex(6), getVertex(9), getVertex(10)],
+    [getVertex(8), getVertex(11), getVertex(10)],
+    [getVertex(8), getVertex(10), getVertex(9)]
   ],
   wireEdges: [
-    [[18, 18, 18], [18, -18, 18]],
-    [[18, -18, 18], [18, -18, -18]],
-    [[18, -18, -18], [18, 18, -18]],
-    [[18, 18, -18], [18, 18, 18]],
-    [[-18, 18, 18], [-18, -18, 18]],
-    [[-18, -18, 18], [-18, -18, -18]],
-    [[-18, -18, -18], [-18, 18, -18]],
-    [[-18, 18, -18], [-18, 18, 18]],
-    [[18, 18, 18], [-18, 18, 18]],
-    [[18, -18, 18], [-18, -18, 18]],
-    [[18, -18, -18], [-18, -18, -18]],
-    [[18, 18, -18], [-18, 18, -18]],
-    [[18, 8, 8], [18, -8, 8]],
-    [[18, -8, 8], [18, -8, -8]],
-    [[18, -8, -8], [18, 8, -8]],
-    [[18, 8, -8], [18, 8, 8]],
-    [[32, 8, 8], [32, -8, 8]],
-    [[32, -8, 8], [32, -8, -8]],
-    [[32, -8, -8], [32, 8, -8]],
-    [[32, 8, -8], [32, 8, 8]],
-    [[18, 8, 8], [32, 8, 8]],
-    [[18, -8, 8], [32, -8, 8]],
-    [[18, -8, -8], [32, -8, -8]],
-    [[18, 8, -8], [32, 8, -8]]
+    [getVertex(0), getVertex(3)],
+    [getVertex(0), getVertex(1)],
+    [getVertex(1), getVertex(2)],
+    [getVertex(2), getVertex(3)],
+    [getVertex(3), getVertex(4)],
+    [getVertex(0), getVertex(4)],
+    [getVertex(0), getVertex(5)],
+    [getVertex(5), getVertex(1)],
+    [getVertex(1), getVertex(6)],
+    [getVertex(2), getVertex(6)],
+    [getVertex(2), getVertex(7)],
+    [getVertex(3), getVertex(7)],
+    [getVertex(8), getVertex(11)],
+    [getVertex(8), getVertex(9)],
+    [getVertex(9), getVertex(10)],
+    [getVertex(10), getVertex(11)],
+    [getVertex(4), getVertex(11)],
+    [getVertex(4), getVertex(8)],
+    [getVertex(5), getVertex(8)],
+    [getVertex(5), getVertex(9)],
+    [getVertex(6), getVertex(9)],
+    [getVertex(6), getVertex(10)],
+    [getVertex(7), getVertex(10)],
+    [getVertex(7), getVertex(11)],
+    [getVertex(12), getVertex(13)],
+    [getVertex(13), getVertex(14)],
+    [getVertex(14), getVertex(15)],
+    [getVertex(15), getVertex(12)]
   ]
 } as const;
 

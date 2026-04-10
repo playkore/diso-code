@@ -11,8 +11,8 @@ const STATION_DOCK_PROGRESS_MARGIN = 6;
  *
  * Docking now follows the authored station mesh rather than a radial hull
  * approximation. The collision envelope comes from the live `z=0` slice of the
- * rotating station mesh, while the docking corridor is the square tunnel that
- * protrudes from the station's +X face in local space.
+ * rotating Coriolis mesh, while the docking corridor is the front-face slot
+ * from the original Elite blueprint.
  */
 export function getStationSlotAngle(stationAngle: number): number {
   return getStationDockAngle(stationAngle);
@@ -54,11 +54,17 @@ export function assessDockingApproach(
     Math.abs(lateralOffset) <= bodyHalfWidth;
   const isInsideSlot = Math.abs(lateralOffset) <= getStationTunnelHalfWidth(station);
   const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
-  const isInDockingGap = isInsideSlot && axialOffset >= station.radius && axialOffset <= mouthAxial + STATION_DOCK_ENTRY_GRACE;
-  const collidesWithHull = (insideBodySlice && !(isInsideSlot && axialOffset >= station.radius)) || (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot);
-  // Once the ship has genuinely entered the tunnel, docking should resolve
-  // anywhere along that corridor instead of requiring one hidden trigger point.
-  const canDock = isInsideSlot && isFacingHangar && axialOffset >= station.radius + STATION_DOCK_PROGRESS_MARGIN;
+  const isInDockingGap =
+    isInsideSlot &&
+    axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE &&
+    axialOffset <= mouthAxial + STATION_DOCK_ENTRY_GRACE;
+  const collidesWithHull =
+    (insideBodySlice && !(isInsideSlot && axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE)) ||
+    (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot);
+  // The original Coriolis slot sits flush with the front face rather than at
+  // the end of a protruding tunnel, so docking should complete once the ship
+  // crosses just inside the rotating aperture while still aligned with it.
+  const canDock = isInsideSlot && isFacingHangar && axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN;
 
   return {
     slotAngle,
