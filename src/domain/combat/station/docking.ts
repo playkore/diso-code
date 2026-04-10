@@ -5,6 +5,19 @@ import { getDistanceToStationSlice, getStationDockAngle, getStationDockDirection
 const STATION_COLLISION_MARGIN = 5;
 const STATION_DOCK_ENTRY_GRACE = 6;
 const STATION_DOCK_PROGRESS_MARGIN = 6;
+const STATION_ALIGN_OK_WINDOW = (10 * Math.PI) / 180;
+const STATION_ROLL_SAFE_WINDOW = 0.22;
+
+function wrapAngleToHalfTurn(angle: number) {
+  const wrapped = clampAngle(angle);
+  if (wrapped > Math.PI / 2) {
+    return wrapped - Math.PI;
+  }
+  if (wrapped < -Math.PI / 2) {
+    return wrapped + Math.PI;
+  }
+  return wrapped;
+}
 
 /**
  * Docking geometry helpers.
@@ -35,6 +48,11 @@ export function assessDockingApproach(
   const tunnelHalfWidth = getStationTunnelHalfWidth(station);
   const slotOffset = lateralOffset / Math.max(1, tunnelHalfWidth);
   const noseAlignment = clampAngle(player.angle - (slotAngle + Math.PI));
+  const doorRoll = wrapAngleToHalfTurn(station.spinAngle ?? 0);
+  const stationToPlayerAngle = Math.atan2(centerOffsetY, centerOffsetX);
+  const axisAlignmentError = Math.abs(clampAngle(stationToPlayerAngle - slotAngle));
+  const alignOk = axisAlignmentError <= STATION_ALIGN_OK_WINDOW;
+  const rollSafe = Math.abs(doorRoll) <= STATION_ROLL_SAFE_WINDOW;
   const sliceExtents = getStationSliceSegments(station).flatMap(([start, end]) => {
     const startAxial = (start[0] - station.x) * dockDirection.x + (start[1] - station.y) * dockDirection.y;
     const startLateral = (start[0] - station.x) * -dockDirection.y + (start[1] - station.y) * dockDirection.x;
@@ -52,15 +70,25 @@ export function assessDockingApproach(
     axialOffset >= -station.radius &&
     axialOffset <= mouthAxial &&
     Math.abs(lateralOffset) <= bodyHalfWidth;
-  const isInsideSlot = Math.abs(lateralOffset) <= getStationTunnelHalfWidth(station);
+  // Manual docking help now promises that ALIGN OK + ROLL SAFE is a genuinely
+  // safe entry window. When both are true near the front face, treat the ship
+  // as being inside the usable doorway even if the strict rectangular slot
+  // projection would clip a front-edge corner.
+  const safeManualEntryWindow =
+    alignOk &&
+    rollSafe &&
+    axialOffset >= mouthAxial - 24 &&
+    axialOffset <= mouthAxial + 24;
+  const isInsideSlot = Math.abs(lateralOffset) <= getStationTunnelHalfWidth(station) || safeManualEntryWindow;
   const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
   const isInDockingGap =
     isInsideSlot &&
     axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE &&
     axialOffset <= mouthAxial + STATION_DOCK_ENTRY_GRACE;
   const collidesWithHull =
-    (insideBodySlice && !(isInsideSlot && axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE)) ||
-    (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot);
+    ((insideBodySlice && !(isInsideSlot && axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE)) ||
+      (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot)) &&
+    !safeManualEntryWindow;
   // The original Coriolis slot sits flush with the front face rather than at
   // the end of a protruding tunnel, so docking should complete once the ship
   // crosses just inside the rotating aperture while still aligned with it.
@@ -72,6 +100,16 @@ export function assessDockingApproach(
     noseAlignment,
     distance,
     speed,
+    axialOffset,
+    lateralOffset,
+    mouthAxial,
+    tunnelHalfWidth,
+    // The doorway roll repeats every half turn because flipping the rectangle
+    // by 180 degrees yields the same visible door plane to the pilot.
+    doorRoll,
+    axisAlignmentError,
+    alignOk,
+    rollSafe,
     isInsideSlot,
     isFacingHangar,
     isInDockingGap,

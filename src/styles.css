@@ -1373,6 +1373,29 @@ button:disabled {
   white-space: pre-line;
 }
 
+.travel-screen__docking-assist {
+  position: absolute;
+  top: clamp(11.8rem, 24%, 16rem);
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  gap: 0.18rem;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 2rem), 18rem);
+  padding: 0.45rem 0.7rem;
+  border: 2px solid var(--cga-yellow);
+  background: var(--cga-black);
+  text-align: center;
+  pointer-events: none;
+}
+
+.travel-screen__docking-assist-line {
+  font-size: clamp(0.9rem, 2.5vw, 1.15rem);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .travel-screen__game-over {
   position: absolute;
   left: 50%;

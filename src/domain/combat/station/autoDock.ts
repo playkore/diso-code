@@ -5,13 +5,13 @@ import { getStationDockDirection, getStationDockMouthPoint, getStationTunnelHalf
 export type AutoDockPhase = 'approach' | 'align' | 'wait' | 'inward';
 
 /**
- * The docking computer now runs a lead-angle intercept instead of circling the
- * station:
- * 1. stop on a safe staging radius outside the hull
+ * The docking computer now stages directly in front of the slot and then times
+ * the inward burn against the station's roll around the docking axis:
+ * 1. move to a fixed staging point on the docking axis
  * 2. point the nose at the station center
- * 3. estimate the inward travel time to the docking mouth
- * 4. wait until the rotating slot reaches the required lead angle
- * 5. burn straight toward the center and let the door rotate onto that line
+ * 3. estimate inward travel time to the docking mouth
+ * 4. wait until the slot roll will match the ship plane at arrival
+ * 5. burn straight inward through the opening
  */
 export interface AutoDockState {
   phase: AutoDockPhase;
@@ -34,11 +34,9 @@ export interface AutoDockCommand {
   mode: 'approach' | 'wait' | 'dock';
   debug: {
     phase: AutoDockPhase;
-    currentSlotAngle: number;
-    expectedSlotAngle: number;
-    playerRadialAngle: number;
-    slotOffset: number;
-    projectedSlotOffset: number;
+    currentDoorRoll: number;
+    expectedDoorRoll: number;
+    projectedDoorRollError: number;
     onStageRing: boolean;
     withinWaitBand: boolean;
     readyToWait: boolean;
@@ -68,6 +66,17 @@ const AUTO_DOCK_STOPPING_FACTOR = 70;
 const AUTO_DOCK_STOPPING_BUFFER = 8;
 const AUTO_DOCK_ALIGNMENT_WINDOW = 0.16;
 const AUTO_DOCK_WAIT_ANGLE_WINDOW = 0.14;
+
+function wrapAngleToHalfTurn(angle: number) {
+  const wrapped = clampAngle(angle);
+  if (wrapped > Math.PI / 2) {
+    return wrapped - Math.PI;
+  }
+  if (wrapped < -Math.PI / 2) {
+    return wrapped + Math.PI;
+  }
+  return wrapped;
+}
 
 function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
@@ -138,15 +147,15 @@ function createDebug(
   const radialSpeed = -(player.vx * radialDirection.x + player.vy * radialDirection.y);
   const tangentialSpeed = Math.abs(player.vx * -radialDirection.y + player.vy * radialDirection.x);
   const stageRadiusError = playerRadius - stageRadius;
-  const leadError = clampAngle((playerAngle - corridor.slotAngle) - leadAngle);
+  const currentDoorRoll = wrapAngleToHalfTurn(station.spinAngle ?? 0);
+  const expectedDoorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle);
+  const leadError = wrapAngleToHalfTurn(expectedDoorRoll);
 
   return {
     phase,
-    currentSlotAngle: corridor.slotAngle,
-    expectedSlotAngle: corridor.slotAngle + leadAngle,
-    playerRadialAngle: playerAngle,
-    slotOffset: corridor.lateralOffset,
-    projectedSlotOffset: leadError,
+    currentDoorRoll,
+    expectedDoorRoll,
+    projectedDoorRollError: leadError,
     onStageRing: Math.abs(stageRadiusError) <= AUTO_DOCK_STAGE_RADIUS_BAND,
     withinWaitBand: Math.abs(leadError) <= AUTO_DOCK_WAIT_ANGLE_WINDOW,
     readyToWait: Math.hypot(player.vx, player.vy) <= AUTO_DOCK_CAPTURE_SPEED,
@@ -190,21 +199,22 @@ export function stepAutoDockState(
   const playerOffsetX = player.x - station.x;
   const playerOffsetY = player.y - station.y;
   const playerRadius = Math.hypot(playerOffsetX, playerOffsetY);
-  const playerAngle = Math.atan2(playerOffsetY, playerOffsetX);
   const currentSpeed = Math.hypot(player.vx, player.vy);
-  const radialDirection = playerRadius > 1e-6
-    ? { x: playerOffsetX / playerRadius, y: playerOffsetY / playerRadius }
-    : { x: Math.cos(playerAngle), y: Math.sin(playerAngle) };
+  const dockDirection = corridor.dockDirection;
   const stageTarget = {
-    x: station.x + radialDirection.x * stageRadius,
-    y: station.y + radialDirection.y * stageRadius
+    x: station.x + dockDirection.x * stageRadius,
+    y: station.y + dockDirection.y * stageRadius
   };
   const inwardHeading = Math.atan2(station.y - player.y, station.x - player.x);
+  const inwardDirection = {
+    x: Math.cos(inwardHeading),
+    y: Math.sin(inwardHeading)
+  };
   const centerAlignment = clampAngle(player.angle - inwardHeading);
   const inwardTravelDistance = Math.max(0, playerRadius - mouthRadius);
   const inwardTravelTime = Math.max(0, inwardTravelDistance / AUTO_DOCK_INWARD_SPEED + (tuning.leadTimeBias ?? 0));
   const leadAngle = station.rotSpeed * inwardTravelTime;
-  const leadError = clampAngle((playerAngle - corridor.slotAngle) - leadAngle);
+  const leadError = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle);
   const debug = createDebug(state.phase, station, player, stageRadius, corridor, centerAlignment, leadAngle, inwardTravelTime);
 
   if (state.phase === 'approach') {
@@ -225,6 +235,9 @@ export function stepAutoDockState(
     };
   }
 
+  // Once the ship has committed to the inward burn it must be allowed to leave
+  // the staging ring; otherwise the controller snaps back to "approach" the
+  // moment it makes genuine docking progress toward the slot.
   if (state.phase !== 'inward' && Math.abs(playerRadius - stageRadius) > AUTO_DOCK_STAGE_RADIUS_BAND * 1.5) {
     state = { phase: 'approach', stageRadius };
     return stepAutoDockState(state, station, player, tuning);
@@ -268,7 +281,7 @@ export function stepAutoDockState(
     };
   }
 
-  const inwardSpeed = Math.max(0, -(player.vx * radialDirection.x + player.vy * radialDirection.y));
+  const inwardSpeed = Math.max(0, player.vx * inwardDirection.x + player.vy * inwardDirection.y);
   const shouldThrust = Math.abs(centerAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW && inwardSpeed < AUTO_DOCK_INWARD_SPEED;
   return {
     state,

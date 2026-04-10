@@ -42,7 +42,7 @@ describe('auto-dock steering', () => {
   });
 
   it('holds position while the station rotates into the lead angle', () => {
-    const station = { x: 0, y: 0, radius: 80, angle: 0.4, rotSpeed: 0.005, safeZoneRadius: 360 };
+    const station = { x: 0, y: 0, radius: 80, angle: 0.4, spinAngle: 0.4, rotSpeed: 0.005, safeZoneRadius: 360 };
     const stageRadius = getStageRadius(station);
     const step = stepAutoDockState({ phase: 'wait', stageRadius }, station, {
       x: station.x,

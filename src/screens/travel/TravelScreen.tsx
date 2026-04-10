@@ -147,6 +147,17 @@ export function TravelScreen() {
 
           {screenState.showTravelPerfOverlay ? <TravelPerfOverlay perf={travel.perf} /> : null}
 
+          {travel.dockingAssist.visible ? (
+            <div className="travel-screen__docking-assist" aria-live="polite">
+              <div className="travel-screen__docking-assist-line" style={{ color: travel.dockingAssist.lateralColor }}>
+                {travel.dockingAssist.lateralText}
+              </div>
+              <div className="travel-screen__docking-assist-line" style={{ color: travel.dockingAssist.rollColor }}>
+                {travel.dockingAssist.rollText}
+              </div>
+            </div>
+          ) : null}
+
           <div className="travel-screen__message">{travel.message}</div>
           {travel.gameOverOverlay.visible ? (
             <div className="travel-screen__game-over" aria-live="polite">

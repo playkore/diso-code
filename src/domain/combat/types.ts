@@ -430,6 +430,14 @@ export interface DockingAssessment {
   noseAlignment: number;
   distance: number;
   speed: number;
+  axialOffset: number;
+  lateralOffset: number;
+  mouthAxial: number;
+  tunnelHalfWidth: number;
+  doorRoll: number;
+  axisAlignmentError: number;
+  alignOk: boolean;
+  rollSafe: boolean;
   isInsideSlot: boolean;
   isFacingHangar: boolean;
   isInDockingGap: boolean;
