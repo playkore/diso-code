@@ -116,6 +116,8 @@ interface DockingAnimationState {
   elapsedMs: number;
   dockSystemName: string;
   spendJumpFuel: boolean;
+  startX: number;
+  startY: number;
 }
 
 interface DockingAssistState {
@@ -129,7 +131,6 @@ interface DockingAssistState {
 const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const DOCKING_ANIMATION_DURATION_MS = 1100;
-const DOCKING_ANIMATION_FORWARD_SPEED = 3.4;
 const DOCKING_CAMERA_FOLLOW_DISTANCE = 13;
 const DOCKING_CAMERA_SIDE_OFFSET = 6;
 const DOCKING_CAMERA_HEIGHT_FACTOR = 0.58;
@@ -717,7 +718,9 @@ export function useTravelSession(
       dockingAnimationState = {
         elapsedMs: 0,
         dockSystemName,
-        spendJumpFuel
+        spendJumpFuel,
+        startX: combatState.player.x,
+        startY: combatState.player.y
       };
       flightState = 'DOCKING_ANIMATION';
       autoDockActive = false;
@@ -811,12 +814,18 @@ export function useTravelSession(
           x: inwardDirection.y,
           y: -inwardDirection.x
         };
+        const cameraBlend = animationProgress * animationProgress * (3 - 2 * animationProgress);
+        // Docking should finish at the station center instead of flying
+        // through and out the back. Interpolating from the player's entry
+        // point to the center makes the cinematic deterministic and keeps the
+        // ship visually swallowed by the station interior.
+        combatState.player.x =
+          dockingAnimationState.startX + (combatState.station.x - dockingAnimationState.startX) * cameraBlend;
+        combatState.player.y =
+          dockingAnimationState.startY + (combatState.station.y - dockingAnimationState.startY) * cameraBlend;
         combatState.player.angle = Math.atan2(inwardDirection.y, inwardDirection.x);
-        combatState.player.x += inwardDirection.x * DOCKING_ANIMATION_FORWARD_SPEED * dt;
-        combatState.player.y += inwardDirection.y * DOCKING_ANIMATION_FORWARD_SPEED * dt;
         playerBankState = createShipBankState();
 
-        const cameraBlend = animationProgress * animationProgress * (3 - 2 * animationProgress);
         const baseCameraDistance = getPerspectiveCameraDistance(ch, 36);
         const dockMouth = getStationDockMouthPoint(combatState.station);
         // Docking readability matters more than a perfectly centered view. Keep
