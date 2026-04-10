@@ -2,6 +2,28 @@ import { Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 
 import { describe, expect, it } from 'vitest';
 import { createLowPolyPlayerObject, createStationObject, selectShipPresenter, setShipPresenterDebugOptions } from './shipPresenter';
 import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
+import { STATION_MESH_DEFINITION } from '../../../domain/combat/station/stationGeometry';
+
+function subtractPoint(
+  [ax, ay, az]: readonly [number, number, number],
+  [bx, by, bz]: readonly [number, number, number]
+) {
+  return [ax - bx, ay - by, az - bz] as const;
+}
+
+function crossProduct(
+  [ax, ay, az]: readonly [number, number, number],
+  [bx, by, bz]: readonly [number, number, number]
+) {
+  return [ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx] as const;
+}
+
+function dotProduct(
+  [ax, ay, az]: readonly [number, number, number],
+  [bx, by, bz]: readonly [number, number, number]
+) {
+  return ax * bx + ay * by + az * bz;
+}
 
 describe('createLowPolyPlayerObject', () => {
   it('builds a black-faced ship with a yellow wireframe edge overlay', () => {
@@ -66,5 +88,22 @@ describe('createStationObject', () => {
     expect(((hull.material as MeshBasicMaterial).color.getHexString())).toBe(CGA_BLACK.slice(1));
     expect(((edges.material as LineBasicMaterial).color.getHexString())).toBe(CGA_YELLOW.slice(1));
     expect(edges.geometry.getAttribute('position').count).toBe(56);
+  });
+
+  it('keeps every filled station triangle wound outward for back-face culling', () => {
+    for (const triangle of STATION_MESH_DEFINITION.hullTriangles) {
+      const [a, b, c] = triangle;
+      const normal = crossProduct(subtractPoint(b, a), subtractPoint(c, a));
+      const centroid = [
+        (a[0] + b[0] + c[0]) / 3,
+        (a[1] + b[1] + c[1]) / 3,
+        (a[2] + b[2] + c[2]) / 3
+      ] as const;
+
+      // The Coriolis hull is centered at the origin, so outward-facing
+      // triangles must have normals that point in the same direction as their
+      // centroid vector. Negative dot products indicate reversed winding.
+      expect(dotProduct(normal, centroid)).toBeGreaterThan(0);
+    }
   });
 });
