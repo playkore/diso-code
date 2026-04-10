@@ -1149,6 +1149,19 @@ export function useTravelSession(
             collidesWithHull: docking.collidesWithHull
           });
         }
+        // Successful docking must win over hull collision once the ship has
+        // already crossed the accepted doorway depth. Otherwise a pilot can
+        // fly deep enough into the station to satisfy `canDock`, yet still be
+        // blown up because the transient "mouth" check no longer matches.
+        if (docking.canDock) {
+          startDockingAnimation(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
+          pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
+          if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
+            publishPerfSnapshot(timestamp);
+          }
+          animationFrameId = window.requestAnimationFrame(loop);
+          return;
+        }
         if (docking.collidesWithHull) {
           // The station hull is unforgiving in the original game: clipping the
           // solid ring is a fatal mistake, not a recoverable bumper impact.
@@ -1161,15 +1174,6 @@ export function useTravelSession(
           animationFrameId = window.requestAnimationFrame(loop);
           return;
         } else if (docking.isInDockingGap) {
-          if (docking.canDock) {
-            startDockingAnimation(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
-            pushPerfSample(perfAccumulator.workDurations, performance.now() - workStart);
-            if (timestamp - perfAccumulator.windowStart >= PERF_REPORT_INTERVAL_MS) {
-              publishPerfSnapshot(timestamp);
-            }
-            animationFrameId = window.requestAnimationFrame(loop);
-            return;
-          }
           if (!docking.isFacingHangar || docking.speed >= 3.6) {
             showMessage('ENTER SLOT NOSE-IN AT LOW SPEED', 1000);
           }
