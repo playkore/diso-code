@@ -7,6 +7,7 @@ const STATION_DOCK_ENTRY_GRACE = 6;
 const STATION_DOCK_PROGRESS_MARGIN = 6;
 const STATION_ALIGN_OK_WINDOW = (10 * Math.PI) / 180;
 const STATION_ROLL_SAFE_WINDOW = 0.34;
+const STATION_DOOR_ROLL_PHASE_OFFSET = Math.PI / 2;
 
 function wrapAngleToHalfTurn(angle: number) {
   const wrapped = clampAngle(angle);
@@ -48,7 +49,10 @@ export function assessDockingApproach(
   const tunnelHalfWidth = getStationTunnelHalfWidth(station);
   const slotOffset = lateralOffset / Math.max(1, tunnelHalfWidth);
   const noseAlignment = clampAngle(player.angle - (slotAngle + Math.PI));
-  const doorRoll = wrapAngleToHalfTurn(station.spinAngle ?? 0);
+  // The visible safe doorway orientation is quarter a turn away from the raw
+  // mesh phase. Without this offset, the assist reports ROLL SAFE when the
+  // door rectangle is actually turned 90 degrees away from the ship plane.
+  const doorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) - STATION_DOOR_ROLL_PHASE_OFFSET);
   const stationToPlayerAngle = Math.atan2(centerOffsetY, centerOffsetX);
   const axisAlignmentError = Math.abs(clampAngle(stationToPlayerAngle - slotAngle));
   const alignOk = axisAlignmentError <= STATION_ALIGN_OK_WINDOW;

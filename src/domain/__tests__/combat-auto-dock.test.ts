@@ -58,7 +58,7 @@ describe('auto-dock steering', () => {
   });
 
   it('switches from wait to inward burn at the computed lead angle', () => {
-    const station = { x: 0, y: 0, radius: 80, angle: Math.PI / 2, rotSpeed: 0, safeZoneRadius: 360 };
+    const station = { x: 0, y: 0, radius: 80, angle: Math.PI / 2, spinAngle: Math.PI / 2, rotSpeed: 0, safeZoneRadius: 360 };
     const stageRadius = getStageRadius(station);
     const dockDirection = getStationDockDirection(station);
     const slotAngle = Math.atan2(dockDirection.y, dockDirection.x);

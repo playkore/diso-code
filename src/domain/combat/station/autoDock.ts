@@ -66,6 +66,7 @@ const AUTO_DOCK_STOPPING_FACTOR = 70;
 const AUTO_DOCK_STOPPING_BUFFER = 8;
 const AUTO_DOCK_ALIGNMENT_WINDOW = 0.16;
 const AUTO_DOCK_WAIT_ANGLE_WINDOW = 0.14;
+const STATION_DOOR_ROLL_PHASE_OFFSET = Math.PI / 2;
 
 function wrapAngleToHalfTurn(angle: number) {
   const wrapped = clampAngle(angle);
@@ -147,8 +148,8 @@ function createDebug(
   const radialSpeed = -(player.vx * radialDirection.x + player.vy * radialDirection.y);
   const tangentialSpeed = Math.abs(player.vx * -radialDirection.y + player.vy * radialDirection.x);
   const stageRadiusError = playerRadius - stageRadius;
-  const currentDoorRoll = wrapAngleToHalfTurn(station.spinAngle ?? 0);
-  const expectedDoorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle);
+  const currentDoorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) - STATION_DOOR_ROLL_PHASE_OFFSET);
+  const expectedDoorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle - STATION_DOOR_ROLL_PHASE_OFFSET);
   const leadError = wrapAngleToHalfTurn(expectedDoorRoll);
 
   return {
@@ -214,7 +215,7 @@ export function stepAutoDockState(
   const inwardTravelDistance = Math.max(0, playerRadius - mouthRadius);
   const inwardTravelTime = Math.max(0, inwardTravelDistance / AUTO_DOCK_INWARD_SPEED + (tuning.leadTimeBias ?? 0));
   const leadAngle = station.rotSpeed * inwardTravelTime;
-  const leadError = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle);
+  const leadError = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle - STATION_DOOR_ROLL_PHASE_OFFSET);
   const debug = createDebug(state.phase, station, player, stageRadius, corridor, centerAlignment, leadAngle, inwardTravelTime);
 
   if (state.phase === 'approach') {
