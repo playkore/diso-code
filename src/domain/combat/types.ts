@@ -279,7 +279,19 @@ export interface CombatStation {
   x: number;
   y: number;
   radius: number;
+  /**
+   * Screen-plane orientation of the station spin axis.
+   *
+   * The axis always passes through the station center and the docking slot
+   * center. `angle = 0` means the axis points to the right on screen.
+   */
   angle: number;
+  /**
+   * Current phase of the station tumbling around its own docking axis.
+   *
+   * Older fixtures can omit this field; runtime logic treats `undefined` as 0.
+   */
+  spinAngle?: number;
   rotSpeed: number;
   safeZoneRadius: number;
 }

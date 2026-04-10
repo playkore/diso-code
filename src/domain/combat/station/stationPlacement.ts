@@ -14,14 +14,17 @@ export function enterStationSpace(
   options: { message?: string; playerAngle?: number } = {}
 ) {
   const stationAngle = random.nextFloat() * Math.PI * 2;
+  const stationSpinAngle = random.nextFloat() * Math.PI * 2;
   state.station = {
     x: Math.round((random.nextFloat() - 0.5) * 120),
     y: -320 - Math.round(random.nextFloat() * 60),
     radius: 80,
-    // Launches should not always reveal the same station face first; seeding a
-    // fresh rotation angle on each station-space entry makes departures feel
-    // like they are joining an already-live world state.
+    // Each entry samples a fresh screen-plane spin axis so the station no
+    // longer always rotates "straight into the camera" from the same angle.
     angle: stationAngle,
+    // The visible octagon should also start at a random phase around that
+    // axis; otherwise every launch would reveal the same face arrangement.
+    spinAngle: stationSpinAngle,
     rotSpeed: 0.005,
     safeZoneRadius: 360
   };

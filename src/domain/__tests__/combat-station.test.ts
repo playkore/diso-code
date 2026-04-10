@@ -46,7 +46,10 @@ describe('travel combat station rules', () => {
     const dy = state.player.y - state.station!.y;
     const distance = Math.hypot(dx, dy);
     const radialAngle = Math.atan2(dy, dx);
-    const expectedArrivalAngle = (32 / 255) * Math.PI * 2;
+    // `enterStationSpace` now consumes one extra random float for the initial
+    // spin phase, so the looping deterministic stream reuses the first byte for
+    // the final arrival bearing sample.
+    const expectedArrivalAngle = (128 / 255) * Math.PI * 2;
 
     expect(distance).toBeGreaterThanOrEqual(10_000);
     expect(distance).toBeLessThanOrEqual(20_000);

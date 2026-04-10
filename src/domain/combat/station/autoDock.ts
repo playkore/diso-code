@@ -225,7 +225,7 @@ export function stepAutoDockState(
     };
   }
 
-  if (Math.abs(playerRadius - stageRadius) > AUTO_DOCK_STAGE_RADIUS_BAND * 1.5) {
+  if (state.phase !== 'inward' && Math.abs(playerRadius - stageRadius) > AUTO_DOCK_STAGE_RADIUS_BAND * 1.5) {
     state = { phase: 'approach', stageRadius };
     return stepAutoDockState(state, station, player, tuning);
   }

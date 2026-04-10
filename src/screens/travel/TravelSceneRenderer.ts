@@ -478,11 +478,11 @@ export class TravelSceneRenderer {
       const stationAnchor = new Group();
       stationAnchor.position.set(combatState.station.x, toSceneY(combatState.station.y), STATION_Z);
       stationAnchor.scale.setScalar(getStationRenderScale(combatState.station));
-      // The outer anchor spins around the camera-facing axis, while the inner
-      // hull spins around its own local X axis after that Z rotation has already
-      // been applied. That gives the station a compound Elite-like tumble.
+      // The station spins around the docking axis itself. The outer anchor
+      // aims that axis inside the screen plane, and the inner hull then rotates
+      // around local X to advance the visible octagon around that axis.
       stationAnchor.rotation.z = -combatState.station.angle;
-      station.rotation.x = combatState.station.angle;
+      station.rotation.x = combatState.station.spinAngle ?? 0;
       stationAnchor.add(station);
       this.worldGroup.add(stationAnchor);
 

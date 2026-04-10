@@ -148,12 +148,12 @@ function scalePoint([x, y, z]: StationPoint3, scale: number): StationPoint3 {
 
 function transformStationPoint(station: CombatStation, point: StationPoint3): StationPoint3 {
   const scaled = scalePoint(point, getStationRenderScale(station));
-  const banked = rotateX(scaled, station.angle);
-  // Three.js applies `rotation.z = -station.angle` in a Y-up scene, while
-  // gameplay still reasons in the legacy Y-down plane. Mirroring the rendered
-  // result back into gameplay space flips the sign, so the equivalent 2D
-  // transform here is `+station.angle`.
-  return rotateZ(banked, station.angle);
+  const spun = rotateX(scaled, station.spinAngle ?? 0);
+  // The station now spins around the docking axis itself. In local mesh space
+  // that axis is `+X`, so `spinAngle` rotates around X first. The whole result
+  // is then turned inside the screen plane so the spin axis points along the
+  // chosen random on-screen direction given by `station.angle`.
+  return rotateZ(spun, station.angle);
 }
 
 function translatePoint(station: CombatStation, [x, y, z]: StationPoint3): StationPoint3 {
@@ -213,10 +213,9 @@ export function getStationRenderScale(station: CombatStation) {
 }
 
 export function getStationDockDirection(station: CombatStation) {
-  // Render space rotates the station by `-station.angle` in a Y-up world, but
-  // gameplay coordinates still use the legacy Y-down convention. Mapping the
-  // rendered dock axis back into gameplay space therefore mirrors the rotated
-  // Y component and yields a `+station.angle` heading.
+  // The docking axis always lies in the screen plane and is authored as local
+  // `+X`. Rotating that axis by `station.angle` gives the world-space direction
+  // from the station center toward the middle of the docking slot.
   const [x, y] = rotateZ([1, 0, 0], station.angle);
   return { x, y };
 }

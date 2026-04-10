@@ -720,7 +720,7 @@ export function useTravelSession(
         const animationProgress = Math.min(1, dockingAnimationState.elapsedMs / DOCKING_ANIMATION_DURATION_MS);
         // Advance station rotation first so camera framing uses the same dock
         // orientation that the renderer will show on this exact frame.
-        combatState.station.angle += combatState.station.rotSpeed * dt;
+        combatState.station.spinAngle = (combatState.station.spinAngle ?? 0) + combatState.station.rotSpeed * dt;
         const dockDirection = getStationDockDirection(combatState.station);
         const inwardDirection = {
           x: -dockDirection.x,

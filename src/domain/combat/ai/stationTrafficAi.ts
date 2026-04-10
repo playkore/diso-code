@@ -35,5 +35,8 @@ export function stepStationTraffic(enemy: CombatEnemy, station: CombatStation, d
 
 export function isStationTrafficDocked(enemy: CombatEnemy, station: CombatStation): boolean {
   const docking = assessDockingApproach(station, enemy);
-  return docking.isInDockingGap;
+  // The Coriolis slot now sits flush with the front face, so traffic can step
+  // from "in the mouth" to "already far enough inside to dock" in one frame.
+  // Treat both states as a successful disappearance into the station.
+  return docking.isInDockingGap || docking.canDock;
 }

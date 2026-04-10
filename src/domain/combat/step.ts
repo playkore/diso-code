@@ -119,7 +119,7 @@ export function stepTravelCombat(
   }
 
   if (state.station) {
-    state.station.angle += state.station.rotSpeed * dt;
+    state.station.spinAngle = (state.station.spinAngle ?? 0) + state.station.rotSpeed * dt;
     state.encounter.safeZone = Math.hypot(state.player.x - state.station.x, state.player.y - state.station.y) <= state.station.safeZoneRadius;
   } else {
     state.encounter.safeZone = false;
