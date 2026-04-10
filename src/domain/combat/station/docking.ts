@@ -86,14 +86,25 @@ export function assessDockingApproach(
     isInsideSlot &&
     axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE &&
     axialOffset <= mouthAxial + STATION_DOCK_ENTRY_GRACE;
+  const deepDockingCorridorHalfWidth = tunnelHalfWidth + 16;
+  // Once the ship has passed the doorway plane and is still flying nose-in,
+  // docking should win over further front-face collision checks. At that depth
+  // the "angle from station center" heuristic is no longer a reliable proxy
+  // for the slot the pilot already entered.
+  const dockedDeepInside =
+    isFacingHangar &&
+    Math.abs(lateralOffset) <= deepDockingCorridorHalfWidth &&
+    axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN &&
+    axialOffset >= -station.radius;
   const collidesWithHull =
     ((insideBodySlice && !(isInsideSlot && axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE)) ||
       (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot)) &&
-    !safeManualDockingCorridor;
+    !safeManualDockingCorridor &&
+    !dockedDeepInside;
   // The original Coriolis slot sits flush with the front face rather than at
   // the end of a protruding tunnel, so docking should complete once the ship
   // crosses just inside the rotating aperture while still aligned with it.
-  const canDock = isInsideSlot && isFacingHangar && axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN;
+  const canDock = (isInsideSlot || dockedDeepInside) && isFacingHangar && axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN;
 
   return {
     slotAngle,
