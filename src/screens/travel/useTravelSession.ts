@@ -120,14 +120,6 @@ interface DockingAnimationState {
   startY: number;
 }
 
-interface DockingAssistState {
-  visible: boolean;
-  lateralText: string;
-  lateralColor: string;
-  rollText: string;
-  rollColor: string;
-}
-
 const PERF_REPORT_INTERVAL_MS = 500;
 const PERF_SAMPLE_CAP = 120;
 const DOCKING_ANIMATION_DURATION_MS = 1100;
@@ -151,14 +143,6 @@ const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
   reactMaxMs: 0,
   longTaskCount: 0,
   longTaskMaxMs: 0
-};
-
-const HIDDEN_DOCKING_ASSIST: DockingAssistState = {
-  visible: false,
-  lateralText: '',
-  lateralColor: CGA_GREEN,
-  rollText: '',
-  rollColor: CGA_GREEN
 };
 
 interface PerfAccumulator {
@@ -212,10 +196,6 @@ function createPerfAccumulator(now: number): PerfAccumulator {
 
 function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
-}
-
-function toDegrees(angle: number) {
-  return (angle * 180) / Math.PI;
 }
 
 function getStationClampedCameraOverride(
@@ -304,16 +284,13 @@ export function useTravelSession(
   });
   const [perf, setPerf] = useState(EMPTY_PERF_SNAPSHOT);
   const [gameOverOverlay, setGameOverOverlay] = useState<GameOverOverlayState>({ visible: false });
-  const [dockingAssist, setDockingAssist] = useState<DockingAssistState>(HIDDEN_DOCKING_ASSIST);
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
   const autoDockRef = useRef(autoDock);
   const bombRef = useRef(bomb);
   const ecmRef = useRef(ecm);
-  const dockingAssistRef = useRef<DockingAssistState>(HIDDEN_DOCKING_ASSIST);
   const perfRef = useRef<PerfAccumulator>(createPerfAccumulator(typeof performance === 'undefined' ? 0 : performance.now()));
-  const lastDockingDebugLogMsRef = useRef(0);
   const {
     inputRef,
     keysRef,
@@ -422,21 +399,6 @@ export function useTravelSession(
     }
     ecmRef.current = next;
     setEcm(next);
-  };
-
-  const setDockingAssistState = (next: DockingAssistState) => {
-    const previous = dockingAssistRef.current;
-    if (
-      previous.visible === next.visible &&
-      previous.lateralText === next.lateralText &&
-      previous.lateralColor === next.lateralColor &&
-      previous.rollText === next.rollText &&
-      previous.rollColor === next.rollColor
-    ) {
-      return;
-    }
-    dockingAssistRef.current = next;
-    setDockingAssist(next);
   };
 
   const publishPerfSnapshot = useCallback((now: number) => {
@@ -1121,83 +1083,9 @@ export function useTravelSession(
 
       if (combatState.station && flightState !== 'HYPERSPACE') {
         // Manual docking is resolved outside the combat step so the hook can
-        // decide whether to finish travel, bounce the ship, or show guidance.
+        // decide whether to finish travel or destroy the ship before the UI
+        // commits the next frame.
         const docking = assessDockingApproach(combatState.station, combatState.player);
-        const shouldShowDockingAssist =
-          !autoDockRef.current.active &&
-          flightState !== 'DOCKING_ANIMATION' &&
-          docking.distance <= combatState.station.safeZoneRadius &&
-          docking.axialOffset >= docking.mouthAxial - 120 &&
-          docking.axialOffset <= docking.mouthAxial + 80;
-        if (shouldShowDockingAssist) {
-          const lateralText =
-            docking.alignOk
-              ? 'ALIGN OK'
-              : docking.lateralOffset > 0
-                ? 'STEER RIGHT'
-                : 'STEER LEFT';
-          const lateralColor =
-            docking.alignOk
-              ? CGA_GREEN
-              : docking.axisAlignmentError <= (20 * Math.PI) / 180
-                ? CGA_YELLOW
-                : CGA_RED;
-          const doorRollMagnitude = Math.abs(docking.doorRoll);
-          // Manual docking needs a forgiving "go now" window because the
-          // pilot is correcting drift and roll by hand rather than following
-          // the frame-perfect auto-dock timing logic.
-          const rollSoonWindow = 0.58;
-          const rollText =
-            docking.rollSafe
-              ? 'ROLL SAFE'
-              : doorRollMagnitude <= rollSoonWindow
-                ? 'ROLL SOON'
-                : 'ROLL WAIT';
-          const rollColor =
-            docking.rollSafe
-              ? CGA_GREEN
-              : doorRollMagnitude <= rollSoonWindow
-                ? CGA_YELLOW
-                : CGA_RED;
-          setDockingAssistState({
-            visible: true,
-            lateralText,
-            lateralColor,
-            rollText,
-            rollColor
-          });
-        } else {
-          setDockingAssistState(HIDDEN_DOCKING_ASSIST);
-        }
-        const shouldLogDockingWindow =
-          docking.distance <= combatState.station.safeZoneRadius &&
-          docking.axialOffset >= docking.mouthAxial - 80 &&
-          docking.axialOffset <= docking.mouthAxial + 40;
-        if (shouldLogDockingWindow && timestamp - lastDockingDebugLogMsRef.current >= 120) {
-          lastDockingDebugLogMsRef.current = timestamp;
-          const lateralMargin = docking.tunnelHalfWidth - Math.abs(docking.lateralOffset);
-          const dockingDepth = docking.mouthAxial - docking.axialOffset;
-          const noseErrorDegrees = toDegrees(docking.noseAlignment);
-          const doorRollDegrees = toDegrees(docking.doorRoll);
-          console.log('[docking-debug]', {
-            distance: Number(docking.distance.toFixed(2)),
-            speed: Number(docking.speed.toFixed(2)),
-            axialOffset: Number(docking.axialOffset.toFixed(2)),
-            mouthAxial: Number(docking.mouthAxial.toFixed(2)),
-            dockingDepth: Number(dockingDepth.toFixed(2)),
-            lateralOffset: Number(docking.lateralOffset.toFixed(2)),
-            tunnelHalfWidth: Number(docking.tunnelHalfWidth.toFixed(2)),
-            lateralMargin: Number(lateralMargin.toFixed(2)),
-            slotOffsetNormalized: Number(docking.slotOffset.toFixed(3)),
-            noseAlignmentDeg: Number(noseErrorDegrees.toFixed(2)),
-            doorRollDeg: Number(doorRollDegrees.toFixed(2)),
-            insideSlot: docking.isInsideSlot,
-            facingHangar: docking.isFacingHangar,
-            inDockingGap: docking.isInDockingGap,
-            canDock: docking.canDock,
-            collidesWithHull: docking.collidesWithHull
-          });
-        }
         // Successful docking must win over hull collision once the ship has
         // already crossed the accepted doorway depth. Otherwise a pilot can
         // fly deep enough into the station to satisfy `canDock`, yet still be
@@ -1227,8 +1115,6 @@ export function useTravelSession(
             showMessage('ENTER SLOT NOSE-IN AT LOW SPEED', 1000);
           }
         }
-      } else {
-        setDockingAssistState(HIDDEN_DOCKING_ASSIST);
       }
 
       if (result.playerDestroyed) {
@@ -1336,7 +1222,6 @@ export function useTravelSession(
     bomb,
     ecm,
     perf,
-    dockingAssist,
     recordReactCommit,
     joystickView,
     viewportHandlers,

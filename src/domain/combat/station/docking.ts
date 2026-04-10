@@ -36,7 +36,6 @@ export function assessDockingApproach(
   station: CombatStation,
   player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>
 ): DockingAssessment {
-  const distance = Math.hypot(player.x - station.x, player.y - station.y);
   const speed = Math.hypot(player.vx, player.vy);
   const slotAngle = getStationSlotAngle(station.angle);
   const dockDirection = getStationDockDirection(station);
@@ -47,7 +46,6 @@ export function assessDockingApproach(
   const lateralOffset = centerOffsetX * -dockDirection.y + centerOffsetY * dockDirection.x;
   const mouthAxial = (dockMouth.x - station.x) * dockDirection.x + (dockMouth.y - station.y) * dockDirection.y;
   const tunnelHalfWidth = getStationTunnelHalfWidth(station);
-  const slotOffset = lateralOffset / Math.max(1, tunnelHalfWidth);
   const noseAlignment = clampAngle(player.angle - (slotAngle + Math.PI));
   // The visible safe doorway orientation is quarter a turn away from the raw
   // mesh phase. Without this offset, the assist reports ROLL SAFE when the
@@ -111,21 +109,9 @@ export function assessDockingApproach(
   const canDock = (isInsideSlot || dockedDeepInside) && isFacingHangar && axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN;
 
   return {
-    slotAngle,
-    slotOffset,
-    noseAlignment,
-    distance,
     speed,
     axialOffset,
     lateralOffset,
-    mouthAxial,
-    tunnelHalfWidth,
-    // The doorway roll repeats every half turn because flipping the rectangle
-    // by 180 degrees yields the same visible door plane to the pilot.
-    doorRoll,
-    axisAlignmentError,
-    alignOk,
-    rollSafe,
     isInsideSlot,
     isFacingHangar,
     isInDockingGap,

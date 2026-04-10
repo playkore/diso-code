@@ -1,7 +1,6 @@
 import { tryRareEncounter } from './encounters/spawnRules';
 import { canAutoDock, LOCAL_JUMP_SPEED_MULTIPLIER, RADAR_SHIP_RANGE } from './navigation';
 import { stepEnemy } from './ai';
-import { assessDockingApproach } from './station/docking';
 import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
@@ -228,7 +227,7 @@ export function stepTravelCombat(
       canAutoDock(state) &&
       state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length === 0 &&
       state.station &&
-      assessDockingApproach(state.station, state.player).distance <= state.station.safeZoneRadius
+      Math.hypot(state.station.x - state.player.x, state.station.y - state.player.y) <= state.station.safeZoneRadius
     )
   };
 }

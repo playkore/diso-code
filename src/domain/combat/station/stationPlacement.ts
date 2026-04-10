@@ -42,7 +42,7 @@ export function enterStationSpace(
     // axis; otherwise every launch would reveal the same face arrangement.
     spinAngle: stationSpinAngle,
     // `dt=1` represents one classic 60 Hz simulation tick, so a full turn in
-    // 80 seconds maps to `2π / (80 * 60)` radians per tick.
+    // 20 seconds maps to `2π / (20 * 60)` radians per tick.
     rotSpeed: STATION_ROTATION_SPEED,
     safeZoneRadius: 360
   };

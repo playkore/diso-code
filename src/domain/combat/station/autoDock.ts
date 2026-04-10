@@ -1,6 +1,6 @@
 import { clampAngle } from '../state';
 import type { CombatPlayer, CombatStation } from '../types';
-import { getStationDockDirection, getStationDockMouthPoint, getStationTunnelHalfWidth } from './stationGeometry';
+import { getStationDockDirection, getStationDockMouthPoint } from './stationGeometry';
 
 export type AutoDockPhase = 'approach' | 'align' | 'wait' | 'inward';
 
@@ -25,32 +25,13 @@ export interface AutoDockTuning {
 /**
  * Frame-local steering output for the docking computer.
  *
- * `mode` is renderer/UI facing, while `phase` in `debug` exposes the exact
- * state-machine branch that produced the command.
+ * `mode` tells callers whether the planner is still staging, holding for the
+ * roll window, or committed to the final inward burn.
  */
 export interface AutoDockCommand {
   turn: number;
   thrust: number;
   mode: 'approach' | 'wait' | 'dock';
-  debug: {
-    phase: AutoDockPhase;
-    currentDoorRoll: number;
-    expectedDoorRoll: number;
-    projectedDoorRollError: number;
-    onStageRing: boolean;
-    withinWaitBand: boolean;
-    readyToWait: boolean;
-    canEnterWait: boolean;
-    doorInFront: boolean;
-    distanceFromStation: number;
-    stageRadius: number;
-    radialSpeed: number;
-    tangentialSpeed: number;
-    stageRadiusError: number;
-    leadAngle?: number;
-    inwardTravelTime?: number;
-    noseError?: number;
-  };
 }
 
 export interface AutoDockStep {
@@ -114,68 +95,15 @@ function getCorridorMetrics(station: CombatStation, player: Pick<CombatPlayer, '
   const offsetY = player.y - dockMouth.y;
   const axialOffset = offsetX * dockDirection.x + offsetY * dockDirection.y;
   const lateralOffset = offsetX * -dockDirection.y + offsetY * dockDirection.x;
-  const slotAngle = Math.atan2(dockDirection.y, dockDirection.x);
-  const inwardAngle = slotAngle + Math.PI;
+  const inwardAngle = Math.atan2(dockDirection.y, dockDirection.x) + Math.PI;
   const noseAlignment = clampAngle(player.angle - inwardAngle);
 
   return {
     dockDirection,
-    slotAngle,
     inwardAngle,
     axialOffset,
     lateralOffset,
     noseAlignment
-  };
-}
-
-function createDebug(
-  phase: AutoDockPhase,
-  station: CombatStation,
-  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>,
-  stageRadius: number,
-  corridor: ReturnType<typeof getCorridorMetrics>,
-  centerAlignment: number,
-  leadAngle: number,
-  inwardTravelTime: number
-): AutoDockCommand['debug'] {
-  const playerOffsetX = player.x - station.x;
-  const playerOffsetY = player.y - station.y;
-  const playerRadius = Math.hypot(playerOffsetX, playerOffsetY);
-  const playerAngle = Math.atan2(playerOffsetY, playerOffsetX);
-  const radialDirection = playerRadius > 1e-6
-    ? { x: playerOffsetX / playerRadius, y: playerOffsetY / playerRadius }
-    : { x: Math.cos(playerAngle), y: Math.sin(playerAngle) };
-  const radialSpeed = -(player.vx * radialDirection.x + player.vy * radialDirection.y);
-  const tangentialSpeed = Math.abs(player.vx * -radialDirection.y + player.vy * radialDirection.x);
-  const stageRadiusError = playerRadius - stageRadius;
-  const currentDoorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) - STATION_DOOR_ROLL_PHASE_OFFSET);
-  const expectedDoorRoll = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle - STATION_DOOR_ROLL_PHASE_OFFSET);
-  const leadError = wrapAngleToHalfTurn(expectedDoorRoll);
-
-  return {
-    phase,
-    currentDoorRoll,
-    expectedDoorRoll,
-    projectedDoorRollError: leadError,
-    onStageRing: Math.abs(stageRadiusError) <= AUTO_DOCK_STAGE_RADIUS_BAND,
-    withinWaitBand: Math.abs(leadError) <= AUTO_DOCK_WAIT_ANGLE_WINDOW,
-    readyToWait: Math.hypot(player.vx, player.vy) <= AUTO_DOCK_CAPTURE_SPEED,
-    canEnterWait:
-      Math.abs(stageRadiusError) <= AUTO_DOCK_STAGE_RADIUS_BAND &&
-      Math.abs(corridor.noseAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW &&
-      Math.hypot(player.vx, player.vy) <= AUTO_DOCK_CAPTURE_SPEED,
-    doorInFront:
-      Math.abs(corridor.lateralOffset) <= getStationTunnelHalfWidth(station) * 0.5 &&
-      corridor.axialOffset >= -8 &&
-      Math.abs(centerAlignment) <= AUTO_DOCK_ALIGNMENT_WINDOW,
-    distanceFromStation: playerRadius,
-    stageRadius,
-    radialSpeed,
-    tangentialSpeed,
-    stageRadiusError,
-    leadAngle,
-    inwardTravelTime,
-    noseError: centerAlignment
   };
 }
 
@@ -216,7 +144,6 @@ export function stepAutoDockState(
   const inwardTravelTime = Math.max(0, inwardTravelDistance / AUTO_DOCK_INWARD_SPEED + (tuning.leadTimeBias ?? 0));
   const leadAngle = station.rotSpeed * inwardTravelTime;
   const leadError = wrapAngleToHalfTurn((station.spinAngle ?? 0) + leadAngle - STATION_DOOR_ROLL_PHASE_OFFSET);
-  const debug = createDebug(state.phase, station, player, stageRadius, corridor, centerAlignment, leadAngle, inwardTravelTime);
 
   if (state.phase === 'approach') {
     const steering = steerToTarget(player, stageTarget, AUTO_DOCK_CAPTURE_SPEED);
@@ -230,8 +157,7 @@ export function stepAutoDockState(
       command: {
         turn: steering.turn,
         thrust: steering.thrust,
-        mode: 'approach',
-        debug
+        mode: 'approach'
       }
     };
   }
@@ -255,8 +181,7 @@ export function stepAutoDockState(
       command: {
         turn: getTargetTurn(player.angle, inwardHeading),
         thrust: 0,
-        mode: 'wait',
-        debug
+        mode: 'wait'
       }
     };
   }
@@ -276,8 +201,7 @@ export function stepAutoDockState(
       command: {
         turn: getTargetTurn(player.angle, inwardHeading),
         thrust: 0,
-        mode: 'wait',
-        debug
+        mode: 'wait'
       }
     };
   }
@@ -289,20 +213,7 @@ export function stepAutoDockState(
     command: {
       turn: getTargetTurn(player.angle, inwardHeading),
       thrust: shouldThrust ? 1 : 0,
-      mode: 'dock',
-      debug
+      mode: 'dock'
     }
   };
-}
-
-/**
- * Stateless compatibility wrapper for older callers such as ambient station
- * traffic. The player-facing docking computer uses `stepAutoDockState(...)`
- * so it can preserve its phase machine across frames.
- */
-export function getAutoDockCommand(
-  station: CombatStation,
-  player: Pick<CombatPlayer, 'x' | 'y' | 'vx' | 'vy' | 'angle'>
-) {
-  return stepAutoDockState(createAutoDockState(), station, player).command;
 }

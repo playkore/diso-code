@@ -425,19 +425,9 @@ export interface CombatTickResult {
  * - whether it should dock or collide
  */
 export interface DockingAssessment {
-  slotAngle: number;
-  slotOffset: number;
-  noseAlignment: number;
-  distance: number;
   speed: number;
   axialOffset: number;
   lateralOffset: number;
-  mouthAxial: number;
-  tunnelHalfWidth: number;
-  doorRoll: number;
-  axisAlignmentError: number;
-  alignOk: boolean;
-  rollSafe: boolean;
   isInsideSlot: boolean;
   isFacingHangar: boolean;
   isInDockingGap: boolean;
