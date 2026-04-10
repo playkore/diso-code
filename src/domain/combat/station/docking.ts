@@ -70,17 +70,18 @@ export function assessDockingApproach(
     axialOffset >= -station.radius &&
     axialOffset <= mouthAxial &&
     Math.abs(lateralOffset) <= bodyHalfWidth;
+  const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
   // Manual docking help now promises that ALIGN OK + ROLL SAFE is a genuinely
   // safe entry window. When both are true near the front face, treat the ship
   // as being inside the usable doorway even if the strict rectangular slot
   // projection would clip a front-edge corner.
-  const safeManualEntryWindow =
+  const safeManualDockingCorridor =
     alignOk &&
     rollSafe &&
-    axialOffset >= mouthAxial - 24 &&
-    axialOffset <= mouthAxial + 24;
-  const isInsideSlot = Math.abs(lateralOffset) <= getStationTunnelHalfWidth(station) || safeManualEntryWindow;
-  const isFacingHangar = Math.abs(noseAlignment) < Math.PI / 3;
+    isFacingHangar &&
+    axialOffset >= -station.radius &&
+    axialOffset <= mouthAxial + 40;
+  const isInsideSlot = Math.abs(lateralOffset) <= getStationTunnelHalfWidth(station) || safeManualDockingCorridor;
   const isInDockingGap =
     isInsideSlot &&
     axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE &&
@@ -88,7 +89,7 @@ export function assessDockingApproach(
   const collidesWithHull =
     ((insideBodySlice && !(isInsideSlot && axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE)) ||
       (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot)) &&
-    !safeManualEntryWindow;
+    !safeManualDockingCorridor;
   // The original Coriolis slot sits flush with the front face rather than at
   // the end of a protruding tunnel, so docking should complete once the ship
   // crosses just inside the rotating aperture while still aligned with it.
