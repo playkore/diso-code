@@ -472,8 +472,8 @@ export function useTravelSession(
 
     // Resolve all fixed session dependencies up front. If any of them are
     // missing, the travel view bails out instead of running a partial loop.
-    const originSystem = getSystemByName(session.originSystem, commander.galaxyIndex)?.data;
-    const destinationSystem = getSystemByName(session.destinationSystem, commander.galaxyIndex)?.data;
+    const originSystem = getSystemByName(session.originSystem, commander.galaxyIndex);
+    const destinationSystem = getSystemByName(session.destinationSystem, commander.galaxyIndex);
     if (!originSystem || !destinationSystem) {
       return undefined;
     }
@@ -494,8 +494,8 @@ export function useTravelSession(
     const combatState = createTravelCombatState(
       {
         legalValue: commander.legalValue,
-        government: originSystem.government,
-        techLevel: originSystem.techLevel,
+        government: originSystem.data.government,
+        techLevel: originSystem.data.techLevel,
         missionContext: session.missionContext,
         energyBanks: commander.energyBanks,
         energyPerBank: commander.energyPerBank,
@@ -509,7 +509,7 @@ export function useTravelSession(
     // travel later rebinds the combat state to the destination system and calls
     // `enterArrivalSpace(...)`, which replaces this origin station with the
     // destination station after hyperspace completes.
-    enterStationSpace(combatState, random);
+    enterStationSpace(combatState, random, { systemSeed: originSystem.seed });
 
     let cw = 0;
     let ch = 0;
@@ -1058,8 +1058,12 @@ export function useTravelSession(
         combatState.player.y += combatState.player.vy * dt;
         hyperspaceTimer -= dt;
         if (hyperspaceTimer <= 0) {
-          setCombatSystemContext(combatState, { government: destinationSystem.government, techLevel: destinationSystem.techLevel, witchspace: false }, random);
-          enterArrivalSpace(combatState, random);
+          setCombatSystemContext(
+            combatState,
+            { government: destinationSystem.data.government, techLevel: destinationSystem.data.techLevel, witchspace: false },
+            random
+          );
+          enterArrivalSpace(combatState, random, { systemSeed: destinationSystem.seed });
           jumpCompleted = true;
           flightState = 'ARRIVED';
           showMessage(`SYSTEM REACHED: ${session.destinationSystem.toUpperCase()}`, 1800);
@@ -1093,7 +1097,7 @@ export function useTravelSession(
           // Manual docking needs a forgiving "go now" window because the
           // pilot is correcting drift and roll by hand rather than following
           // the frame-perfect auto-dock timing logic.
-          const rollSoonWindow = 0.42;
+          const rollSoonWindow = 0.58;
           const rollText =
             docking.rollSafe
               ? 'ROLL SAFE'

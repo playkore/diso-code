@@ -2,25 +2,38 @@ import { pushMessage } from '../state';
 import { getStationSlotAngle } from './docking';
 import { getStationRenderScale, STATION_TUNNEL_END_X } from './stationGeometry';
 import type { RandomSource, TravelCombatState } from '../types';
+import type { SeedTriplet } from '../../universe';
 
 const STATION_LAUNCH_CLEARANCE = 28;
 const STATION_LAUNCH_SPEED = 2.4;
 const HYPERSPACE_ARRIVAL_MIN_DISTANCE = 10_000;
 const HYPERSPACE_ARRIVAL_MAX_DISTANCE = 20_000;
 
+function getStationAxisAngleFromSystemSeed(seed: SeedTriplet) {
+  // Station door direction should be stable per system but still vary across
+  // systems. A tiny integer hash over the canonical Elite seed gives us a
+  // deterministic pseudo-random angle without storing extra world data.
+  let hash = 0x811c9dc5;
+  hash = Math.imul(hash ^ seed.w0, 0x01000193);
+  hash = Math.imul(hash ^ seed.w1, 0x01000193);
+  hash = Math.imul(hash ^ seed.w2, 0x01000193);
+  return ((hash >>> 0) / 0x1_0000_0000) * Math.PI * 2;
+}
+
 export function enterStationSpace(
   state: TravelCombatState,
   random: RandomSource,
-  options: { message?: string; playerAngle?: number } = {}
+  options: { message?: string; playerAngle?: number; systemSeed?: SeedTriplet } = {}
 ) {
-  const stationAngle = random.nextFloat() * Math.PI * 2;
+  const stationAngle = options.systemSeed ? getStationAxisAngleFromSystemSeed(options.systemSeed) : random.nextFloat() * Math.PI * 2;
   const stationSpinAngle = random.nextFloat() * Math.PI * 2;
   state.station = {
     x: Math.round((random.nextFloat() - 0.5) * 120),
     y: -320 - Math.round(random.nextFloat() * 60),
     radius: 80,
-    // Each entry samples a fresh screen-plane spin axis so the station no
-    // longer always rotates "straight into the camera" from the same angle.
+    // The docking-axis direction is deterministic per system, so the same
+    // system always presents the same door bearing while different systems do
+    // not all line up identically.
     angle: stationAngle,
     // The visible octagon should also start at a random phase around that
     // axis; otherwise every launch would reveal the same face arrangement.
@@ -49,9 +62,13 @@ export function enterStationSpace(
   }
 }
 
-export function enterArrivalSpace(state: TravelCombatState, random: RandomSource) {
+export function enterArrivalSpace(
+  state: TravelCombatState,
+  random: RandomSource,
+  options: { systemSeed?: SeedTriplet } = {}
+) {
   const playerAngle = state.player.angle;
-  enterStationSpace(state, random, { message: 'SYSTEM REACHED', playerAngle });
+  enterStationSpace(state, random, { message: 'SYSTEM REACHED', playerAngle, systemSeed: options.systemSeed });
   if (!state.station) {
     return;
   }

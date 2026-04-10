@@ -6,7 +6,7 @@ const STATION_COLLISION_MARGIN = 5;
 const STATION_DOCK_ENTRY_GRACE = 6;
 const STATION_DOCK_PROGRESS_MARGIN = 6;
 const STATION_ALIGN_OK_WINDOW = (10 * Math.PI) / 180;
-const STATION_ROLL_SAFE_WINDOW = 0.22;
+const STATION_ROLL_SAFE_WINDOW = 0.34;
 
 function wrapAngleToHalfTurn(angle: number) {
   const wrapped = clampAngle(angle);
