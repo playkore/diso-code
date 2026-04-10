@@ -8,6 +8,9 @@ const STATION_LAUNCH_CLEARANCE = 28;
 const STATION_LAUNCH_SPEED = 2.4;
 const HYPERSPACE_ARRIVAL_MIN_DISTANCE = 10_000;
 const HYPERSPACE_ARRIVAL_MAX_DISTANCE = 20_000;
+const STATION_ROTATION_PERIOD_SECONDS = 80;
+const CLASSIC_SIMULATION_TICKS_PER_SECOND = 60;
+const STATION_ROTATION_SPEED = (Math.PI * 2) / (STATION_ROTATION_PERIOD_SECONDS * CLASSIC_SIMULATION_TICKS_PER_SECOND);
 
 function getStationAxisAngleFromSystemSeed(seed: SeedTriplet) {
   // Station door direction should be stable per system but still vary across
@@ -38,7 +41,9 @@ export function enterStationSpace(
     // The visible octagon should also start at a random phase around that
     // axis; otherwise every launch would reveal the same face arrangement.
     spinAngle: stationSpinAngle,
-    rotSpeed: 0.005,
+    // `dt=1` represents one classic 60 Hz simulation tick, so a full turn in
+    // 80 seconds maps to `2π / (80 * 60)` radians per tick.
+    rotSpeed: STATION_ROTATION_SPEED,
     safeZoneRadius: 360
   };
   const slotAngle = getStationSlotAngle(state.station.angle);
