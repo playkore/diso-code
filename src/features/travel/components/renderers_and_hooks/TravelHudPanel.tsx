@@ -1,0 +1,101 @@
+import type { TravelSessionHudState } from './travelSessionState';
+import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
+import { formatCredits } from '../../../../shared/utils/money';
+
+interface TravelHudPanelProps {
+  routeLabel: string;
+  fuelLabel: string;
+  commanderCash: number;
+  hud: TravelSessionHudState;
+}
+
+const MOUNT_LABELS: Record<LaserMountPosition, string> = {
+  front: 'F',
+  rear: 'A',
+  left: 'L',
+  right: 'R'
+};
+
+/**
+ * Renders the flight telemetry block as a standalone component so the screen
+ * container can stay focused on wiring and route fallback behavior.
+ */
+export function TravelHudPanel({ routeLabel, fuelLabel, commanderCash, hud }: TravelHudPanelProps) {
+  const energyBanks = hud.energyBanks.map((ratio, index) => (
+    <span key={`energy-bank-${index}`} className="travel-screen__hud-bank">
+      <span className="travel-screen__hud-bank-fill" style={{ width: `${ratio * 100}%`, backgroundColor: hud.energyColor }} />
+    </span>
+  ));
+
+  const laserHeat = hud.laserHeat.map((entry) => (
+    <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
+      <span className="travel-screen__hud-heat-label">{MOUNT_LABELS[entry.mount]}</span>
+      <span className="travel-screen__hud-meter travel-screen__hud-meter--heat">
+        <span className="travel-screen__hud-meter-fill" style={{ width: `${entry.ratio * 100}%`, backgroundColor: entry.color }} />
+      </span>
+    </span>
+  ));
+
+  return (
+    <div className="travel-screen__hud">
+      <div className="travel-screen__hud-panel" aria-label="Flight telemetry">
+        <span className="travel-screen__hud-stat travel-screen__hud-stat--route">
+          <span className="travel-screen__hud-key">Route</span>
+          <span className="travel-screen__hud-value">{routeLabel}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Fuel</span>
+          <span className="travel-screen__hud-value">{fuelLabel}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Credits</span>
+          <span className="travel-screen__hud-value">{formatCredits(commanderCash)}</span>
+        </span>
+        <span className="travel-screen__hud-stat travel-screen__hud-stat--bar">
+          <span className="travel-screen__hud-key">Energy</span>
+          <span className="travel-screen__hud-banks">{energyBanks}</span>
+        </span>
+        <span className="travel-screen__hud-stat travel-screen__hud-stat--bar">
+          <span className="travel-screen__hud-key">Shield</span>
+          <span className="travel-screen__hud-meter">
+            <span className="travel-screen__hud-meter-fill" style={{ width: `${hud.shieldRatio * 100}%`, backgroundColor: hud.shieldColor }} />
+          </span>
+        </span>
+        <span className="travel-screen__hud-stat travel-screen__hud-stat--heat">
+          <span className="travel-screen__hud-key">Heat</span>
+          <span className="travel-screen__hud-heat-grid">{laserHeat}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Drive</span>
+          <span className="travel-screen__hud-value" style={{ color: hud.jumpColor }}>
+            {hud.jump}
+          </span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Hyper</span>
+          <span className="travel-screen__hud-value" style={{ color: hud.hyperspaceColor }}>
+            {hud.hyperspace}
+          </span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Legal</span>
+          <span className="travel-screen__hud-value" style={{ color: hud.legalColor }}>
+            {hud.legal}
+          </span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Threat</span>
+          <span className="travel-screen__hud-value" style={{ color: hud.threatColor }}>
+            {hud.threat}
+          </span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Arc</span>
+          <span className="travel-screen__hud-value" style={{ color: hud.arcColor }}>
+            {hud.arc}
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+}

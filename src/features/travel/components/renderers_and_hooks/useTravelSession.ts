@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSystemByName, getSystemHeading } from '../../../galaxy/domain/galaxyCatalog';
-import type { CommanderState } from '../../../commander/domain/commander';
 import { clampAngle } from '../../domain/combat/state';
 import {
   assessDockingApproach,
@@ -22,13 +21,33 @@ import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
-import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { createAutoDockState, stepAutoDockState, type AutoDockState } from '../../domain/combat/station/autoDock';
 import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
 import { createStars } from './travelVisuals';
 import { TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 import type { PriorityState } from '../../../../shared/store/types';
+import type { TravelCompletionReport } from '../../../../shared/store/storeTypes';
+import {
+  areTravelSessionHudStatesEqual,
+  INITIAL_HUD,
+  type AutoDockUiState,
+  type BombUiState,
+  type CombatCommanderSnapshot,
+  type DockingAnimationState,
+  type EcmUiState,
+  type GameOverOverlayState,
+  type TravelRefs,
+  type TravelSessionHudState
+} from './travelSessionState';
+import {
+  EMPTY_PERF_SNAPSHOT,
+  buildPerfSnapshot,
+  createPerfAccumulator,
+  pushPerfSample,
+  resetPerfAccumulator,
+  type PerfAccumulator
+} from './travelSessionPerf';
 
 interface PlayerDeathState {
   elapsedMs: number;
@@ -36,93 +55,7 @@ interface PlayerDeathState {
 
 const PLAYER_DEATH_ANIMATION_MS = 1800;
 const PLAYER_DEATH_GAME_OVER_MS = 900;
-
-/**
- * Owns the real-time travel session that bridges React UI and the mutable
- * combat simulation.
- *
- * React state here is intentionally limited to data that affects rendering and
- * must trigger re-renders: HUD text/colors, overlay messages, and joystick UI.
- * The combat state, phase machine, timers, and star field remain mutable locals
- * inside the effect so the animation loop can advance them every frame without
- * paying React reconciliation costs, while the Three.js viewport consumes that
- * mutable snapshot strictly as a rendering concern.
- */
-const INITIAL_HUD = {
-  energyBanks: [1, 1, 1, 1],
-  energyColor: CGA_GREEN,
-  shieldRatio: 1,
-  shieldColor: CGA_GREEN,
-  laserHeat: [
-    { mount: 'front', installed: true, ratio: 0, color: CGA_GREEN },
-    { mount: 'rear', installed: false, ratio: 0, color: CGA_GREEN },
-    { mount: 'left', installed: false, ratio: 0, color: CGA_GREEN },
-    { mount: 'right', installed: false, ratio: 0, color: CGA_GREEN }
-  ],
-  jump: 'READY',
-  jumpColor: CGA_GREEN,
-  hyperspace: 'SAFE ZONE',
-  hyperspaceColor: CGA_RED,
-  legal: 'clean 0',
-  legalColor: CGA_GREEN,
-  threat: 'F- / 0',
-  threatColor: CGA_GREEN,
-  lasersActive: true,
-  arc: 'FRONT',
-  arcColor: CGA_RED
-};
-
-interface TravelRefs {
-  canvasRef: RefObject<HTMLCanvasElement | null>;
-  viewportRef: RefObject<HTMLDivElement | null>;
-}
-
-/**
- * Flight setup snapshot captured from the commander store.
- *
- * The combat effect must depend only on fields that define the active flight
- * simulation. Store updates such as live cash rewards should not rebuild the
- * whole session and silently respawn the ship near the station.
- */
-interface CombatCommanderSnapshot {
-  cargo: CommanderState['cargo'];
-  legalValue: CommanderState['legalValue'];
-  galaxyIndex: number;
-  energyBanks: CommanderState['energyBanks'];
-  energyPerBank: CommanderState['energyPerBank'];
-  laserMounts: CommanderState['laserMounts'];
-  installedEquipment: CommanderState['installedEquipment'];
-  missilesInstalled: CommanderState['missilesInstalled'];
-}
-
-interface AutoDockUiState {
-  visible: boolean;
-  enabled: boolean;
-  active: boolean;
-}
-
-interface BombUiState {
-  visible: boolean;
-}
-
-interface EcmUiState {
-  visible: boolean;
-}
-
-interface GameOverOverlayState {
-  visible: boolean;
-}
-
-interface DockingAnimationState {
-  elapsedMs: number;
-  dockSystemName: string;
-  spendJumpFuel: boolean;
-  startX: number;
-  startY: number;
-}
-
 const PERF_REPORT_INTERVAL_MS = 500;
-const PERF_SAMPLE_CAP = 120;
 const DOCKING_ANIMATION_DURATION_MS = 1100;
 const DOCKING_CAMERA_FOLLOW_DISTANCE = 13;
 const DOCKING_CAMERA_SIDE_OFFSET = 6;
@@ -131,69 +64,8 @@ const DOCKING_CAMERA_LOOKAHEAD = 8;
 const DOCKING_CAMERA_MOUTH_FOCUS = 0.78;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
-const EMPTY_PERF_SNAPSHOT: TravelPerfSnapshot = {
-  fps: 0,
-  frameAvgMs: 0,
-  frameP95Ms: 0,
-  frameMaxMs: 0,
-  workAvgMs: 0,
-  workP95Ms: 0,
-  workMaxMs: 0,
-  reactCommitsPerSecond: 0,
-  reactAvgMs: 0,
-  reactMaxMs: 0,
-  longTaskCount: 0,
-  longTaskMaxMs: 0
-};
-
-interface PerfAccumulator {
-  windowStart: number;
-  frameDeltas: number[];
-  workDurations: number[];
-  reactCommitCount: number;
-  reactCommitTotalMs: number;
-  reactCommitMaxMs: number;
-  longTaskCount: number;
-  longTaskMaxMs: number;
-}
 
 const JOYSTICK_TARGET_TURN_ANGLE = 0.12;
-
-function pushPerfSample(samples: number[], value: number) {
-  samples.push(value);
-  if (samples.length > PERF_SAMPLE_CAP) {
-    samples.shift();
-  }
-}
-
-function average(samples: number[]) {
-  return samples.length === 0 ? 0 : samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
-}
-
-function max(samples: number[]) {
-  return samples.length === 0 ? 0 : Math.max(...samples);
-}
-
-function percentile95(samples: number[]) {
-  if (samples.length === 0) {
-    return 0;
-  }
-  const sorted = [...samples].sort((left, right) => left - right);
-  return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))];
-}
-
-function createPerfAccumulator(now: number): PerfAccumulator {
-  return {
-    windowStart: now,
-    frameDeltas: [],
-    workDurations: [],
-    reactCommitCount: 0,
-    reactCommitTotalMs: 0,
-    reactCommitMaxMs: 0,
-    longTaskCount: 0,
-    longTaskMaxMs: 0
-  };
-}
 
 function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
@@ -264,7 +136,7 @@ export function useTravelSession(
   priority: PriorityState,
   commander: CombatCommanderSnapshot,
   grantCombatCredits: (amount: number) => void,
-  completeTravel: (report?: Parameters<ReturnType<typeof import('../../../../store/useGameStore').useGameStore.getState>['completeTravel']>[0]) => void,
+  completeTravel: (report?: TravelCompletionReport) => void,
   resetAfterDeath: () => void,
   acknowledgePriorityAnnouncement: () => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
@@ -308,34 +180,8 @@ export function useTravelSession(
     resetInput
   } = useTravelInput(refs.viewportRef);
 
-  const setHudState = (next: typeof INITIAL_HUD) => {
-    const previous = hudRef.current;
-    if (
-      previous.energyColor === next.energyColor &&
-      previous.shieldRatio === next.shieldRatio &&
-      previous.shieldColor === next.shieldColor &&
-      previous.laserHeat.length === next.laserHeat.length &&
-      previous.laserHeat.every(
-        (entry, index) =>
-          entry.mount === next.laserHeat[index].mount &&
-          entry.installed === next.laserHeat[index].installed &&
-          entry.ratio === next.laserHeat[index].ratio &&
-          entry.color === next.laserHeat[index].color
-      ) &&
-      previous.energyBanks.length === next.energyBanks.length &&
-      previous.energyBanks.every((ratio, index) => ratio === next.energyBanks[index]) &&
-      previous.jump === next.jump &&
-      previous.jumpColor === next.jumpColor &&
-      previous.hyperspace === next.hyperspace &&
-      previous.hyperspaceColor === next.hyperspaceColor &&
-      previous.legal === next.legal &&
-      previous.legalColor === next.legalColor &&
-      previous.threat === next.threat &&
-      previous.threatColor === next.threatColor &&
-      previous.arc === next.arc &&
-      previous.arcColor === next.arcColor &&
-      previous.lasersActive === next.lasersActive
-    ) {
+  const setHudState = (next: TravelSessionHudState) => {
+    if (areTravelSessionHudStatesEqual(hudRef.current, next)) {
       return;
     }
     hudRef.current = next;
@@ -404,21 +250,7 @@ export function useTravelSession(
 
   const publishPerfSnapshot = useCallback((now: number) => {
     const accumulator = perfRef.current;
-    const elapsedMs = Math.max(1, now - accumulator.windowStart);
-    const nextPerf: TravelPerfSnapshot = {
-      fps: accumulator.frameDeltas.length * (1000 / elapsedMs),
-      frameAvgMs: average(accumulator.frameDeltas),
-      frameP95Ms: percentile95(accumulator.frameDeltas),
-      frameMaxMs: max(accumulator.frameDeltas),
-      workAvgMs: average(accumulator.workDurations),
-      workP95Ms: percentile95(accumulator.workDurations),
-      workMaxMs: max(accumulator.workDurations),
-      reactCommitsPerSecond: accumulator.reactCommitCount * (1000 / elapsedMs),
-      reactAvgMs: accumulator.reactCommitCount === 0 ? 0 : accumulator.reactCommitTotalMs / accumulator.reactCommitCount,
-      reactMaxMs: accumulator.reactCommitMaxMs,
-      longTaskCount: accumulator.longTaskCount,
-      longTaskMaxMs: accumulator.longTaskMaxMs
-    };
+    const nextPerf = buildPerfSnapshot(accumulator, now);
     setPerf((previous) => {
       if (
         previous.fps === nextPerf.fps &&
@@ -438,7 +270,7 @@ export function useTravelSession(
       }
       return nextPerf;
     });
-    perfRef.current = createPerfAccumulator(now);
+    perfRef.current = resetPerfAccumulator(now);
   }, []);
 
   const recordReactCommit = useCallback((actualDuration: number) => {

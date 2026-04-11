@@ -1,17 +1,4 @@
-export interface TravelPerfSnapshot {
-  fps: number;
-  frameAvgMs: number;
-  frameP95Ms: number;
-  frameMaxMs: number;
-  workAvgMs: number;
-  workP95Ms: number;
-  workMaxMs: number;
-  reactCommitsPerSecond: number;
-  reactAvgMs: number;
-  reactMaxMs: number;
-  longTaskCount: number;
-  longTaskMaxMs: number;
-}
+import type { TravelPerfSnapshot } from './travelSessionPerf';
 
 interface TravelPerfOverlayProps {
   perf: TravelPerfSnapshot;
