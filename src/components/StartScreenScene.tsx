@@ -3,7 +3,8 @@ import { createDefaultCommander } from '../domain/commander';
 import { createDefaultMissionTravelContext } from '../domain/missionContext';
 import { spawnEnemyFromBlueprint } from '../domain/combat/spawn/spawnEnemy';
 import { createMathRandomSource, createTravelCombatState, type CombatStation } from '../domain/travelCombat';
-import { createStars, TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
+import { createStars } from '../screens/travel/travelVisuals';
+import { TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travelSceneMath';
 import { START_SCREEN_SHOWCASE_COUNT, START_SCREEN_SHOWCASE_ENTRIES } from './startScreenShowcase';
 

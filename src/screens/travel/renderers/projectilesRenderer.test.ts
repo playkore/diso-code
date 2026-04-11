@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getEnemyHealthBarState, getEnemyLaserTrace } from './projectilesRenderer';
+import { getEnemyHealthBarState, getEnemyLaserTrace } from '../travelVisuals';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './constants';
 import { getCgaBarFillColor, getSegmentedBankRatios } from './bars';
 import type { CombatEnemy, TravelCombatState } from '../../../domain/travelCombat';

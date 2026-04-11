@@ -1,4 +1,4 @@
-import type { StarPoint } from './starsRenderer';
+import type { StarPoint } from '../travelVisuals';
 
 /**
  * Fixed star depth bands for the WebGL renderer.

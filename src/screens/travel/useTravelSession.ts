@@ -25,7 +25,8 @@ import { useTravelInput } from './useTravelInput';
 import type { TravelPerfSnapshot } from './TravelPerfOverlay';
 import { createAutoDockState, stepAutoDockState, type AutoDockState } from '../../domain/combat/station/autoDock';
 import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
-import { createStars, TravelSceneRenderer } from './TravelSceneRenderer';
+import { createStars } from './travelVisuals';
+import { TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 import type { PriorityState } from '../../store/types';
 

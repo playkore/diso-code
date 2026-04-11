@@ -25,11 +25,9 @@ import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type FlightPhase, type Trave
 import { getStationRenderScale } from '../../domain/combat/station/stationGeometry';
 import type { LineShape } from './background/types';
 import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_THARGOID } from './renderers/constants';
-import { getEnemyHealthBarState, getEnemyLaserTrace } from './renderers/projectilesRenderer';
-import { getEnemyColor, getProjectileColor } from './renderers/shipsRenderer';
 import { createStationObject, selectShipPresenter, type EnemyShipMeshId } from './renderers/shipPresenter';
-import { createStars, type StarPoint } from './renderers/starsRenderer';
 import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './renderers/travelSceneMath';
+import { getEnemyColor, getEnemyHealthBarState, getEnemyLaserTrace, getProjectileColor, type StarPoint } from './travelVisuals';
 
 interface TravelSceneRenderArgs {
   combatState: TravelCombatState;
@@ -819,5 +817,3 @@ export class TravelSceneRenderer {
     this.flashMesh.visible = false;
   }
 }
-
-export { createStars };
