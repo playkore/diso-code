@@ -111,6 +111,22 @@ describe('travel combat station rules', () => {
     expect(docking.canDock).toBe(true);
   });
 
+  it('does not dock when the ship has drifted onto the far side and is moving away', () => {
+    const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    const player = {
+      x: -90,
+      y: 0,
+      vx: -0.5,
+      vy: 0,
+      angle: Math.PI
+    };
+    const docking = assessDockingApproach(station, player);
+
+    expect(docking.isInsideSlot).toBe(true);
+    expect(docking.collidesWithHull).toBe(false);
+    expect(docking.canDock).toBe(false);
+  });
+
   it('collides when crossing the ring away from the visible split', () => {
     const station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     const dockDirection = getStationDockDirection(station);

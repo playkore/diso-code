@@ -101,12 +101,19 @@ export function assessDockingApproach(
   const collidesWithHull =
     ((insideBodySlice && !(isInsideSlot && axialOffset >= mouthAxial - STATION_DOCK_ENTRY_GRACE)) ||
       (getDistanceToStationSlice(station, player) <= STATION_COLLISION_MARGIN && !isInsideSlot)) &&
-    !safeManualDockingCorridor &&
-    !dockedDeepInside;
+      !safeManualDockingCorridor &&
+      !dockedDeepInside;
   // The original Coriolis slot sits flush with the front face rather than at
   // the end of a protruding tunnel, so docking should complete once the ship
   // crosses just inside the rotating aperture while still aligned with it.
-  const canDock = (isInsideSlot || dockedDeepInside) && isFacingHangar && axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN;
+  // Keep the accepted corridor on the front half of the station so a ship
+  // drifting onto the far side cannot "ghost dock" just because its slot
+  // projection still looks valid from the top-down view.
+  const canDock =
+    (isInsideSlot || dockedDeepInside) &&
+    isFacingHangar &&
+    axialOffset >= 0 &&
+    axialOffset <= mouthAxial - STATION_DOCK_PROGRESS_MARGIN;
 
   return {
     speed,
