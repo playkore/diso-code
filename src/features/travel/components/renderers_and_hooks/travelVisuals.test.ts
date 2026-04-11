@@ -21,9 +21,11 @@ describe('createBackgroundStar', () => {
 
   it('keeps the star very far away and large enough to read like a landmark', () => {
     const star = createBackgroundStar(seedA);
+    const centerDistance = Math.hypot(star.x, star.y);
 
     expect(star.parallax).toBeLessThan(0.05);
     expect(star.parallax).toBeGreaterThan(0);
+    expect(centerDistance).toBeGreaterThanOrEqual(120);
     expect(star.diameter).toBeGreaterThanOrEqual(112);
     expect(star.diameter).toBeLessThanOrEqual(152);
     expect(star.color).toBe('#ff5555');

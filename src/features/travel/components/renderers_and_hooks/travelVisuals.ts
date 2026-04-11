@@ -35,8 +35,8 @@ export interface BackgroundStar {
 const BACKGROUND_STAR_PARALLAX = 0.02;
 const BACKGROUND_STAR_MIN_DIAMETER = 112;
 const BACKGROUND_STAR_DIAMETER_VARIATION = 40;
-const BACKGROUND_STAR_POSITION_SPREAD_X = 1800;
-const BACKGROUND_STAR_POSITION_SPREAD_Y = 1400;
+const BACKGROUND_STAR_MIN_DISTANCE = 120;
+const BACKGROUND_STAR_DISTANCE_VARIATION = 100;
 
 function hashSeedTriplet(seed: SeedTriplet, salt: number) {
   // A tiny FNV-style hash gives us stable pseudo-random values from the
@@ -69,13 +69,15 @@ export function createStars() {
 }
 
 export function createBackgroundStar(seed: SeedTriplet): BackgroundStar {
-  const xHash = hashSeedTriplet(seed, 0);
-  const yHash = hashSeedTriplet(seed, 1);
+  const angleHash = hashSeedTriplet(seed, 0);
+  const distanceHash = hashSeedTriplet(seed, 1);
   const sizeHash = hashSeedTriplet(seed, 2);
+  const angle = hashToUnitInterval(angleHash) * Math.PI * 2;
+  const distance = BACKGROUND_STAR_MIN_DISTANCE + hashToUnitInterval(distanceHash) * BACKGROUND_STAR_DISTANCE_VARIATION;
 
   return {
-    x: Math.round((hashToUnitInterval(xHash) - 0.5) * BACKGROUND_STAR_POSITION_SPREAD_X),
-    y: Math.round((hashToUnitInterval(yHash) - 0.5) * BACKGROUND_STAR_POSITION_SPREAD_Y),
+    x: Math.round(Math.cos(angle) * distance),
+    y: Math.round(Math.sin(angle) * distance),
     parallax: BACKGROUND_STAR_PARALLAX,
     diameter: Math.round(BACKGROUND_STAR_MIN_DIAMETER + hashToUnitInterval(sizeHash) * BACKGROUND_STAR_DIAMETER_VARIATION),
     color: CGA_RED

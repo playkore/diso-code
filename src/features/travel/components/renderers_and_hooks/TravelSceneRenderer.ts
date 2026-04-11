@@ -408,13 +408,12 @@ export class TravelSceneRenderer {
   ) {
     const starfieldPlayer = starfieldAnchor ?? combatState.player;
     if (backgroundStar) {
-      const screen = getWrappedStarScreenPosition(
-        { x: backgroundStar.x, y: backgroundStar.y, z: 0 },
-        starfieldPlayer,
-        this.width,
-        this.height,
-        backgroundStar.parallax
-      );
+      // The landmark is screen-stable, not viewport-wrapped. It sits in one
+      // fixed global location and only drifts by a tiny amount from parallax.
+      const screen = {
+        x: this.width / 2 + backgroundStar.x - starfieldPlayer.x * backgroundStar.parallax,
+        y: this.height / 2 + backgroundStar.y - starfieldPlayer.y * backgroundStar.parallax
+      };
       const radius = backgroundStar.diameter / 2;
       // Elite's distant sun reads as a solid disk rather than a wireframe
       // marker, so keep the background object as a single filled circle.
