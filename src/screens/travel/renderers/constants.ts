@@ -40,3 +40,5 @@ export const CGA_BLACK = '#000000';
 export const CGA_GREEN = '#55ff55';
 export const CGA_RED = '#ff5555';
 export const CGA_YELLOW = '#ffff55';
+// Keep canvas text and DOM text aligned when the UI font changes.
+export const TRAVEL_FONT_FAMILY = '"Share Tech Mono", monospace';

@@ -5,7 +5,6 @@ import { spawnEnemyFromBlueprint } from '../domain/combat/spawn/spawnEnemy';
 import { BLUEPRINTS, createMathRandomSource, createTravelCombatState, type BlueprintId } from '../domain/travelCombat';
 import { createStars, TravelSceneRenderer } from '../screens/travel/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../screens/travel/renderers/travelSceneMath';
-import { setShipPresenterDebugOptions } from '../screens/travel/renderers/shipPresenter';
 import { START_SCREEN_SHOWCASE_COUNT, START_SCREEN_SHOWCASE_SHIP_IDS } from './startScreenShowcase';
 
 const DEMO_SYSTEM_NAME = 'Lave';
@@ -15,12 +14,11 @@ const DEMO_STARFIELD_SPEED_X = 42;
 const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
 const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
-const SHOWCASE_PITCH_LIMIT = Math.PI * 0.45;
+const SHOWCASE_ROLL_SPEED = 1.8;
+const SHOWCASE_PITCH_SPEED = 0.7;
+const TAU = Math.PI * 2;
 export interface StartScreenSceneProps {
   showcaseIndex: number;
-  debugFaceLabels?: boolean;
-  debugVertexLabels?: boolean;
-  debugDoubleSide?: boolean;
   onShowcaseLabelChange: (label: string) => void;
   onSceneReady?: (ready: boolean) => void;
 }
@@ -34,9 +32,6 @@ function getShowcaseLabel(showcaseShipId: 'player' | BlueprintId): string {
 
 export function StartScreenScene({
   showcaseIndex,
-  debugFaceLabels = false,
-  debugVertexLabels = false,
-  debugDoubleSide = false,
   onShowcaseLabelChange,
   onSceneReady
 }: StartScreenSceneProps) {
@@ -47,21 +42,6 @@ export function StartScreenScene({
   useEffect(() => {
     showcaseIndexRef.current = showcaseIndex;
   }, [showcaseIndex]);
-
-  useEffect(() => {
-    setShipPresenterDebugOptions({
-      showFaceLabels: debugFaceLabels,
-      showVertexLabels: debugVertexLabels,
-      doubleSidedHull: debugDoubleSide
-    });
-    return () => {
-      setShipPresenterDebugOptions({
-        showFaceLabels: false,
-        showVertexLabels: false,
-        doubleSidedHull: false
-      });
-    };
-  }, [debugDoubleSide, debugFaceLabels, debugVertexLabels]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,8 +78,10 @@ export function StartScreenScene({
     let starfieldOffsetX = 0;
     let dragAnchorX = 0;
     let dragAnchorY = 0;
-    let showcasePitch = 0;
-    let showcaseYaw = 0;
+    let manualShowcaseRoll = 0;
+    let manualShowcasePitch = 0;
+    let autoShowcaseRoll = 0;
+    let autoShowcasePitch = 0;
     let activePointerId: number | null = null;
 
     // The attract scene reuses the real travel renderer, but it keeps a frozen
@@ -128,8 +110,14 @@ export function StartScreenScene({
       const deltaSeconds = lastTimestamp === 0 ? 1 / 60 : Math.min(0.05, (timestamp - lastTimestamp) / 1000);
       lastTimestamp = timestamp;
       starfieldOffsetX += deltaSeconds * DEMO_STARFIELD_SPEED_X;
+      autoShowcaseRoll = (autoShowcaseRoll + deltaSeconds * SHOWCASE_ROLL_SPEED) % TAU;
+      autoShowcasePitch = (autoShowcasePitch + deltaSeconds * SHOWCASE_PITCH_SPEED) % TAU;
       const showcaseShipId = START_SCREEN_SHOWCASE_SHIP_IDS[showcaseIndexRef.current % START_SCREEN_SHOWCASE_COUNT];
       const showcaseLabel = getShowcaseLabel(showcaseShipId);
+      // The auto-rotation is a true two-axis spin, with independent angular
+      // velocities so the hull never falls into an obvious synchronized loop.
+      const showcasePitch = manualShowcasePitch + autoShowcasePitch;
+      const showcaseRoll = manualShowcaseRoll + autoShowcaseRoll;
 
       // The overlay label only needs to update when the carousel advances to a
       // new showcase target, so React avoids re-rendering every animation tick.
@@ -210,8 +198,8 @@ export function StartScreenScene({
           }
         },
         showcaseOrientationOverride: {
+          roll: showcaseRoll,
           pitch: showcasePitch,
-          yaw: showcaseYaw
         },
         radarInsetTop: 0,
         radarInsetRight: 0
@@ -220,8 +208,8 @@ export function StartScreenScene({
       animationFrameId = window.requestAnimationFrame(renderFrame);
     };
 
-    // The showcase keeps pitch and yaw separate so debugging a missing face
-    // does not require fighting an automatic spin or a mixed-axis gesture.
+    // The showcase keeps pitch and yaw separate so a horizontal ship browse
+    // gesture never fights the vertical camera tilt.
     const handlePointerDown = (event: PointerEvent) => {
       if (activePointerId !== null) {
         return;
@@ -238,8 +226,8 @@ export function StartScreenScene({
       }
       const deltaX = event.clientX - dragAnchorX;
       const deltaY = event.clientY - dragAnchorY;
-      showcaseYaw += deltaX * 0.008;
-      showcasePitch = Math.max(-SHOWCASE_PITCH_LIMIT, Math.min(SHOWCASE_PITCH_LIMIT, showcasePitch + deltaY * 0.008));
+      manualShowcaseRoll += deltaX * 0.008;
+      manualShowcasePitch += deltaY * 0.008;
       dragAnchorX = event.clientX;
       dragAnchorY = event.clientY;
     };

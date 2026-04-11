@@ -54,9 +54,6 @@ export function StartScreenGate() {
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
   const [showcaseIndex, setShowcaseIndex] = useState(0);
-  const [debugFaceLabels, setDebugFaceLabels] = useState(false);
-  const [debugVertexLabels, setDebugVertexLabels] = useState(false);
-  const [debugDoubleSide, setDebugDoubleSide] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
@@ -155,9 +152,6 @@ export function StartScreenGate() {
           <Suspense fallback={<StartScreenSceneFallback />}>
             <StartScreenScene
               showcaseIndex={showcaseIndex}
-              debugFaceLabels={debugFaceLabels}
-              debugVertexLabels={debugVertexLabels}
-              debugDoubleSide={debugDoubleSide}
               onShowcaseLabelChange={setShowcaseLabel}
               onSceneReady={setIsMenuReady}
             />
@@ -183,32 +177,6 @@ export function StartScreenGate() {
               aria-label="Next ship"
             >
               &gt;
-            </button>
-          </div>
-          <div className="start-menu__ship-debug">
-            <button
-              type="button"
-              className={`start-menu__ship-debug-button${debugFaceLabels ? ' start-menu__ship-debug-button--active' : ''}`}
-              onClick={() => setDebugFaceLabels((current) => !current)}
-              disabled={!isMenuReady}
-            >
-              Face IDs
-            </button>
-            <button
-              type="button"
-              className={`start-menu__ship-debug-button${debugVertexLabels ? ' start-menu__ship-debug-button--active' : ''}`}
-              onClick={() => setDebugVertexLabels((current) => !current)}
-              disabled={!isMenuReady}
-            >
-              Vertex IDs
-            </button>
-            <button
-              type="button"
-              className={`start-menu__ship-debug-button${debugDoubleSide ? ' start-menu__ship-debug-button--active' : ''}`}
-              onClick={() => setDebugDoubleSide((current) => !current)}
-              disabled={!isMenuReady}
-            >
-              Double Side
             </button>
           </div>
           <div className="start-menu__controls">

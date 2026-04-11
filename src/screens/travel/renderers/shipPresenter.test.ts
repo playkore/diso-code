@@ -1,6 +1,6 @@
 import { Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { createLowPolyPlayerObject, createStationObject, selectShipPresenter, setShipPresenterDebugOptions } from './shipPresenter';
+import { createLowPolyPlayerObject, createStationObject, selectShipPresenter } from './shipPresenter';
 import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
 import { STATION_MESH_DEFINITION } from '../../../domain/combat/station/stationGeometry';
 
@@ -27,9 +27,6 @@ function dotProduct(
 
 describe('createLowPolyPlayerObject', () => {
   it('builds a black-faced ship with a yellow wireframe edge overlay', () => {
-    // The presenter keeps debug label toggles in module state for the showcase,
-    // so tests must reset them explicitly before asserting the base mesh shape.
-    setShipPresenterDebugOptions({ showFaceLabels: false, showVertexLabels: false, doubleSidedHull: false });
     const ship = createLowPolyPlayerObject();
     const hull = ship.children[0] as Mesh;
     const edges = ship.children[1] as LineSegments;

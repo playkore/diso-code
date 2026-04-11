@@ -52,8 +52,8 @@ interface TravelSceneRenderArgs {
     lookAt: { x: number; y: number; z: number };
   };
   showcaseOrientationOverride?: {
+    roll: number;
     pitch: number;
-    yaw: number;
   } | null;
   playerDeathEffect?: {
     elapsedMs: number;
@@ -510,9 +510,10 @@ export class TravelSceneRenderer {
       // the world-space axis that rotates the ship toward the camera.
       enemyAnchor.rotation.z = showcaseOrientationOverride ? 0 : -enemy.angle;
       if (showcaseOrientationOverride) {
-        // The start-screen showcase needs direct manual control over pitch and
-        // yaw so horizontal and vertical drags rotate around independent axes.
-        ship.rotation.set(showcaseOrientationOverride.pitch, showcaseOrientationOverride.yaw, 0);
+        // The showcase uses the ship's local X/Y axes so the hull can spin
+        // continuously on its nose axis while also pitching toward and away
+        // from the camera.
+        ship.rotation.set(showcaseOrientationOverride.roll, showcaseOrientationOverride.pitch, 0);
       } else {
         ship.rotation.set((enemyBankAngles.get(enemy.id) ?? 0) - presentation.pitch, presentation.yaw, 0);
       }
@@ -538,7 +539,7 @@ export class TravelSceneRenderer {
       // around its own forward axis without corrupting the heading axis itself.
       playerAnchor.rotation.z = showcaseOrientationOverride ? 0 : -combatState.player.angle;
       if (showcaseOrientationOverride) {
-        player.rotation.set(showcaseOrientationOverride.pitch, showcaseOrientationOverride.yaw, 0);
+        player.rotation.set(showcaseOrientationOverride.roll, showcaseOrientationOverride.pitch, 0);
       } else {
         // The hull uses +X as its nose direction, so rolling around local X makes
         // the ship lean onto its left/right side instead of skewing its turn axis.
