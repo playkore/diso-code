@@ -37,6 +37,12 @@ const BACKGROUND_STAR_MIN_DIAMETER = 30;
 const BACKGROUND_STAR_DIAMETER_VARIATION = 20;
 const BACKGROUND_STAR_MIN_DISTANCE = 120;
 const BACKGROUND_STAR_DISTANCE_VARIATION = 100;
+// These salts deliberately offset the new-game landmark away from the old
+// first-system look while keeping the mapping deterministic per seed.
+const BACKGROUND_STAR_ANGLE_SALT = 0;
+const BACKGROUND_STAR_DISTANCE_SALT = 0;
+const BACKGROUND_STAR_SIZE_SALT = 2;
+const BACKGROUND_STAR_COLOR_SALT = 32;
 
 function hashSeedTriplet(seed: SeedTriplet, salt: number) {
   // A tiny FNV-style hash gives us stable pseudo-random values from the
@@ -50,6 +56,18 @@ function hashSeedTriplet(seed: SeedTriplet, salt: number) {
 
 function hashToUnitInterval(hash: number) {
   return hash / 0x1_0000_0000;
+}
+
+function getBackgroundStarColor(seed: SeedTriplet) {
+  const colorHash = hashSeedTriplet(seed, BACKGROUND_STAR_COLOR_SALT);
+  const value = hashToUnitInterval(colorHash);
+  if (value < 0.06) {
+    return CGA_YELLOW;
+  }
+  if (value < 0.79) {
+    return CGA_RED;
+  }
+  return CGA_GREEN;
 }
 
 /**
@@ -69,9 +87,9 @@ export function createStars() {
 }
 
 export function createBackgroundStar(seed: SeedTriplet): BackgroundStar {
-  const angleHash = hashSeedTriplet(seed, 0);
-  const distanceHash = hashSeedTriplet(seed, 1);
-  const sizeHash = hashSeedTriplet(seed, 2);
+  const angleHash = hashSeedTriplet(seed, BACKGROUND_STAR_ANGLE_SALT);
+  const distanceHash = hashSeedTriplet(seed, BACKGROUND_STAR_DISTANCE_SALT);
+  const sizeHash = hashSeedTriplet(seed, BACKGROUND_STAR_SIZE_SALT);
   const angle = hashToUnitInterval(angleHash) * Math.PI * 2;
   const distance = BACKGROUND_STAR_MIN_DISTANCE + hashToUnitInterval(distanceHash) * BACKGROUND_STAR_DISTANCE_VARIATION;
 
@@ -80,7 +98,7 @@ export function createBackgroundStar(seed: SeedTriplet): BackgroundStar {
     y: Math.round(Math.sin(angle) * distance),
     parallax: BACKGROUND_STAR_PARALLAX,
     diameter: Math.round(BACKGROUND_STAR_MIN_DIAMETER + hashToUnitInterval(sizeHash) * BACKGROUND_STAR_DIAMETER_VARIATION),
-    color: CGA_RED
+    color: getBackgroundStarColor(seed)
   };
 }
 
