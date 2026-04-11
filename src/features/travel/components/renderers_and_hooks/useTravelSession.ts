@@ -23,11 +23,12 @@ import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
 import { createAutoDockState, stepAutoDockState, type AutoDockState } from '../../domain/combat/station/autoDock';
 import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
-import { createStars } from './travelVisuals';
+import { createBackgroundStar, createStars } from './travelVisuals';
 import { TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
 import type { PriorityState } from '../../../../shared/store/types';
 import type { TravelCompletionReport } from '../../../../shared/store/storeTypes';
+import type { SeedTriplet } from '../../../galaxy/domain/universe';
 import {
   areTravelSessionHudStatesEqual,
   INITIAL_HUD,
@@ -66,6 +67,14 @@ const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
 
 const JOYSTICK_TARGET_TURN_ANGLE = 0.12;
+
+/**
+ * Background scenery is keyed to the active system rather than the whole
+ * travel session so the same system always reuses the same decorative star.
+ */
+export function getTravelBackgroundStarSeed(originSeed: SeedTriplet, destinationSeed: SeedTriplet, jumpCompleted: boolean) {
+  return jumpCompleted ? destinationSeed : originSeed;
+}
 
 function clampUnit(value: number) {
   return Math.max(-1, Math.min(1, value));
@@ -365,6 +374,7 @@ export function useTravelSession(
     let lastTimestamp = 0;
     let stationaryTicks = 0;
     let stars = createStars();
+    let backgroundStar = createBackgroundStar(getTravelBackgroundStarSeed(originSystem.seed, destinationSystem.seed, false));
     let overlayMessage = '';
     let overlayTimer = 0;
     let jumpCompleted = false;
@@ -605,6 +615,7 @@ export function useTravelSession(
           random
         );
         enterArrivalSpace(combatState, random, { systemSeed: destinationSystem.seed });
+        backgroundStar = createBackgroundStar(getTravelBackgroundStarSeed(originSystem.seed, destinationSystem.seed, true));
         jumpCompleted = true;
         flightState = 'ARRIVED';
         showMessage(`SYSTEM REACHED: ${session.destinationSystem.toUpperCase()}`, 1800);
@@ -685,6 +696,7 @@ export function useTravelSession(
         showTargetLock: false,
         playerBankAngle: 0,
         enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+        backgroundStar,
         cameraOverride: {
           position: cameraPosition,
           lookAt: cameraLookAt
@@ -757,6 +769,7 @@ export function useTravelSession(
         showTargetLock: false,
         playerBankAngle: 0,
         enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+        backgroundStar,
         playerDeathEffect: {
           elapsedMs: playerDeathState.elapsedMs,
           showGameOver: false,
@@ -1023,6 +1036,7 @@ export function useTravelSession(
         showTargetLock: Boolean(combatState.playerTargetLock),
         playerBankAngle: playerBankState.visualAngle,
         enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+        backgroundStar,
         playerDeathEffect: null,
         cameraOverride: getStationClampedCameraOverride(combatState, defaultCameraDistance) ?? undefined,
         radarInsetTop,

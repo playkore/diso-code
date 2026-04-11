@@ -1,4 +1,5 @@
 import type { CombatEnemy, CombatProjectile, CombatShipRoles, TravelCombatState } from '../../domain/travelCombat';
+import type { SeedTriplet } from '../../../galaxy/domain/universe';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
 
@@ -17,6 +18,41 @@ export interface StarPoint {
 }
 
 /**
+ * A large decorative star that sits far behind the normal travel action.
+ *
+ * The object stays purely visual: the renderer places it in the background
+ * layer and the session logic only regenerates it when the active system seed
+ * changes.
+ */
+export interface BackgroundStar {
+  x: number;
+  y: number;
+  parallax: number;
+  diameter: number;
+  color: string;
+}
+
+const BACKGROUND_STAR_PARALLAX = 0.02;
+const BACKGROUND_STAR_MIN_DIAMETER = 112;
+const BACKGROUND_STAR_DIAMETER_VARIATION = 40;
+const BACKGROUND_STAR_POSITION_SPREAD_X = 1800;
+const BACKGROUND_STAR_POSITION_SPREAD_Y = 1400;
+
+function hashSeedTriplet(seed: SeedTriplet, salt: number) {
+  // A tiny FNV-style hash gives us stable pseudo-random values from the
+  // canonical Elite seed without introducing another runtime random stream.
+  let hash = 0x811c9dc5 ^ salt;
+  hash = Math.imul(hash ^ seed.w0, 0x01000193);
+  hash = Math.imul(hash ^ seed.w1, 0x01000193);
+  hash = Math.imul(hash ^ seed.w2, 0x01000193);
+  return hash >>> 0;
+}
+
+function hashToUnitInterval(hash: number) {
+  return hash / 0x1_0000_0000;
+}
+
+/**
  * The starfield is only data here; the renderer decides whether that data is
  * turned into points, streaks, or parallax layers.
  */
@@ -30,6 +66,20 @@ export function createStars() {
     });
   }
   return stars;
+}
+
+export function createBackgroundStar(seed: SeedTriplet): BackgroundStar {
+  const xHash = hashSeedTriplet(seed, 0);
+  const yHash = hashSeedTriplet(seed, 1);
+  const sizeHash = hashSeedTriplet(seed, 2);
+
+  return {
+    x: Math.round((hashToUnitInterval(xHash) - 0.5) * BACKGROUND_STAR_POSITION_SPREAD_X),
+    y: Math.round((hashToUnitInterval(yHash) - 0.5) * BACKGROUND_STAR_POSITION_SPREAD_Y),
+    parallax: BACKGROUND_STAR_PARALLAX,
+    diameter: Math.round(BACKGROUND_STAR_MIN_DIAMETER + hashToUnitInterval(sizeHash) * BACKGROUND_STAR_DIAMETER_VARIATION),
+    color: CGA_RED
+  };
 }
 
 export function getEnemyColor(roles: CombatShipRoles, missionTag?: TravelCombatState['enemies'][number]['missionTag']) {

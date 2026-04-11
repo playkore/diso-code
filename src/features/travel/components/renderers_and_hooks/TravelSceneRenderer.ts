@@ -18,6 +18,7 @@ import {
   Points,
   PointsMaterial,
   Scene,
+  CircleGeometry,
   Vector3,
   WebGLRenderer
 } from 'three';
@@ -27,7 +28,7 @@ import type { LineShape } from './background/types';
 import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { createShipObject, createStationObject } from './renderers/shipPresenter';
 import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './renderers/travelSceneMath';
-import { getEnemyColor, getEnemyHealthBarState, getEnemyLaserTrace, getProjectileColor, type StarPoint } from './travelVisuals';
+import { getEnemyColor, getEnemyHealthBarState, getEnemyLaserTrace, getProjectileColor, type BackgroundStar, type StarPoint } from './travelVisuals';
 
 interface TravelSceneRenderArgs {
   combatState: TravelCombatState;
@@ -45,6 +46,7 @@ interface TravelSceneRenderArgs {
     vx: number;
     vy: number;
   };
+  backgroundStar?: BackgroundStar | null;
   cameraOverride?: {
     position: { x: number; y: number; z: number };
     lookAt: { x: number; y: number; z: number };
@@ -67,6 +69,7 @@ const CAMERA_FOV_DEGREES = 36;
 const CAMERA_NEAR = 1;
 const CAMERA_FAR = 5000;
 const STARFIELD_Z = -900;
+const BACKGROUND_STAR_Z = STARFIELD_Z - 180;
 const PLAYER_Z = 28;
 const STATION_Z = PLAYER_Z;
 const SHIP_Z = 0;
@@ -179,6 +182,18 @@ function createQuad(width: number, height: number, color: string, opacity = 1) {
       // HUD quads are screen-space overlays and should never participate in
       // depth buffering; otherwise coplanar panels can hide later fills even
       // when the renderer computes the right health ratios.
+      depthTest: false,
+      depthWrite: false
+    })
+  );
+}
+
+function createFilledCircle(radius: number, color: string) {
+  return new Mesh(
+    new CircleGeometry(radius, 24),
+    new MeshBasicMaterial({
+      color,
+      side: DoubleSide,
       depthTest: false,
       depthWrite: false
     })
@@ -329,6 +344,7 @@ export class TravelSceneRenderer {
     playerBankAngle,
     enemyBankAngles,
     starfieldAnchor,
+    backgroundStar = null,
     cameraOverride,
     showcaseOrientationOverride = null,
     playerDeathEffect,
@@ -355,7 +371,7 @@ export class TravelSceneRenderer {
       disposeObject(child);
     }
 
-    this.buildStarfield(stars, combatState, flightState, starfieldAnchor);
+    this.buildStarfield(stars, combatState, flightState, starfieldAnchor, backgroundStar);
     this.buildWorld(
       combatState,
       playerBankAngle,
@@ -387,9 +403,25 @@ export class TravelSceneRenderer {
     stars: StarPoint[],
     combatState: TravelCombatState,
     flightState: FlightPhase,
-    starfieldAnchor?: TravelSceneRenderArgs['starfieldAnchor']
+    starfieldAnchor?: TravelSceneRenderArgs['starfieldAnchor'],
+    backgroundStar: BackgroundStar | null = null
   ) {
     const starfieldPlayer = starfieldAnchor ?? combatState.player;
+    if (backgroundStar) {
+      const screen = getWrappedStarScreenPosition(
+        { x: backgroundStar.x, y: backgroundStar.y, z: 0 },
+        starfieldPlayer,
+        this.width,
+        this.height,
+        backgroundStar.parallax
+      );
+      const radius = backgroundStar.diameter / 2;
+      // Elite's distant sun reads as a solid disk rather than a wireframe
+      // marker, so keep the background object as a single filled circle.
+      const star = createFilledCircle(radius, backgroundStar.color);
+      star.position.set(screen.x, screen.y, BACKGROUND_STAR_Z);
+      this.starGroup.add(setRenderOrder(star, -20));
+    }
     const buckets = bucketStarsByParallax(stars);
     buckets.forEach((bucket, bucketIndex) => {
       if (bucket.length === 0) {
