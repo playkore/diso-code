@@ -213,6 +213,22 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.legalValue).toBe(10);
   });
 
+  it('still opens the travel session for undocking when instant travel is enabled', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      universe: { ...state.universe, currentSystem: 'Lave' },
+      ui: {
+        ...state.ui,
+        instantTravelEnabled: true
+      }
+    }));
+
+    expect(useGameStore.getState().beginTravel('Lave')).toBe(true);
+    expect(useGameStore.getState().travelSession?.originSystem).toBe('Lave');
+    expect(useGameStore.getState().travelSession?.destinationSystem).toBe('Lave');
+    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+  });
+
   it('credits combat rewards immediately through the travel slice helper', () => {
     const startingCash = useGameStore.getState().commander.cash;
     useGameStore.getState().grantCombatCredits(710);

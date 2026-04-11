@@ -86,7 +86,10 @@ export const createTravelSlice: GameSlice<
       });
       return false;
     }
-    if (state.ui.instantTravelEnabled) {
+    // Instant travel is a jump shortcut, not a replacement for local launch.
+    // Undocking still needs the travel session so the player can leave the
+    // station and regain manual control in the same system.
+    if (state.ui.instantTravelEnabled && !isUndocking) {
       const nextState = createArrivalState(state, systemName);
       if (!nextState) {
         return false;
