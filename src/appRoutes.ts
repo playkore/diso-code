@@ -1,4 +1,4 @@
-import type { AppTab } from './store/types';
+import type { AppTab } from './shared/store/types';
 
 /**
  * Docked tabs and routes intentionally share a single mapping so browser

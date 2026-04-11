@@ -1,187 +1,149 @@
 import { createWithEqualityFn } from 'zustand/traditional';
-import { createDefaultCommander } from '../domain/commander';
+import { persist } from 'zustand/middleware';
+import { createDefaultCommander } from '../features/commander/domain/commander';
 import {
   createInitialGameState,
-  loadPersistedDockedSession,
   loadInstantTravelEnabled,
   loadPersistedSaveStates,
   loadTravelPerfOverlayEnabled,
-  persistDockedSession,
   persistInstantTravelEnabled,
-  persistTravelPerfOverlayEnabled
-} from './gameStateFactory';
-import { createOutfittingSlice } from './slices/outfittingSlice';
-import { createSaveLoadSlice } from './slices/saveLoadSlice';
-import { createTradeSlice } from './slices/tradeSlice';
-import { createTravelSlice } from './slices/travelSlice';
-import { syncPriorityProgress } from './priority';
-import type { GameStore } from './storeTypes';
-import { createUiMessage, withUiMessage } from './uiMessages';
+  persistTravelPerfOverlayEnabled,
+  refreshItems
+} from '../shared/store/gameStateFactory';
+import { createOutfittingSlice } from '../features/commander/store/outfittingSlice';
+import { createSaveLoadSlice } from '../features/persistence/store/saveLoadSlice';
+import { createTradeSlice } from '../features/market/store/tradeSlice';
+import { createTravelSlice } from '../features/travel/store/travelSlice';
+import { syncPriorityProgress } from '../shared/store/priority';
+import type { AppTab, GameStore, PriorityState } from '../shared/store/storeTypes';
+import { createUiMessage, withUiMessage } from '../shared/store/uiMessages';
 
-export type { GameStore, SaveSlotId, SaveState, TravelCompletionReport } from './storeTypes';
+export type { GameStore, SaveSlotId, SaveState, TravelCompletionReport } from '../shared/store/storeTypes';
 
-/**
- * Reduces the docked portion of the store to the fields that define the
- * refresh-restorable session. Activity log chatter is intentionally excluded so
- * notification spam does not trigger extra writes.
- */
-function getDockedSessionSignature(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'priority' | 'travelSession' | 'ui'>) {
-  if (state.travelSession) {
-    return null;
+const storageWrapper = {
+  getItem: (name: string) => {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(name);
+    return raw ? JSON.parse(raw) : null;
+  },
+  setItem: (name: string, value: any) => {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    // If the partialize function flagged this as mid-travel, don't overwrite the good save!
+    if (value.state && value.state.__isTravelling) {
+      return;
+    }
+    window.localStorage.setItem(name, JSON.stringify(value));
+  },
+  removeItem: (name: string) => {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    window.localStorage.removeItem(name);
   }
-  return JSON.stringify({
-    activeTab: state.ui.activeTab,
-    commander: state.commander,
-    universe: state.universe,
-    marketSession: state.market.session,
-    priority: state.priority
-  });
-}
+};
 
-/**
- * Global application store
- * ------------------------
- *
- * This is the single source of truth for the docked game state:
- * - universe position / local economy
- * - commander state
- * - current docked market
- * - active travel session, if the player is in flight
- * - UI preferences and recent activity messages
- *
- * The public API remains flat for the rest of the app, but the implementation
- * is assembled from focused slices:
- * - travelSlice: route lifecycle and travel completion
- * - tradeSlice: commodity/fuel economy actions
- * - outfittingSlice: equipment, lasers and missiles
- * - saveLoadSlice: persistence and new game flow
- */
-export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) => {
-  // Boot sequence:
-  // 1. create a default commander
-  // 2. derive the initial docked world state for that commander
-  // 3. rehydrate persisted save slots and player settings
-  const initialCommander = createDefaultCommander();
-  const initialState = createInitialGameState(initialCommander);
-  const persistedDockedSession = loadPersistedDockedSession();
-  const persistedSaveStates = loadPersistedSaveStates();
-  const instantTravelEnabled = loadInstantTravelEnabled();
-  const showTravelPerfOverlay = loadTravelPerfOverlayEnabled();
-  const bootState = persistedDockedSession?.restoredState ?? initialState;
+export const useGameStore = createWithEqualityFn<GameStore>()(
+  persist(
+    (set, get, api) => {
+      const initialCommander = createDefaultCommander();
+      const bootState = createInitialGameState(initialCommander);
+      const persistedSaveStates = loadPersistedSaveStates();
+      const instantTravelEnabled = loadInstantTravelEnabled();
+      const showTravelPerfOverlay = loadTravelPerfOverlayEnabled();
 
-  return {
-    // Base state for a fresh session before any user actions occur.
-    universe: bootState.universe,
-    commander: bootState.commander,
-    market: bootState.market,
-    travelSession: null,
-    priority: bootState.priority,
-    saveStates: persistedSaveStates,
-    ui: {
-      activeTab: persistedDockedSession?.activeTab ?? 'market',
-      selectedChartSystem: null,
-      compactMode: true,
-      instantTravelEnabled,
-      showTravelPerfOverlay,
-      startScreenVisible: true,
-      newGameBootVisible: false,
-      newGamePowerOnVisible: false,
-      activityLog: []
+      return {
+        universe: bootState.universe,
+        commander: bootState.commander,
+        market: bootState.market,
+        travelSession: null,
+        priority: bootState.priority,
+        saveStates: persistedSaveStates,
+        ui: {
+          activeTab: 'market',
+          selectedChartSystem: null,
+          compactMode: true,
+          instantTravelEnabled,
+          showTravelPerfOverlay,
+          startScreenVisible: true,
+          newGameBootVisible: false,
+          newGamePowerOnVisible: false,
+          activityLog: []
+        },
+
+        setActiveTab: (tab: AppTab) => set((state: GameStore) => ({ ui: { ...state.ui, activeTab: tab } })),
+        setStartScreenVisible: (visible: boolean) => set((state: GameStore) => ({ ui: { ...state.ui, startScreenVisible: visible } })),
+        setNewGameBootVisible: (visible: boolean) => set((state: GameStore) => ({ ui: { ...state.ui, newGameBootVisible: visible } })),
+        setNewGamePowerOnVisible: (visible: boolean) => set((state: GameStore) => ({ ui: { ...state.ui, newGamePowerOnVisible: visible } })),
+        setSelectedChartSystem: (systemName: string | null) => set((state: GameStore) => ({ ui: { ...state.ui, selectedChartSystem: systemName } })),
+        setInstantTravelEnabled: (enabled: boolean) =>
+          set((state: GameStore) => {
+            persistInstantTravelEnabled(enabled);
+            return {
+              ui: withUiMessage(
+                { ...state.ui, instantTravelEnabled: enabled },
+                createUiMessage(
+                  'info',
+                  enabled ? 'Instant travel enabled' : 'Space travel enabled',
+                  enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
+                )
+              )
+            };
+          }),
+        setPriority: (priority: PriorityState, options?: { announce?: boolean }) =>
+          set(() => ({ priority: { ...priority, pendingAnnouncement: options?.announce ?? true } })),
+        acknowledgePriorityAnnouncement: () =>
+          set((state: GameStore) => ({ priority: { ...state.priority, pendingAnnouncement: false } })),
+        setShowTravelPerfOverlay: (enabled: boolean) =>
+          set((state: GameStore) => {
+            persistTravelPerfOverlayEnabled(enabled);
+            return {
+              ui: withUiMessage(
+                { ...state.ui, showTravelPerfOverlay: enabled },
+                createUiMessage(
+                  'info',
+                  enabled ? 'Travel perf overlay enabled' : 'Travel perf overlay disabled',
+                  enabled ? 'Space flight now shows a live frame and React commit overlay.' : 'Space flight hides the live performance overlay.'
+                )
+              )
+            };
+          }),
+
+        ...createTravelSlice(set, get, api),
+        ...createTradeSlice(set, get, api),
+        ...createOutfittingSlice(set, get, api),
+        ...createSaveLoadSlice(set, get, api)
+      };
     },
-
-    // Small UI-only helpers stay here rather than in their own slice because
-    // they are stateless wrappers around `set`.
-    setActiveTab: (tab) => set((state) => ({ ui: { ...state.ui, activeTab: tab } })),
-    setStartScreenVisible: (visible) =>
-      set((state) => ({
-        ui: {
-          ...state.ui,
-          startScreenVisible: visible
+    {
+      name: 'diso-code:docked-session-v2',
+      storage: storageWrapper,
+      partialize: (state: any) => {
+        if (state.travelSession) {
+          return { __isTravelling: true };
         }
-      })),
-    setNewGameBootVisible: (visible) =>
-      set((state) => ({
-        ui: {
-          ...state.ui,
-          newGameBootVisible: visible
-        }
-      })),
-    setNewGamePowerOnVisible: (visible) =>
-      set((state) => ({
-        ui: {
-          ...state.ui,
-          newGamePowerOnVisible: visible
-        }
-      })),
-    setSelectedChartSystem: (systemName) =>
-      set((state) => ({
-        ui: {
-          ...state.ui,
-          selectedChartSystem: systemName
-        }
-      })),
-    setInstantTravelEnabled: (enabled) =>
-      set((state) => {
-        persistInstantTravelEnabled(enabled);
         return {
-          ui: withUiMessage(
-            { ...state.ui, instantTravelEnabled: enabled },
-            createUiMessage(
-              'info',
-              enabled ? 'Instant travel enabled' : 'Space travel enabled',
-              enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
-            )
-          )
+          ui: { activeTab: state.ui.activeTab },
+          commander: state.commander,
+          universe: state.universe,
+          marketSession: state.market.session,
+          priority: state.priority
         };
-      }),
-    setPriority: (priority, options) =>
-      set(() => ({
-        priority: {
-          ...priority,
-          pendingAnnouncement: options?.announce ?? true
-        }
-      })),
-    acknowledgePriorityAnnouncement: () =>
-      set((state) => ({
-        priority: {
-          ...state.priority,
-          pendingAnnouncement: false
-        }
-      })),
-    setShowTravelPerfOverlay: (enabled) =>
-      set((state) => {
-        persistTravelPerfOverlayEnabled(enabled);
+      },
+      merge: (persistedState: any, currentState: any) => {
+        if (!persistedState || persistedState.__isTravelling) return currentState;
         return {
-          ui: withUiMessage(
-            { ...state.ui, showTravelPerfOverlay: enabled },
-            createUiMessage(
-              'info',
-              enabled ? 'Travel perf overlay enabled' : 'Travel perf overlay disabled',
-              enabled ? 'Space flight now shows a live frame and React commit overlay.' : 'Space flight hides the live performance overlay.'
-            )
-          )
+          ...currentState,
+          universe: persistedState.universe ?? currentState.universe,
+          commander: persistedState.commander ?? currentState.commander,
+          priority: persistedState.priority ?? currentState.priority,
+          market: persistedState.marketSession ? refreshItems(persistedState.marketSession) : currentState.market,
+          ui: {
+            ...currentState.ui,
+            activeTab: persistedState.ui?.activeTab ?? currentState.ui.activeTab
+          }
         };
-      }),
-
-    // The flat public API is composed from internal slices to keep domain
-    // responsibilities separate without making callers import multiple stores.
-    ...createTravelSlice(set, get, api),
-    ...createTradeSlice(set, get, api),
-    ...createOutfittingSlice(set, get, api),
-    ...createSaveLoadSlice(set, get, api)
-  };
-});
-
-let lastDockedSessionSignature = getDockedSessionSignature(useGameStore.getState());
-
-useGameStore.subscribe((state) => {
-  const nextDockedSessionSignature = getDockedSessionSignature(state);
-  if (!nextDockedSessionSignature || nextDockedSessionSignature === lastDockedSessionSignature) {
-    return;
-  }
-  lastDockedSessionSignature = nextDockedSessionSignature;
-  persistDockedSession(state);
-});
+      }
+    }
+  )
+);
 
 useGameStore.subscribe((state) => {
   const syncedPriority = syncPriorityProgress(state.priority, state.commander.cash);

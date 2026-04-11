@@ -1,19 +1,19 @@
 import { Suspense, lazy } from 'react';
 import { Navigate, RouterProvider, createBrowserRouter } from 'react-router-dom';
-import { AppShell } from './components/AppShell';
-import { DebugScreen } from './screens/DebugScreen';
-import { EquipmentScreen } from './screens/EquipmentScreen';
-import { GalaxyChartScreen } from './screens/GalaxyChartScreen';
-import { InventoryScreen } from './screens/InventoryScreen';
-import { LoadScreen } from './screens/LoadScreen';
-import { MarketScreen } from './screens/MarketScreen';
-import { SaveScreen } from './screens/SaveScreen';
-import { SystemDataScreen } from './screens/SystemDataScreen';
-import { StarMapScreen } from './screens/StarMapScreen';
+import { AppShell } from './shared/components/AppShell';
+import { DebugScreen } from './shared/components/DebugScreen';
+import { EquipmentScreen } from './features/commander/components/EquipmentScreen';
+import { GalaxyChartScreen } from './features/galaxy/components/GalaxyChartScreen';
+import { InventoryScreen } from './features/commander/components/InventoryScreen';
+import { LoadScreen } from './features/persistence/components/LoadScreen';
+import { MarketScreen } from './features/market/components/MarketScreen';
+import { SaveScreen } from './features/persistence/components/SaveScreen';
+import { SystemDataScreen } from './features/galaxy/components/SystemDataScreen';
+import { StarMapScreen } from './features/galaxy/components/StarMapScreen';
 
 // Travel is the only route that pulls in Three.js and the full flight renderer,
 // so loading it lazily keeps docked screens out of that heavier dependency path.
-const TravelScreen = lazy(() => import('./screens/TravelScreen').then((module) => ({ default: module.TravelScreen })));
+const TravelScreen = lazy(() => import('./features/travel/components/TravelScreen').then((module) => ({ default: module.TravelScreen })));
 
 const router = createBrowserRouter([
   {
