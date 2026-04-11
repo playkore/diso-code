@@ -4,8 +4,7 @@ import type { BlueprintId } from '../domain/travelCombat';
  * The start screen and its 3D showcase share the same ordered carousel list so
  * button navigation and rendered hull selection cannot drift apart over time.
  */
-export const START_SCREEN_SHOWCASE_SHIP_IDS: readonly ('player' | BlueprintId)[] = [
-  'player',
+export const START_SCREEN_SHOWCASE_SHIP_IDS: readonly BlueprintId[] = [
   'sidewinder',
   'mamba',
   'krait',

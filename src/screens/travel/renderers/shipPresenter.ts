@@ -67,9 +67,9 @@ function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: st
 }
 
 /**
- * The player Cobra has two engine nozzles on the stern. Rendering each plume
- * as its own narrow wedge keeps the silhouette aligned with the authored hull
- * instead of collapsing both engines into one centered exhaust streak.
+ * The player shares the same Cobra Mk III mesh as the trader variant. Only
+ * the role color changes, which keeps the player silhouette consistent with
+ * the legacy ship data while avoiding a second maintenance-only model id.
  */
 const STATION_MESH: ShipMeshDefinition = {
   ...STATION_MESH_DEFINITION,
@@ -87,7 +87,7 @@ const STATION_MESH: ShipMeshDefinition = {
  * CGA palette by using black hull faces plus colored wire edges only.
  */
 export function createLowPolyPlayerObject() {
-  return createWireframeMeshObject(getEliteShipMeshDefinition('cobra-mk3-player'), CGA_YELLOW);
+  return createWireframeMeshObject(getEliteShipMeshDefinition('cobra-mk3-trader'), CGA_YELLOW);
 }
 
 export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: string) {

@@ -11,7 +11,6 @@ const DEMO_SYSTEM_NAME = 'Lave';
 const DEMO_CAMERA_FOV_DEGREES = 36;
 const DEMO_SHIP_CAMERA_DISTANCE_FACTOR = 0.07;
 const DEMO_STARFIELD_SPEED_X = 42;
-const DEMO_PLAYER_SHOWCASE_DISTANCE = 0;
 const DEMO_ENEMY_SHOWCASE_DISTANCE = 0;
 const DEMO_HIDDEN_ENTITY_OFFSET = 10000;
 const SHOWCASE_ROLL_SPEED = 1.8;
@@ -23,10 +22,7 @@ export interface StartScreenSceneProps {
   onSceneReady?: (ready: boolean) => void;
 }
 
-function getShowcaseLabel(showcaseShipId: 'player' | BlueprintId): string {
-  if (showcaseShipId === 'player') {
-    return 'Cobra Mk III';
-  }
+function getShowcaseLabel(showcaseShipId: BlueprintId): string {
   return BLUEPRINTS[showcaseShipId].label;
 }
 
@@ -133,37 +129,26 @@ export function StartScreenScene({
       combatState.player.angle = 0;
       combatState.enemies.length = 0;
       enemyBankAngles.clear();
-      if (showcaseShipId === 'player') {
-        combatState.player.x = DEMO_PLAYER_SHOWCASE_DISTANCE;
-        combatState.player.y = 0;
-        combatState.player.angle = 0;
+      if (showcasedEnemyBlueprintId !== showcaseShipId || showcasedEnemyId === null) {
+        showcasedEnemyBlueprintId = showcaseShipId;
+        combatState.nextId += 1;
+        showcasedEnemyId = combatState.nextId;
       }
 
-      if (showcaseShipId !== 'player') {
-        if (showcasedEnemyBlueprintId !== showcaseShipId || showcasedEnemyId === null) {
-          showcasedEnemyBlueprintId = showcaseShipId;
-          combatState.nextId += 1;
-          showcasedEnemyId = combatState.nextId;
-        }
-
-        const showcasedEnemy = spawnEnemyFromBlueprint(combatState, showcaseShipId, createMathRandomSource(), {
-          id: showcasedEnemyId,
-          x: DEMO_ENEMY_SHOWCASE_DISTANCE,
-          y: 0,
-          vx: 0,
-          vy: 0,
-          angle: 0,
-          aggression: 0,
-          baseAggression: 0,
-          fireCooldown: Number.POSITIVE_INFINITY,
-          missileCooldown: Number.POSITIVE_INFINITY,
-          lifetime: 0
-        });
-        enemyBankAngles.set(showcasedEnemy.id, 0);
-      } else {
-        showcasedEnemyBlueprintId = null;
-        showcasedEnemyId = null;
-      }
+      const showcasedEnemy = spawnEnemyFromBlueprint(combatState, showcaseShipId, createMathRandomSource(), {
+        id: showcasedEnemyId,
+        x: DEMO_ENEMY_SHOWCASE_DISTANCE,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        angle: 0,
+        aggression: 0,
+        baseAggression: 0,
+        fireCooldown: Number.POSITIVE_INFINITY,
+        missileCooldown: Number.POSITIVE_INFINITY,
+        lifetime: 0
+      });
+      enemyBankAngles.set(showcasedEnemy.id, 0);
 
       // The start screen keeps a close camera so every showcased hull reads as
       // a large hero render instead of a distant gameplay object.

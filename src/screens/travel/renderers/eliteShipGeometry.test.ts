@@ -25,7 +25,7 @@ function triangleUsesRawPoints(
 
 describe('getEliteShipMeshDefinition', () => {
   it('keeps the Cobra Mk III nose antenna out of filled hull triangulation', () => {
-    const definition = getEliteShipMeshDefinition('cobra-mk3-player');
+    const definition = getEliteShipMeshDefinition('cobra-mk3-trader');
     const antennaTipX = 90 * CLASSIC_COORDINATE_SCALE;
 
     const hullUsesAntennaTip = definition.hullTriangles.some((triangle) =>

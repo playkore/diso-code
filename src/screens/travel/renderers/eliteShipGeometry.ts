@@ -25,7 +25,7 @@ export interface ShipMeshDefinition {
   vertexLabels: readonly ShipVertexLabelAnchor[];
 }
 
-export type EliteShipModelId = BlueprintId | 'cobra-mk3-player';
+export type EliteShipModelId = BlueprintId;
 
 type RawModelKey = keyof typeof RAW_ELITE_SHIP_MODELS;
 type RawVertex = (typeof RAW_ELITE_SHIP_MODELS)[RawModelKey]['vertices'][number];
@@ -383,8 +383,7 @@ const ELITE_SHIP_MESHES: Record<EliteShipModelId, ShipMeshDefinition> = {
   viper: buildShipMeshDefinition('viper'),
   constrictor: buildShipMeshDefinition('constrictor'),
   thargoid: buildShipMeshDefinition('thargoid'),
-  thargon: buildShipMeshDefinition('thargon'),
-  'cobra-mk3-player': buildShipMeshDefinition('cobraMk3')
+  thargon: buildShipMeshDefinition('thargon')
 };
 
 export function getEliteShipMeshDefinition(id: EliteShipModelId) {
