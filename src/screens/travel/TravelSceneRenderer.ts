@@ -60,6 +60,7 @@ interface TravelSceneRenderArgs {
     showGameOver: boolean;
     showPrompt: boolean;
   } | null;
+  showPlayer?: boolean;
   radarInsetTop: number;
   radarInsetRight: number;
 }
@@ -362,6 +363,7 @@ export class TravelSceneRenderer {
     cameraOverride,
     showcaseOrientationOverride = null,
     playerDeathEffect,
+    showPlayer = true,
     radarInsetTop,
     radarInsetRight
   }: TravelSceneRenderArgs) {
@@ -391,7 +393,8 @@ export class TravelSceneRenderer {
       enemyBankAngles,
       showSafeZoneRing,
       playerDeathEffect ?? null,
-      showcaseOrientationOverride
+      showcaseOrientationOverride,
+      showPlayer
     );
     this.buildOverlay(combatState, showTargetLock, showRadar, radarInsetTop, radarInsetRight);
     this.updateFlash(combatState);
@@ -471,7 +474,8 @@ export class TravelSceneRenderer {
     enemyBankAngles: ReadonlyMap<number, number>,
     showSafeZoneRing: boolean,
     playerDeathEffect: TravelSceneRenderArgs['playerDeathEffect'],
-    showcaseOrientationOverride: TravelSceneRenderArgs['showcaseOrientationOverride']
+    showcaseOrientationOverride: TravelSceneRenderArgs['showcaseOrientationOverride'],
+    showPlayer: boolean
   ) {
     if (combatState.station) {
       const station = createStationObject();
@@ -528,7 +532,7 @@ export class TravelSceneRenderer {
 
     if (playerDeathEffect) {
       this.buildPlayerDeathEffect(combatState, playerDeathEffect);
-    } else {
+    } else if (showPlayer) {
       const player = this.shipPresenter.playerGeometryMode === 'mesh'
         ? this.shipPresenter.createPlayerObject?.() ?? new Group()
         : createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
