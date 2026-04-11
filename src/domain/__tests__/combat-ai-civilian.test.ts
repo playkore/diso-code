@@ -10,7 +10,7 @@ describe('travel combat civilian AI', () => {
     const state = createCombatState([0, 0, 0, 0]);
     // This test exercises docking behavior, not ambient encounter spawning.
     state.encounter.rareTimer = -10_000;
-    state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
+    state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0.005, safeZoneRadius: 360 };
     const dockMouth = getStationDockMouthPoint(state.station);
     const stageRadius = Math.hypot(dockMouth.x - state.station.x, dockMouth.y - state.station.y) + 56;
     state.player.x = 220;

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { selectShipPresenter } from './shipPresenter';
 import { bucketStarsByParallax, createShipBankState, getPerspectiveCameraDistance, getPlayerBankAngle, getShipPresentationAngles, getWrappedStarScreenPosition, stepShipBankState } from './travelSceneMath';
 
 describe('bucketStarsByParallax', () => {
@@ -112,24 +111,6 @@ describe('getWrappedStarScreenPosition', () => {
     expect(getWrappedStarScreenPosition({ x: -40, y: 650, z: 0.2 }, { x: 100, y: 100 }, 800, 600, 0.5)).toEqual({
       x: 710,
       y: 0
-    });
-  });
-});
-
-describe('selectShipPresenter', () => {
-  it('defaults to the low-poly ship presenter for both enemy and player meshes', () => {
-    expect(selectShipPresenter()).toMatchObject({
-      id: 'low-poly-ships',
-      enemyGeometryMode: 'mesh',
-      playerGeometryMode: 'mesh'
-    });
-  });
-
-  it('keeps the flat wireframe presenter as an explicit fallback', () => {
-    expect(selectShipPresenter('flat-wireframe')).toEqual({
-      id: 'flat-wireframe',
-      enemyGeometryMode: 'line-shape',
-      playerGeometryMode: 'line-shape'
     });
   });
 });

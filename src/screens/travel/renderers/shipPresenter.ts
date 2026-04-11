@@ -8,19 +8,16 @@ import { CGA_BLACK, CGA_YELLOW } from './constants';
 export type EnemyShipMeshId = BlueprintId;
 
 export interface ShipPresenter {
-  id: 'flat-wireframe' | 'low-poly-ships';
-  enemyGeometryMode: 'line-shape' | 'mesh';
-  playerGeometryMode: 'line-shape' | 'mesh';
-  createEnemyObject?: (shipId: EnemyShipMeshId, edgeColor: string) => Object3D;
-  createPlayerObject?: () => Object3D;
+  id: 'low-poly-ships';
+  createShipObject: (shipId: EnemyShipMeshId, edgeColor: string) => Object3D;
 }
 
-export type RequestedShipPresenter = ShipPresenter['id'];
-
 /**
- * Every 3D ship now has an explicit authored mesh definition instead of being
- * derived from the legacy 2D contour on the fly. That keeps renderer logic
- * simple and lets each hull evolve independently in the future.
+ * Every rendered ship now uses the same authored mesh pipeline.
+ *
+ * The helper keeps the renderer-side Three.js object construction in one
+ * place so callers only choose the blueprint and edge color; they never need
+ * to care whether that ship is a player hull, an enemy hull, or a station.
  */
 function createTriangleGeometry(triangles: ShipMeshDefinition['hullTriangles']) {
   const geometry = new BufferGeometry();
@@ -67,18 +64,7 @@ function createWireframeMeshObject(definition: ShipMeshDefinition, edgeColor: st
 }
 
 /**
- * The player shares the same Cobra Mk III mesh as the trader variant. Only
- * the role color changes, which keeps the player silhouette consistent with
- * the legacy ship data while avoiding a second maintenance-only model id.
- */
-const STATION_MESH: ShipMeshDefinition = {
-  ...STATION_MESH_DEFINITION,
-  faceLabels: [],
-  vertexLabels: []
-};
-
-/**
- * The player hull uses the renderer's native Three.js axes:
+ * The rendered ship uses the renderer's native Three.js axes:
  * - `+X` points toward the nose
  * - `+Y` spans the ship's left/right silhouette in screen space
  * - `+Z` lifts the dorsal hump toward the camera
@@ -86,11 +72,7 @@ const STATION_MESH: ShipMeshDefinition = {
  * Travel rendering never enables scene lights, so every ship stays inside the
  * CGA palette by using black hull faces plus colored wire edges only.
  */
-export function createLowPolyPlayerObject() {
-  return createWireframeMeshObject(getEliteShipMeshDefinition('cobra-mk3-trader'), CGA_YELLOW);
-}
-
-export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: string) {
+export function createShipObject(shipId: EnemyShipMeshId, edgeColor: string) {
   return createWireframeMeshObject(getEliteShipMeshDefinition(shipId), edgeColor);
 }
 
@@ -100,26 +82,10 @@ export function createLowPolyEnemyObject(shipId: EnemyShipMeshId, edgeColor: str
  * face rather than a synthetic protruding tunnel.
  */
 export function createStationObject() {
-  return createWireframeMeshObject(STATION_MESH, CGA_YELLOW);
+  return createWireframeMeshObject(STATION_MESH_DEFINITION, CGA_YELLOW);
 }
 
-export const FLAT_WIREFRAME_SHIP_PRESENTER: ShipPresenter = {
-  id: 'flat-wireframe',
-  enemyGeometryMode: 'line-shape',
-  playerGeometryMode: 'line-shape'
-};
-
-export const LOW_POLY_SHIP_PRESENTER: ShipPresenter = {
+export const SHIP_PRESENTER: ShipPresenter = {
   id: 'low-poly-ships',
-  enemyGeometryMode: 'mesh',
-  playerGeometryMode: 'mesh',
-  createEnemyObject: createLowPolyEnemyObject,
-  createPlayerObject: createLowPolyPlayerObject
+  createShipObject
 };
-
-export function selectShipPresenter(requested: RequestedShipPresenter = 'low-poly-ships'): ShipPresenter {
-  if (requested === 'flat-wireframe') {
-    return FLAT_WIREFRAME_SHIP_PRESENTER;
-  }
-  return LOW_POLY_SHIP_PRESENTER;
-}

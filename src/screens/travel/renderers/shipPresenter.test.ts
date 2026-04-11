@@ -1,6 +1,6 @@
 import { Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial } from 'three';
 import { describe, expect, it } from 'vitest';
-import { createLowPolyPlayerObject, createStationObject, selectShipPresenter } from './shipPresenter';
+import { createShipObject, createStationObject, SHIP_PRESENTER } from './shipPresenter';
 import { CGA_BLACK, CGA_RED, CGA_YELLOW } from './constants';
 import { STATION_MESH_DEFINITION } from '../../../domain/combat/station/stationGeometry';
 
@@ -25,9 +25,9 @@ function dotProduct(
   return ax * bx + ay * by + az * bz;
 }
 
-describe('createLowPolyPlayerObject', () => {
+describe('createShipObject', () => {
   it('builds a black-faced ship with a yellow wireframe edge overlay', () => {
-    const ship = createLowPolyPlayerObject();
+    const ship = createShipObject('cobra-mk3-trader', CGA_YELLOW);
     const hull = ship.children[0] as Mesh;
     const edges = ship.children[1] as LineSegments;
     const hullMaterial = hull.material as MeshBasicMaterial;
@@ -45,25 +45,17 @@ describe('createLowPolyPlayerObject', () => {
   });
 });
 
-describe('selectShipPresenter geometry split', () => {
-  it('uses mesh-backed geometry for both enemy and player ships in the default presenter', () => {
-    const presenter = selectShipPresenter();
-    const enemy = presenter.createEnemyObject?.('sidewinder', CGA_RED) as Group;
-
-    expect(presenter.enemyGeometryMode).toBe('mesh');
-    expect(presenter.playerGeometryMode).toBe('mesh');
-    expect(enemy).toBeInstanceOf(Group);
-    expect(enemy.children[0]).toBeInstanceOf(Mesh);
-    expect(enemy.children[1]).toBeInstanceOf(LineSegments);
-    expect(((enemy.children[0] as Mesh).material as MeshBasicMaterial).color.getHexString()).toBe(CGA_BLACK.slice(1));
-    expect(((enemy.children[1] as LineSegments).material as LineBasicMaterial).color.getHexString()).toBe(CGA_RED.slice(1));
-    expect(presenter.createPlayerObject?.()).toBeInstanceOf(Group);
+describe('SHIP_PRESENTER', () => {
+  it('exposes the single mesh-backed ship presenter', () => {
+    expect(SHIP_PRESENTER).toMatchObject({
+      id: 'low-poly-ships'
+    });
+    expect(SHIP_PRESENTER.createShipObject('sidewinder', CGA_RED)).toBeInstanceOf(Group);
   });
 
   it('keeps separate authored 3D meshes for different ship blueprints', () => {
-    const presenter = selectShipPresenter();
-    const police = presenter.createEnemyObject?.('viper', CGA_YELLOW) as Group;
-    const thargoid = presenter.createEnemyObject?.('thargoid', CGA_YELLOW) as Group;
+    const police = createShipObject('viper', CGA_YELLOW);
+    const thargoid = createShipObject('thargoid', CGA_YELLOW);
 
     expect(police).toBeInstanceOf(Group);
     expect(thargoid).toBeInstanceOf(Group);

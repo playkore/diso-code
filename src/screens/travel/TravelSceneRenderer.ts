@@ -24,8 +24,8 @@ import {
 import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type FlightPhase, type TravelCombatState } from '../../domain/travelCombat';
 import { getStationRenderScale } from '../../domain/combat/station/stationGeometry';
 import type { LineShape } from './background/types';
-import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW, SHAPE_ENEMY, SHAPE_PLAYER, SHAPE_POLICE, SHAPE_THARGOID } from './renderers/constants';
-import { createStationObject, selectShipPresenter, type EnemyShipMeshId } from './renderers/shipPresenter';
+import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
+import { createShipObject, createStationObject } from './renderers/shipPresenter';
 import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './renderers/travelSceneMath';
 import { getEnemyColor, getEnemyHealthBarState, getEnemyLaserTrace, getProjectileColor, type StarPoint } from './travelVisuals';
 
@@ -147,18 +147,6 @@ function createLineShapeObject(shape: LineShape, color: string, invertY = true) 
   return group;
 }
 
-function createClosedShape(points: readonly (readonly [number, number])[], color: string) {
-  return createLineShapeObject(
-    [
-      {
-        points: points.map(([x, y]) => [x, y] as [number, number]),
-        closed: true
-      }
-    ],
-    color
-  );
-}
-
 function createCircleLoop(radius: number, segments: number, color: string, dashed = false, invertY = true) {
   const geometry = new BufferGeometry();
   const positions: number[] = [];
@@ -266,22 +254,6 @@ function createEnemyHealthBarObject(healthBar: NonNullable<ReturnType<typeof get
   return group;
 }
 
-function getEnemyShape(enemy: TravelCombatState['enemies'][number]) {
-  if (enemy.roles.cop) {
-    return SHAPE_POLICE;
-  }
-  if (enemy.blueprintId === 'thargoid' || enemy.blueprintId === 'thargon') {
-    return SHAPE_THARGOID;
-  }
-  return SHAPE_ENEMY;
-}
-
-function getEnemyMeshId(enemy: TravelCombatState['enemies'][number]): EnemyShipMeshId {
-  // Renderer geometry now follows the authored ship blueprint instead of
-  // collapsing everything into generic hostile/police silhouettes.
-  return enemy.blueprintId;
-}
-
 /**
  * The WebGL travel renderer keeps the combat simulation completely outside the
  * scene graph. Its only job is to translate the current mutable combat state
@@ -300,7 +272,6 @@ export class TravelSceneRenderer {
   private readonly worldGroup = new Group();
   private readonly overlayGroup = new Group();
   private readonly flashMesh = createQuad(1, 1, CGA_RED, 0);
-  private readonly shipPresenter = selectShipPresenter();
   private width = 1;
   private height = 1;
 
@@ -496,9 +467,7 @@ export class TravelSceneRenderer {
     }
 
     for (const enemy of combatState.enemies) {
-      const ship = this.shipPresenter.enemyGeometryMode === 'mesh'
-        ? this.shipPresenter.createEnemyObject?.(getEnemyMeshId(enemy), getEnemyColor(enemy.roles, enemy.missionTag)) ?? new Group()
-        : createClosedShape(getEnemyShape(enemy), getEnemyColor(enemy.roles, enemy.missionTag));
+      const ship = createShipObject(enemy.blueprintId, getEnemyColor(enemy.roles, enemy.missionTag));
       const presentation = getShipPresentationAngles(
         enemy.x - combatState.player.x,
         enemy.y - combatState.player.y,
@@ -531,9 +500,7 @@ export class TravelSceneRenderer {
     if (playerDeathEffect) {
       this.buildPlayerDeathEffect(combatState, playerDeathEffect);
     } else if (showPlayer) {
-      const player = this.shipPresenter.playerGeometryMode === 'mesh'
-        ? this.shipPresenter.createPlayerObject?.() ?? new Group()
-        : createClosedShape(SHAPE_PLAYER, CGA_YELLOW);
+      const player = createShipObject('cobra-mk3-trader', CGA_YELLOW);
       const playerAnchor = new Group();
       playerAnchor.position.set(combatState.player.x, toSceneY(combatState.player.y), PLAYER_Z);
       // Heading stays on the outer anchor so the ship still rotates around the

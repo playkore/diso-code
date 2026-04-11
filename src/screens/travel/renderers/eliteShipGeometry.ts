@@ -7,22 +7,9 @@ type Triangle = readonly [HullPoint, HullPoint, HullPoint];
 type Edge = readonly [HullPoint, HullPoint];
 type VertexPair = readonly [number, number];
 
-export interface ShipFaceLabelAnchor {
-  index: number;
-  position: HullPoint;
-  normal: HullPoint;
-}
-
-export interface ShipVertexLabelAnchor {
-  index: number;
-  position: HullPoint;
-}
-
 export interface ShipMeshDefinition {
   hullTriangles: readonly Triangle[];
   wireEdges: readonly Edge[];
-  faceLabels: readonly ShipFaceLabelAnchor[];
-  vertexLabels: readonly ShipVertexLabelAnchor[];
 }
 
 export type EliteShipModelId = BlueprintId;
@@ -67,14 +54,6 @@ function normalizeVector(vector: HullPoint): HullPoint {
     return [0, 0, 1];
   }
   return [vector[0] / length, vector[1] / length, vector[2] / length];
-}
-
-function averagePoint(points: readonly HullPoint[]): HullPoint {
-  const sum = points.reduce<HullPoint>(
-    (accumulator, point) => [accumulator[0] + point[0], accumulator[1] + point[1], accumulator[2] + point[2]],
-    [0, 0, 0]
-  );
-  return [sum[0] / points.length, sum[1] / points.length, sum[2] / points.length];
 }
 
 function getFaceEdges(edges: readonly (readonly [number, number, number, number])[], faceIndex: number) {
@@ -297,22 +276,6 @@ function orderFaceVertices(points: readonly HullPoint[], normal: HullPoint) {
   return ordered;
 }
 
-function getPolygonArea(points: readonly HullPoint[], normal: HullPoint) {
-  const ordered = orderFaceVertices(points, normal);
-  if (ordered.length < 3) {
-    return 0;
-  }
-  const planeNormal = normalizeVector(normal);
-  let area = 0;
-  for (let index = 1; index < ordered.length - 1; index += 1) {
-    area += dotProduct(
-      crossProduct(subtractPoint(ordered[index], ordered[0]), subtractPoint(ordered[index + 1], ordered[0])),
-      planeNormal
-    ) / 2;
-  }
-  return Math.abs(area);
-}
-
 function triangulateFace(
   vertices: readonly HullPoint[],
   edges: readonly (readonly [number, number, number, number])[],
@@ -320,47 +283,26 @@ function triangulateFace(
   faceIndex: number
 ) {
   const faceNormal = normalizeVector(toSceneNormal(face));
-  const orderedComponents = getFaceEdgeComponents(getFaceEdges(edges, faceIndex))
-    .flatMap((componentEdges) => getOrderedCycleVertexIndexes(componentEdges))
-    .map((cycle) => cycle.map((index) => vertices[index]))
-    .map((cycleVertices) => ({
-      vertices: orderFaceVertices(cycleVertices, faceNormal),
-      area: getPolygonArea(cycleVertices, faceNormal)
-    }))
-    .filter((component) => component.area > 0.000001)
-    .sort((left, right) => right.area - left.area);
-
-  if (orderedComponents.length === 0) {
-    return { triangles: [] as Triangle[], label: null };
-  }
   const triangles: Triangle[] = [];
-  for (const component of orderedComponents) {
-    for (let index = 1; index < component.vertices.length - 1; index += 1) {
-      triangles.push([component.vertices[0], component.vertices[index], component.vertices[index + 1]]);
+  for (const cycle of getFaceEdgeComponents(getFaceEdges(edges, faceIndex)).flatMap((componentEdges) => getOrderedCycleVertexIndexes(componentEdges))) {
+    const cycleVertices = orderFaceVertices(cycle.map((index) => vertices[index]), faceNormal);
+    if (cycleVertices.length < 3) {
+      continue;
+    }
+    for (let index = 1; index < cycleVertices.length - 1; index += 1) {
+      triangles.push([cycleVertices[0], cycleVertices[index], cycleVertices[index + 1]]);
     }
   }
-  const primaryVertices = orderedComponents[0]?.vertices ?? [];
-  return {
-    triangles,
-    label: {
-      index: faceIndex,
-      position: averagePoint(primaryVertices),
-      normal: faceNormal
-    } satisfies ShipFaceLabelAnchor
-  };
+  return triangles;
 }
 
 function buildShipMeshDefinition(modelKey: RawModelKey): ShipMeshDefinition {
   const rawModel = RAW_ELITE_SHIP_MODELS[modelKey];
   const vertices = rawModel.vertices.map((vertex) => toScenePoint(vertex));
-  const triangulatedFaces = rawModel.faces.map((face, faceIndex) => triangulateFace(vertices, rawModel.edges, face, faceIndex));
+  const triangulatedFaces = rawModel.faces.flatMap((face, faceIndex) => triangulateFace(vertices, rawModel.edges, face, faceIndex));
   return {
-    hullTriangles: triangulatedFaces.flatMap((entry) => entry.triangles),
-    wireEdges: rawModel.edges.map(([start, end]) => [vertices[start], vertices[end]] as const),
-    faceLabels: triangulatedFaces.flatMap((entry) => (entry.label ? [entry.label] : [])),
-    // Vertex ids are stored in scene space so debug overlays can reference the
-    // exact authored blueprint indexes without recomputing coordinate remaps.
-    vertexLabels: vertices.map((position, index) => ({ index, position }))
+    hullTriangles: triangulatedFaces,
+    wireEdges: rawModel.edges.map(([start, end]) => [vertices[start], vertices[end]] as const)
   };
 }
 
