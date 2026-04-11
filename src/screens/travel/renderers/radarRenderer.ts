@@ -1,5 +1,5 @@
 import { getVisibleRadarContacts, RADAR_SHIP_RANGE, type TravelCombatState } from '../../../domain/travelCombat';
-import { CGA_BLACK, CGA_GREEN, CGA_YELLOW, TRAVEL_FONT_FAMILY } from './constants';
+import { CGA_BLACK, CGA_GREEN, CGA_YELLOW } from './constants';
 import { getEnemyColor } from './shipsRenderer';
 
 /**
@@ -12,7 +12,6 @@ import { getEnemyColor } from './shipsRenderer';
 export function drawRadarPanel(
   ctx: CanvasRenderingContext2D,
   state: TravelCombatState,
-  sessionLabel: string,
   radarX = 0,
   radarY = 0,
   radarWidth = 156,
@@ -44,10 +43,6 @@ export function drawRadarPanel(
   ctx.moveTo(radarCenterX, radarCenterY - radarRadius);
   ctx.lineTo(radarCenterX, radarCenterY + radarRadius);
   ctx.stroke();
-
-  ctx.fillStyle = CGA_GREEN;
-  ctx.font = `bold 12px ${TRAVEL_FONT_FAMILY}`;
-  ctx.fillText(sessionLabel.toUpperCase(), radarX + 12, radarY + 18);
 
   // The main viewport already carries the player's facing marker, so the radar
   // stays focused on contact positions instead of duplicating the ship glyph.
