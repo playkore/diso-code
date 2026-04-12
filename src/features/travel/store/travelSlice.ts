@@ -24,12 +24,7 @@ export const createTravelSlice: GameSlice<
   Pick<GameStore, 'grantDebugCredits' | 'grantCombatCredits' | 'beginTravel' | 'cancelTravel' | 'completeTravel' | 'dockAtSystem'>
 > = (set, get) => {
   const autosaveCurrentDockedState = () => {
-    const currentState = get();
-    const activeSaveSlotId = currentState.activeSaveSlotId;
-    if (!activeSaveSlotId) {
-      return;
-    }
-    currentState.saveToSlot(activeSaveSlotId);
+    get().autosaveDockedState();
   };
 
   const applyDockedState = (nextState: Partial<GameStore>) => {

@@ -11,8 +11,23 @@ import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 import { formatCredits } from '../../../shared/utils/money';
 
 export const createSaveLoadSlice: GameSlice<
-  Pick<GameStore, 'saveToSlot' | 'loadFromSlot' | 'startNewGame' | 'resetAfterDeath'>
+  Pick<GameStore, 'autosaveDockedState' | 'saveToSlot' | 'loadFromSlot' | 'startNewGame' | 'resetAfterDeath'>
 > = (set, get) => ({
+  /**
+   * Station-only autosave hook.
+   *
+   * Invariant: call this only after a docked/station-side action has fully
+   * committed durable state. It must never be invoked from flight/combat logic
+   * or from transient UI-only updates, because the slot should always reflect
+   * the last safe station checkpoint.
+   */
+  autosaveDockedState: () => {
+    const state = get();
+    if (state.activeSaveSlotId === null) {
+      return;
+    }
+    state.saveToSlot(state.activeSaveSlotId);
+  },
   saveToSlot: (slotId) => {
     const state = get();
     // Slots store a full snapshot so loading can rebuild every docked subsystem

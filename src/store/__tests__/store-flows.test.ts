@@ -5,6 +5,7 @@ import { getSystemDistance } from '../../features/galaxy/domain/galaxyCatalog';
 import { createDefaultMissionTravelContext } from '../../features/travel/domain/missionContext';
 import {
   ACTIVE_SAVE_SLOT_STORAGE_KEY,
+  SAVE_SLOT_STORAGE_KEY,
   loadPersistedActiveSaveSlotId
 } from '../../shared/store/gameStateFactory';
 import { useGameStore } from '../useGameStore';
@@ -71,6 +72,52 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.laserMounts.rear).toBe('beam_laser');
     useGameStore.getState().buyMissile();
     expect(useGameStore.getState().commander.missilesInstalled).toBe(1);
+  });
+
+  it('autosaves fuel purchases into the active slot', () => {
+    useGameStore.getState().startNewGame(1);
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...state.commander,
+        fuel: 2
+      })
+    }));
+    const beforeFuel = useGameStore.getState().commander.fuel;
+
+    useGameStore.getState().buyFuel(1);
+
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.fuel).toBeGreaterThan(beforeFuel);
+    expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY)).toBe('1');
+    expect(window.localStorage.getItem(SAVE_SLOT_STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('autosaves commodity trades into the active slot', () => {
+    useGameStore.getState().startNewGame(1);
+    const beforeCash = useGameStore.getState().saveStates[1]?.snapshot.commander.cash ?? 0;
+
+    useGameStore.getState().buyCommodity('food', 1);
+
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.cargo.food).toBe(1);
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.cash).toBeLessThan(beforeCash);
+  });
+
+  it('autosaves outfitting purchases into the active slot', () => {
+    useGameStore.getState().startNewGame(1);
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Zaonce',
+        cash: 120000
+      }),
+      universe: { ...state.universe, currentSystem: 'Zaonce' }
+    }));
+
+    useGameStore.getState().buyEquipment('shield_generator');
+
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.installedEquipment.shield_generator).toBe(true);
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.currentSystem).toBe('Zaonce');
   });
 
   it('adds debug credits from settings helpers', () => {
@@ -358,14 +405,14 @@ describe('outfitting store flows', () => {
 
   it('autosaves the active slot when docking completes', () => {
     useGameStore.getState().startNewGame(3);
-    const beforeTravelSavedAt = useGameStore.getState().saveStates[3]?.savedAt;
+    const beforeTravelSnapshot = JSON.stringify(useGameStore.getState().saveStates[3]);
 
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
 
     expect(useGameStore.getState().activeSaveSlotId).toBe(3);
     expect(useGameStore.getState().saveStates[3]?.snapshot.commander.currentSystem).toBe('Diso');
-    expect(useGameStore.getState().saveStates[3]?.savedAt).not.toBe(beforeTravelSavedAt);
+    expect(JSON.stringify(useGameStore.getState().saveStates[3])).not.toBe(beforeTravelSnapshot);
   });
 
   it('autosaves the loaded slot when the player docks again', () => {
@@ -380,6 +427,7 @@ describe('outfitting store flows', () => {
   });
 
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {
+    useGameStore.getState().startNewGame(1);
     useGameStore.setState((state) => ({
       ...state,
       commander: normalizeCommanderState({
@@ -395,6 +443,8 @@ describe('outfitting store flows', () => {
 
     expect(useGameStore.getState().universe.galaxyIndex).toBe(1);
     expect(useGameStore.getState().commander.installedEquipment.galactic_hyperdrive).toBe(false);
+    expect(useGameStore.getState().saveStates[1]?.snapshot.universe.galaxyIndex).toBe(1);
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.installedEquipment.galactic_hyperdrive).toBe(false);
   });
 
   it('keeps the last docked autosave while travel is in progress', () => {

@@ -75,6 +75,7 @@ export interface GameStore {
   buyLaser: (mount: LaserMountPosition, laserId: LaserId) => void;
   buyMissile: () => void;
   useGalacticHyperdrive: () => void;
+  autosaveDockedState: () => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
   startNewGame: (slotId: SaveSlotId) => void;

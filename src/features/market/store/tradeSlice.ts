@@ -7,8 +7,9 @@ import { refreshItems } from '../../../shared/store/gameStateFactory';
 import { setUiMessage } from '../../../shared/store/uiMessages';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 
-export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodity' | 'sellCommodity'>> = (set) => ({
-  buyFuel: (units) =>
+export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodity' | 'sellCommodity'>> = (set, get) => ({
+  buyFuel: (units) => {
+    let committed = false;
     set((state) => {
       const requestedUnits = Math.max(0, Math.trunc(units));
       const currentFuelUnits = getFuelUnits(state.commander.fuel);
@@ -25,8 +26,11 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           ui: setUiMessage(state.ui, 'error', 'Not enough credits for fuel', `You need ${formatCredits(cost)} but only have ${formatCredits(state.commander.cash)}.`)
         };
       }
+      committed = true;
       const nextFuel = clampFuel(fuelUnitsToLightYears(currentFuelUnits + purchasedUnits));
       const nextCash = state.commander.cash - cost;
+      // Fuel purchases update durable commander state only after the station
+      // confirms the transaction, so autosave must happen after this commit.
       return {
         commander: {
           ...state.commander,
@@ -35,8 +39,13 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
         },
         ui: setUiMessage(state.ui, 'success', 'Fuel purchased', `Added ${formatLightYears(fuelUnitsToLightYears(purchasedUnits))}. Fuel now ${formatLightYears(nextFuel)}. Balance ${formatCredits(nextCash)}.`)
       };
-    }),
-  buyCommodity: (commodityKey, amount) =>
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  },
+  buyCommodity: (commodityKey, amount) => {
+    let committed = false;
     set((state) => {
       const item = state.market.items.find((entry) => entry.key === commodityKey);
       if (!item) {
@@ -61,6 +70,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           ui: setUiMessage(state.ui, 'error', `Not enough credits for ${item.name}`, `You need ${formatCredits(spent)} but only have ${formatCredits(state.commander.cash)}.`)
         };
       }
+      committed = true;
       // Buying always updates commander cargo/cash and the docked market
       // session together so inventory and station stock never drift apart.
       const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, -units);
@@ -77,8 +87,13 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
         market: refreshItems(nextSession),
         ui: setUiMessage(state.ui, 'success', `Bought ${units} ${item.name}`, `Spent ${formatCredits(spent)}. Balance now ${formatCredits(nextCash)}.`)
       };
-    }),
-  sellCommodity: (commodityKey, amount) =>
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  },
+  sellCommodity: (commodityKey, amount) => {
+    let committed = false;
     set((state) => {
       const item = state.market.items.find((entry) => entry.key === commodityKey);
       if (!item) {
@@ -91,6 +106,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           ui: setUiMessage(state.ui, 'error', `Cannot sell ${item.name}`, 'You do not have any units of this commodity.')
         };
       }
+      committed = true;
       // Selling uses the same lockstep rule in reverse: increase local station
       // stock, decrease commander cargo, then report the completed trade once.
       const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, units);
@@ -108,5 +124,9 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
         market: refreshItems(nextSession),
         ui: setUiMessage(state.ui, 'success', `Sold ${units} ${item.name}`, `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`)
       };
-    })
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  }
 });

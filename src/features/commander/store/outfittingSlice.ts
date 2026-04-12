@@ -6,8 +6,9 @@ import { setUiMessage } from '../../../shared/store/uiMessages';
 import { createGalacticHyperdriveState, getCurrentTechLevel } from '../../../shared/store/gameStateFactory';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 
-export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | 'buyLaser' | 'buyMissile' | 'useGalacticHyperdrive'>> = (set) => ({
-  buyEquipment: (equipmentId) =>
+export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | 'buyLaser' | 'buyMissile' | 'useGalacticHyperdrive'>> = (set, get) => ({
+  buyEquipment: (equipmentId) => {
+    let committed = false;
     set((state) => {
       const techLevel = getCurrentTechLevel(state.universe.currentSystem, state.universe.galaxyIndex);
       const equipment = EQUIPMENT_CATALOG[equipmentId];
@@ -28,12 +29,18 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           [equipmentId]: true
         }
       });
+      committed = true;
       return {
         commander: nextCommander,
         ui: setUiMessage(state.ui, 'success', `${equipment.name} installed`, `Spent ${formatCredits(equipment.price)}. Balance now ${formatCredits(nextCommander.cash)}.`)
       };
-    }),
-  buyLaser: (mount, laserId) =>
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  },
+  buyLaser: (mount, laserId) => {
+    let committed = false;
     set((state) => {
       const techLevel = getCurrentTechLevel(state.universe.currentSystem, state.universe.galaxyIndex);
       const laser = LASER_CATALOG[laserId];
@@ -54,12 +61,18 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
         }
       });
       const previousText = previous ? ` Replaced ${LASER_CATALOG[previous].name}.` : '';
+      committed = true;
       return {
         commander: nextCommander,
         ui: setUiMessage(state.ui, 'success', `${laser.name} fitted`, `Spent ${formatCredits(laser.price)} on the ${mount} mount.${previousText} Balance ${formatCredits(nextCommander.cash)}.`)
       };
-    }),
-  buyMissile: () =>
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  },
+  buyMissile: () => {
+    let committed = false;
     set((state) => {
       const techLevel = getCurrentTechLevel(state.universe.currentSystem, state.universe.galaxyIndex);
       const check = canBuyMissile(state.commander, techLevel);
@@ -74,12 +87,18 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
         cash: state.commander.cash - MISSILE_CATALOG.price,
         missilesInstalled: state.commander.missilesInstalled + MISSILE_CATALOG.capacityUse
       });
+      committed = true;
       return {
         commander: nextCommander,
         ui: setUiMessage(state.ui, 'success', 'Missile loaded', `Spent ${formatCredits(MISSILE_CATALOG.price)}. Rack now ${nextCommander.missilesInstalled}/${nextCommander.missileCapacity}.`)
       };
-    }),
-  useGalacticHyperdrive: () =>
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  },
+  useGalacticHyperdrive: () => {
+    let committed = false;
     set((state) => {
       if (!state.commander.installedEquipment.galactic_hyperdrive) {
         return {
@@ -92,6 +111,7 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           ui: setUiMessage(state.ui, 'error', 'Galactic jump failed', 'The navigation computer could not resolve a valid destination system.')
         };
       }
+      committed = true;
       return {
         ...nextState,
         ui: {
@@ -99,5 +119,9 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
           selectedChartSystem: null
         }
       };
-    })
+    });
+    if (committed) {
+      get().autosaveDockedState();
+    }
+  }
 });
