@@ -1,11 +1,10 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../../appRoutes';
 import { totalCargoUsedTonnes } from '../../features/commander/domain/commander';
 import { useGameStore } from '../../store/useGameStore';
 import type { AppTab } from '../store/types';
 import { formatCredits } from '../utils/money';
-import { NewGameBootScreen } from './NewGameBootScreen';
 import { StartScreenGate } from './StartScreenGate';
 import { StartScreenLoader } from './StartScreenLoader';
 
@@ -111,53 +110,16 @@ const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode 
 ];
 
 export function AppShell() {
-  const CRT_DOT_DURATION_MS = 450;
-  const CRT_LINE_DURATION_MS = 450;
-  const CRT_REVEAL_DURATION_MS = 900;
   const location = useLocation();
   const setActiveTab = useGameStore((state) => state.setActiveTab);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
-  const setNewGamePowerOnVisible = useGameStore((state) => state.setNewGamePowerOnVisible);
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
-  const newGameBootVisible = useGameStore((state) => state.ui.newGameBootVisible);
-  const newGamePowerOnVisible = useGameStore((state) => state.ui.newGamePowerOnVisible);
-  const latestUiEvent = useGameStore((state) => state.ui.latestEvent);
-  const finishNewGame = useGameStore((state) => state.startNewGame);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
   const isMenuFlowRoute = location.pathname === '/save' || location.pathname === '/load' || location.pathname === '/debug';
   const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
-  const [powerOnPhase, setPowerOnPhase] = useState<'dot' | 'line' | 'reveal' | null>(null);
-
-  useEffect(() => {
-    if (!newGamePowerOnVisible) {
-      setPowerOnPhase(null);
-      return undefined;
-    }
-
-    // The boot handoff is staged explicitly as point -> scan line -> reveal so
-    // each CRT phase remains visible and debuggable instead of relying on one
-    // dense keyframe animation to communicate three separate moments.
-    setPowerOnPhase('dot');
-    const lineTimer = window.setTimeout(() => {
-      setPowerOnPhase('line');
-    }, CRT_DOT_DURATION_MS);
-    const revealTimer = window.setTimeout(() => {
-      setPowerOnPhase('reveal');
-    }, CRT_DOT_DURATION_MS + CRT_LINE_DURATION_MS);
-    const completionTimer = window.setTimeout(() => {
-      setPowerOnPhase(null);
-      setNewGamePowerOnVisible(false);
-    }, CRT_DOT_DURATION_MS + CRT_LINE_DURATION_MS + CRT_REVEAL_DURATION_MS);
-
-    return () => {
-      window.clearTimeout(lineTimer);
-      window.clearTimeout(revealTimer);
-      window.clearTimeout(completionTimer);
-    };
-  }, [newGamePowerOnVisible, setNewGamePowerOnVisible]);
 
   if (isTravelRoute) {
     // Travel owns its own full-screen chrome, so the shell strips everything
@@ -175,22 +137,8 @@ export function AppShell() {
     return <StartScreenLoader onContinue={() => setHasEnteredStartMenu(true)} />;
   }
 
-  if (newGameBootVisible) {
-    return <NewGameBootScreen onComplete={finishNewGame} />;
-  }
-
   return (
-    <div
-      className={`app-shell${
-        powerOnPhase ? ` app-shell--power-on app-shell--power-on-${powerOnPhase}` : ''
-      }`}
-    >
-      {powerOnPhase ? (
-        <span
-          className={`app-shell__power-on-overlay app-shell__power-on-overlay--${powerOnPhase}`}
-          aria-hidden="true"
-        />
-      ) : null}
+    <div className="app-shell">
       <StartScreenGate />
       {isMenuFlowRoute ? null : (
         <header>
@@ -238,12 +186,8 @@ export function AppShell() {
               <span className="sr-only">Start Menu</span>
             </Link>
           </div>
-          {latestUiEvent ? (
-            <div className="mission-notice" role="status" aria-live="polite">
-              <strong>{latestUiEvent.title}</strong>
-              <span>{latestUiEvent.body}</span>
-            </div>
-          ) : null}
+          {/* The docked shell no longer shows a transient message banner; feedback
+              stays inside the screen that triggered it instead. */}
         </header>
       )}
 

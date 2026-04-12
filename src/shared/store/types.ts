@@ -55,8 +55,6 @@ export interface UiState {
   instantTravelEnabled: boolean;
   showTravelPerfOverlay: boolean;
   startScreenVisible: boolean;
-  newGameBootVisible: boolean;
-  newGamePowerOnVisible: boolean;
   latestEvent?: UiMessage;
   activityLog: UiMessage[];
 }

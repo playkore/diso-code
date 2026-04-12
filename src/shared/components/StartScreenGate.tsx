@@ -49,7 +49,7 @@ export function StartScreenGate() {
   const navigate = useNavigate();
   const isMenuVisible = useGameStore((state) => state.ui.startScreenVisible);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
-  const beginNewGameBoot = useGameStore((state) => state.beginNewGameBoot);
+  const startNewGame = useGameStore((state) => state.startNewGame);
   const saveStates = useGameStore((state) => state.saveStates);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [showcaseLabel, setShowcaseLabel] = useState('');
@@ -132,7 +132,8 @@ export function StartScreenGate() {
     }
 
     if (mode === 'new-game') {
-      beginNewGameBoot();
+      // The confirmation dialog stays, but new games now hand off directly.
+      startNewGame();
     } else {
       closeMenu();
     }

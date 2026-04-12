@@ -16,8 +16,6 @@ export function createSettingsActions(set: StoreSetter) {
   return {
     setActiveTab: (tab: AppTab) => set((state: GameStore) => ({ ui: { ...state.ui, activeTab: tab } })),
     setStartScreenVisible: (visible: boolean) => set((state: GameStore) => ({ ui: { ...state.ui, startScreenVisible: visible } })),
-    setNewGameBootVisible: (visible: boolean) => set((state: GameStore) => ({ ui: { ...state.ui, newGameBootVisible: visible } })),
-    setNewGamePowerOnVisible: (visible: boolean) => set((state: GameStore) => ({ ui: { ...state.ui, newGamePowerOnVisible: visible } })),
     setSelectedChartSystem: (systemName: string | null) => set((state: GameStore) => ({ ui: { ...state.ui, selectedChartSystem: systemName } })),
     setInstantTravelEnabled: (enabled: boolean) =>
       set((state: GameStore) => {

@@ -46,8 +46,6 @@ export const useGameStore = createWithEqualityFn<GameStore>()(
           instantTravelEnabled,
           showTravelPerfOverlay,
           startScreenVisible: true,
-          newGameBootVisible: false,
-          newGamePowerOnVisible: false,
           activityLog: []
         },
         ...createSettingsActions(set),

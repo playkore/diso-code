@@ -60,8 +60,6 @@ export interface GameStore {
   saveStates: Partial<Record<SaveSlotId, SaveState>>;
   setActiveTab: (tab: AppTab) => void;
   setStartScreenVisible: (visible: boolean) => void;
-  setNewGameBootVisible: (visible: boolean) => void;
-  setNewGamePowerOnVisible: (visible: boolean) => void;
   setSelectedChartSystem: (systemName: string | null) => void;
   setInstantTravelEnabled: (enabled: boolean) => void;
   setShowTravelPerfOverlay: (enabled: boolean) => void;
@@ -82,7 +80,6 @@ export interface GameStore {
   useGalacticHyperdrive: () => void;
   saveToSlot: (slotId: SaveSlotId) => void;
   loadFromSlot: (slotId: SaveSlotId) => void;
-  beginNewGameBoot: () => void;
   startNewGame: () => void;
   resetAfterDeath: () => void;
 }

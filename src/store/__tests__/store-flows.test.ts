@@ -322,6 +322,40 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().ui.activityLog).toEqual([]);
   });
 
+  it('starts a fresh commander immediately when a new game is launched', () => {
+    useGameStore.setState((state) => ({
+      ...state,
+      commander: normalizeCommanderState({
+        ...createDefaultCommander(),
+        currentSystem: 'Diso',
+        cash: 4242,
+        cargo: { food: 4 }
+      }),
+      universe: {
+        ...state.universe,
+        currentSystem: 'Diso',
+        nearbySystems: ['Lave']
+      },
+      ui: {
+        ...state.ui,
+        startScreenVisible: true,
+        activeTab: 'equipment',
+        selectedChartSystem: 'Leesti'
+      }
+    }));
+
+    useGameStore.getState().startNewGame();
+
+    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().commander.cash).toBe(1000);
+    expect(useGameStore.getState().commander.cargo).toEqual({});
+    expect(useGameStore.getState().travelSession).toBeNull();
+    expect(useGameStore.getState().ui.startScreenVisible).toBe(false);
+    expect(useGameStore.getState().ui.activeTab).toBe('market');
+    expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
+    expect(useGameStore.getState().ui.latestEvent).toBeUndefined();
+  });
+
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {
     useGameStore.setState((state) => ({
       ...state,
