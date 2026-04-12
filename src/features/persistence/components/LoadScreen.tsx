@@ -7,6 +7,7 @@ export function LoadScreen() {
   const navigate = useNavigate();
   const loadFromSlot = useGameStore((state) => state.loadFromSlot);
   const saveStates = useGameStore((state) => state.saveStates);
+  const activeSaveSlotId = useGameStore((state) => state.activeSaveSlotId);
   const setStartScreenVisible = useGameStore((state) => state.setStartScreenVisible);
   const [pendingLoadSlotId, setPendingLoadSlotId] = useState<(typeof SAVE_SLOT_IDS)[number] | null>(null);
   const [loadedSlotId, setLoadedSlotId] = useState<(typeof SAVE_SLOT_IDS)[number] | null>(null);
@@ -29,6 +30,7 @@ export function LoadScreen() {
       <div className="save-panels">
         {SAVE_SLOT_IDS.map((slotId) => {
           const saveState = saveStates[slotId];
+          const isActiveSlot = activeSaveSlotId === slotId;
           const savedCommander = saveState?.snapshot.commander;
           const savedUniverse = saveState?.snapshot.universe;
 
@@ -36,17 +38,20 @@ export function LoadScreen() {
             <button
               key={slotId}
               type="button"
-              className="save-panel save-slot-button"
+              className={`save-panel save-slot-button${isActiveSlot ? ' is-active-slot' : ''}`}
               onClick={() => setPendingLoadSlotId(slotId)}
               disabled={!saveState}
             >
               <div className="save-slot__header">
                 <p className="dialog-kicker">Slot {slotId}</p>
-                <p className="save-slot__cta">Load</p>
+                <p className="save-slot__cta">{isActiveSlot ? 'Active' : 'Load'}</p>
               </div>
               {savedCommander && savedUniverse ? (
                 <>
-                  <p className="muted">Saved {new Date(saveState.savedAt).toLocaleString()}</p>
+                  {/* Each slot renders its persisted snapshot. The active slot is
+                      highlighted separately so the UI can show which snapshot
+                      will be refreshed by the next dock. */}
+                  <p className="muted">{isActiveSlot ? 'Active slot' : `Saved ${new Date(saveState.savedAt).toLocaleString()}`}</p>
                   <dl className="detail-grid">
                     <dt>Name</dt>
                     <dd>{savedCommander.name}</dd>

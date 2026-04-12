@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../../appRoutes';
 import { totalCargoUsedTonnes } from '../../features/commander/domain/commander';
@@ -21,6 +21,18 @@ function UtilityIcon({ children }: { children: ReactNode }) {
     <svg className="app-shell__utility-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8">
       {children}
     </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <UtilityIcon>
+      {/* The menu entry stays as the last control in the bottom bar so it reads
+          as an escape action instead of competing with the core game tabs. */}
+      <path d="M6.5 6.5h8.5v11H6.5z" />
+      <path d="M15 12h2.5" />
+      <path d="M15.5 10.5l2 1.5-2 1.5" />
+    </UtilityIcon>
   );
 }
 
@@ -161,30 +173,6 @@ export function AppShell() {
                 <dd>{universe.currentSystem}</dd>
               </div>
             </dl>
-            {/* The header shortcut reopens the start menu so the player can
-                reach New Game, Continue, and Load from the same entry point. */}
-            <Link
-              className="app-shell__utility-link"
-              to="/"
-              aria-label="Open start menu"
-              title="Start Menu"
-              onClick={() => setStartScreenVisible(true)}
-            >
-              <UtilityIcon>
-                {/* The header shortcut now reads as a general menu/settings entry
-                    point rather than a verb-only save action. */}
-                <circle cx="12" cy="12" r="2.4" />
-                <path d="M12 3.8v2.1" />
-                <path d="M12 18.1v2.1" />
-                <path d="M4.8 12h2.1" />
-                <path d="M17.1 12h2.1" />
-                <path d="M6.7 6.7l1.5 1.5" />
-                <path d="M15.8 15.8l1.5 1.5" />
-                <path d="M17.3 6.7l-1.5 1.5" />
-                <path d="M8.2 15.8l-1.5 1.5" />
-              </UtilityIcon>
-              <span className="sr-only">Start Menu</span>
-            </Link>
           </div>
           {/* The docked shell no longer shows a transient message banner; feedback
               stays inside the screen that triggered it instead. */}
@@ -210,6 +198,16 @@ export function AppShell() {
               <span className="sr-only">{item.label}</span>
             </NavLink>
           ))}
+          <button
+            type="button"
+            className="tab-link tab-link--menu"
+            onClick={() => setStartScreenVisible(true)}
+            aria-label="Open start menu"
+            title="Start Menu"
+          >
+            <MenuIcon />
+            <span className="sr-only">Start Menu</span>
+          </button>
         </nav>
       )}
     </div>

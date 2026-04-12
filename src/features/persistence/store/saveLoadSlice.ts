@@ -1,4 +1,11 @@
-import { createFreshGameState, createSaveState, createSnapshot, persistSaveStates, restoreSnapshot } from '../../../shared/store/gameStateFactory';
+import {
+  createFreshGameState,
+  createSaveState,
+  createSnapshot,
+  persistActiveSaveSlotId,
+  persistSaveStates,
+  restoreSnapshot
+} from '../../../shared/store/gameStateFactory';
 import { setUiMessage } from '../../../shared/store/uiMessages';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 import { formatCredits } from '../../../shared/utils/money';
@@ -18,6 +25,7 @@ export const createSaveLoadSlice: GameSlice<
       [slotId]: saveState
     };
     persistSaveStates(nextSaveStates);
+    persistActiveSaveSlotId(slotId);
     set({
       saveStates: nextSaveStates,
       activeSaveSlotId: slotId
@@ -30,6 +38,7 @@ export const createSaveLoadSlice: GameSlice<
       return;
     }
     const restoredState = restoreSnapshot(saveState.snapshot);
+    persistActiveSaveSlotId(slotId);
     set((current) => ({
       ...restoredState,
       // Travel sessions are intentionally transient and cannot survive a restore
@@ -59,6 +68,7 @@ export const createSaveLoadSlice: GameSlice<
       [slotId]: saveState
     };
     persistSaveStates(nextSaveStates);
+    persistActiveSaveSlotId(slotId);
     // Starting a new run now skips all staged intro effects and swaps directly
     // to the freshly initialized docked state. The chosen slot becomes the
     // active autosave target immediately so the next station dock preserves it.
@@ -80,6 +90,7 @@ export const createSaveLoadSlice: GameSlice<
   },
   resetAfterDeath: () => {
     const freshState = createFreshGameState();
+    persistActiveSaveSlotId(null);
     set((state) => ({
       ...freshState,
       // Death without an escape pod mirrors the original game's trip back to

@@ -1,9 +1,12 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultCommander, normalizeCommanderState } from '../../features/commander/domain/commander';
 import { getJumpFuelCost } from '../../shared/domain/fuel';
 import { getSystemDistance } from '../../features/galaxy/domain/galaxyCatalog';
 import { createDefaultMissionTravelContext } from '../../features/travel/domain/missionContext';
-import { DOCKED_SESSION_STORAGE_KEY, loadPersistedDockedSession } from '../../shared/store/gameStateFactory';
+import {
+  ACTIVE_SAVE_SLOT_STORAGE_KEY,
+  loadPersistedActiveSaveSlotId
+} from '../../shared/store/gameStateFactory';
 import { useGameStore } from '../useGameStore';
 
 describe('outfitting store flows', () => {
@@ -31,6 +34,8 @@ describe('outfitting store flows', () => {
     const commander = normalizeCommanderState(createDefaultCommander());
     useGameStore.setState((state) => ({
       ...state,
+      saveStates: {},
+      activeSaveSlotId: null,
       commander,
       universe: {
         ...state.universe,
@@ -235,26 +240,19 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.cash).toBe(startingCash + 710);
   });
 
-  it('persists the last docked session for refresh recovery', () => {
-    useGameStore.setState((state) => ({
-      ...state,
-      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Diso', cash: 4242 }),
-      universe: {
-        ...state.universe,
-        currentSystem: 'Diso',
-        nearbySystems: ['Lave'],
-        economy: 6
-      }
-    }));
-    useGameStore.getState().setActiveTab('galaxy-chart');
+  it('persists the active slot id and boots from that slot after reload', async () => {
+    useGameStore.getState().startNewGame(2);
+    expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY)).toBe('2');
 
-    const persistedRaw = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
-    expect(persistedRaw).toBeTruthy();
+    expect(useGameStore.getState().beginTravel('Orerve')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Orerve', spendJumpFuel: true });
+    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe('Orerve');
+    expect(loadPersistedActiveSaveSlotId(useGameStore.getState().saveStates)).toBe(2);
 
-    const restoredSession = loadPersistedDockedSession();
-    expect(restoredSession?.activeTab).toBe('galaxy-chart');
-    expect(restoredSession?.restoredState.commander.currentSystem).toBe('Diso');
-    expect(restoredSession?.restoredState.commander.cash).toBe(4242);
+    vi.resetModules();
+    const { useGameStore: reloadedStore } = await import('../useGameStore');
+    expect(reloadedStore.getState().activeSaveSlotId).toBe(2);
+    expect(reloadedStore.getState().commander.currentSystem).toBe('Orerve');
   });
 
   it('stores selected chart systems separately from the current system and clears them after travel', () => {
@@ -370,6 +368,17 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().saveStates[3]?.savedAt).not.toBe(beforeTravelSavedAt);
   });
 
+  it('autosaves the loaded slot when the player docks again', () => {
+    useGameStore.getState().startNewGame(2);
+    useGameStore.getState().loadFromSlot(2);
+
+    expect(useGameStore.getState().beginTravel('Orerve')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Orerve', spendJumpFuel: true });
+
+    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe('Orerve');
+    expect(useGameStore.getState().saveStates[2]?.snapshot.universe.currentSystem).toBe('Orerve');
+  });
+
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {
     useGameStore.setState((state) => ({
       ...state,
@@ -389,13 +398,12 @@ describe('outfitting store flows', () => {
   });
 
   it('keeps the last docked autosave while travel is in progress', () => {
-    useGameStore.getState().setActiveTab('equipment');
-    const persistedBeforeTravel = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
+    useGameStore.getState().startNewGame(1);
+    const persistedBeforeTravel = window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY);
 
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
 
-    expect(window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY)).toBe(persistedBeforeTravel);
-    expect(loadPersistedDockedSession()?.activeTab).toBe('equipment');
-    expect(loadPersistedDockedSession()?.restoredState.commander.currentSystem).toBe('Lave');
+    expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY)).toBe(persistedBeforeTravel);
+    expect(loadPersistedActiveSaveSlotId(useGameStore.getState().saveStates)).toBe(1);
   });
 });

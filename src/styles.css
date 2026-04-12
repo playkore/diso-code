@@ -329,25 +329,7 @@ header {
 
 .app-shell__header-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.55rem;
-  align-items: start;
-}
-
-.app-shell__utility-link {
-  display: inline-grid;
-  place-items: center;
-  min-width: 4.25rem;
-  min-height: 100%;
-  padding: 0.55rem 0.7rem;
-  border: 2px solid var(--cga-yellow);
-  border-radius: 0.6rem;
-  color: var(--cga-yellow);
-  text-decoration: none;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  background: var(--cga-black);
 }
 
 .app-shell__utility-icon {
@@ -355,8 +337,13 @@ header {
   height: 1.15rem;
 }
 
-.app-shell__utility-link:hover,
-.app-shell__utility-link:focus-visible {
+.tab-link--menu {
+  border: 2px dashed var(--cga-yellow);
+  color: var(--cga-yellow);
+}
+
+.tab-link--menu:hover,
+.tab-link--menu:focus-visible {
   outline: none;
   background: var(--cga-yellow);
   color: var(--cga-black);
@@ -826,7 +813,7 @@ button:disabled {
   position: sticky;
   bottom: 0;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.3rem;
   padding: 0.35rem;
   border-radius: 0.75rem;
@@ -843,6 +830,11 @@ button:disabled {
   min-height: 2.5rem;
   padding: 0.3rem 0.1rem;
   border-radius: 0.5rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
 }
 
 .tab-link__icon {

@@ -29,8 +29,8 @@ import type { AppTab, MarketState } from './types';
  */
 export const SAVE_SLOT_IDS: SaveSlotId[] = [1, 2, 3];
 export const SAVE_SLOT_STORAGE_KEY = 'diso-code:slots';
+export const ACTIVE_SAVE_SLOT_STORAGE_KEY = 'diso-code:active-slot';
 export const SETTINGS_STORAGE_KEY = 'diso-code:settings';
-export const DOCKED_SESSION_STORAGE_KEY = 'diso-code:docked-session-v2';
 
 interface PersistedSettings {
   instantTravelEnabled?: boolean;
@@ -255,49 +255,6 @@ export function isAppTab(value: unknown): value is AppTab {
 }
 
 /**
- * Checks whether browser storage already contains a docked run that can be
- * resumed from the start menu without going through a manual slot load.
- */
-export function hasPersistedDockedSession(): boolean {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return false;
-  }
-  return Boolean(window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY));
-}
-
-/**
- * Loads and rehydrates the last persisted docked session from local storage.
- */
-export function loadPersistedDockedSession() {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return null;
-  }
-  const raw = window.localStorage.getItem(DOCKED_SESSION_STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    const state = parsed.state;
-    if (!state || state.__isTravelling) {
-      return null;
-    }
-    const restored = restoreSnapshot({
-      commander: state.commander,
-      universe: state.universe,
-      marketSession: state.marketSession
-    });
-    return {
-      activeTab: state.ui?.activeTab as AppTab,
-      activeSaveSlotId: state.activeSaveSlotId ?? null,
-      restoredState: restored
-    };
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Writes all existing save slots into local storage as a compact serializable
  * payload.
  */
@@ -315,6 +272,41 @@ export function persistSaveStates(saveStates: Partial<Record<SaveSlotId, SaveSta
     })
   );
   window.localStorage.setItem(SAVE_SLOT_STORAGE_KEY, JSON.stringify(payload));
+}
+
+/**
+ * Reads the active save slot number from local storage if the referenced slot
+ * still exists in the persisted slot bundle.
+ */
+export function loadPersistedActiveSaveSlotId(saveStates: Partial<Record<SaveSlotId, SaveState>>): SaveSlotId | null {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return null;
+  }
+  const raw = window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!SAVE_SLOT_IDS.includes(parsed as SaveSlotId)) {
+    return null;
+  }
+  const slotId = parsed as SaveSlotId;
+  return saveStates[slotId] ? slotId : null;
+}
+
+/**
+ * Stores the active save slot number so Continue can resume the correct slot
+ * after a page refresh.
+ */
+export function persistActiveSaveSlotId(slotId: SaveSlotId | null) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+  if (slotId === null) {
+    window.localStorage.removeItem(ACTIVE_SAVE_SLOT_STORAGE_KEY);
+    return;
+  }
+  window.localStorage.setItem(ACTIVE_SAVE_SLOT_STORAGE_KEY, String(slotId));
 }
 
 /**

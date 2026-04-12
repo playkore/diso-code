@@ -1,7 +1,6 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  hasPersistedDockedSession,
   SAVE_SLOT_IDS,
   loadStartMenuFullscreenEnabled,
   loadStartMenuMusicEnabled,
@@ -60,7 +59,8 @@ export function StartScreenGate() {
   const [isLaunching, setIsLaunching] = useState(false);
   const [isPickingNewGameSlot, setIsPickingNewGameSlot] = useState(false);
   const [overwriteSlotId, setOverwriteSlotId] = useState<(typeof SAVE_SLOT_IDS)[number] | null>(null);
-  const hasResumeSession = hasPersistedDockedSession();
+  const activeSaveSlotId = useGameStore((state) => state.activeSaveSlotId);
+  const hasResumeSession = activeSaveSlotId !== null && Boolean(saveStates[activeSaveSlotId]);
   const canContinue = hasResumeSession;
   const canLoad = Object.keys(saveStates).length > 0;
 
