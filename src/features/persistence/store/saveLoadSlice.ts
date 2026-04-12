@@ -1,6 +1,6 @@
 import { createFreshGameState, createSaveState, createSnapshot, persistSaveStates, restoreSnapshot } from '../../../shared/store/gameStateFactory';
 import { createDefaultPriority } from '../../../shared/store/priority';
-import { createUiMessage, withUiMessage } from '../../../shared/store/uiMessages';
+import { setUiMessage } from '../../../shared/store/uiMessages';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 import { formatCredits } from '../../../shared/utils/money';
 
@@ -20,7 +20,7 @@ export const createSaveLoadSlice: GameSlice<
     persistSaveStates(nextSaveStates);
     set((current) => ({
       saveStates: nextSaveStates,
-      ui: withUiMessage(current.ui, createUiMessage('info', `Slot ${slotId} saved`, `Saved ${snapshot.commander.name} at ${snapshot.commander.currentSystem}.`))
+      ui: setUiMessage(current.ui, 'info', `Slot ${slotId} saved`, `Saved ${snapshot.commander.name} at ${snapshot.commander.currentSystem}.`)
     }));
   },
   loadFromSlot: (slotId) => {
@@ -36,14 +36,16 @@ export const createSaveLoadSlice: GameSlice<
       // because their mutable runtime state only exists in memory.
       travelSession: null,
       saveStates: state.saveStates,
-      ui: withUiMessage(
+      ui: setUiMessage(
         {
           ...current.ui,
           activeTab: 'market',
           selectedChartSystem: null,
           startScreenVisible: false
         },
-        createUiMessage('info', `Slot ${slotId} loaded`, `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`)
+        'info',
+        `Slot ${slotId} loaded`,
+        `Commander restored at ${saveState.snapshot.commander.currentSystem} with ${formatCredits(saveState.snapshot.commander.cash)}.`
       )
     }));
   },

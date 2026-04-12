@@ -1,11 +1,11 @@
-import { createDefaultCommander, getLegalValueAfterHyperspaceJump, normalizeCommanderState, type CommanderState } from '../../features/commander/domain/commander';
+import { createDefaultCommander, getLegalValueAfterHyperspaceJump, normalizeCommanderState, patchCommanderState, type CommanderState } from '../../features/commander/domain/commander';
 import { encodeCommanderBinary256 } from '../../features/persistence/domain/commanderPersistence';
 import { loadGameJson, serializeGameJson, type GameSnapshot } from '../../features/persistence/domain/gamePersistence';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelUnits } from '../domain/fuel';
 import { getGalaxySystems, getNearbySystemNames, getSystemByName, getSystemDistance } from '../../features/galaxy/domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../../features/market/domain/market';
 import { createDefaultPriority, syncPriorityProgress } from './priority';
-import { createUiMessage, withUiMessage } from './uiMessages';
+import { setUiMessage } from './uiMessages';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
 import type { AppTab, MarketState } from './types';
 
@@ -132,7 +132,7 @@ export function createDockedState(
 
   // Commander state is normalized after system transfer so any legacy or
   // partial state stays consistent.
-  const nextCommander = normalizeCommanderState({ ...state.commander, currentSystem: systemName });
+  const nextCommander = patchCommanderState(state.commander, { currentSystem: systemName });
   if (options.spendJumpFuel) {
     nextCommander.fuel = clampFuel(fuelUnitsToLightYears(availableFuelUnits - jumpFuelUnits));
   }
@@ -145,7 +145,7 @@ export function createDockedState(
   // callers can spread into the store directly.
   const nextUi =
     options.title && options.body !== undefined
-      ? withUiMessage(state.ui, createUiMessage('info', options.title, options.body))
+      ? setUiMessage(state.ui, 'info', options.title, options.body)
       : state.ui;
 
   return {
@@ -170,8 +170,7 @@ export function createDockedState(
  * `createDockedState` and then adds the arrival-specific UI summary.
  */
 export function createArrivalState(state: Pick<GameStore, 'universe' | 'commander' | 'ui'>, systemName: string) {
-  const arrivalCommander = normalizeCommanderState({
-    ...state.commander,
+  const arrivalCommander = patchCommanderState(state.commander, {
     legalValue: getLegalValueAfterHyperspaceJump(state.commander.legalValue, state.commander.cargo)
   });
   return createDockedState({ ...state, commander: arrivalCommander }, systemName, {
@@ -196,8 +195,7 @@ export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander'
     return null;
   }
 
-  const commander = normalizeCommanderState({
-    ...state.commander,
+  const commander = patchCommanderState(state.commander, {
     currentSystem: destinationSystem.data.name,
     installedEquipment: {
       ...state.commander.installedEquipment,
@@ -218,14 +216,7 @@ export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander'
       marketFluctuation: fluctuation
     },
     market: createMarketState(destinationSystem.data.name, destinationSystem.data.economy, fluctuation),
-    ui: withUiMessage(
-      state.ui,
-      createUiMessage(
-        'success',
-        'Galactic Hyperdrive engaged',
-        `Arrived in galaxy ${nextGalaxyIndex + 1} at ${destinationSystem.data.name}.`
-      )
-    )
+    ui: setUiMessage(state.ui, 'success', 'Galactic Hyperdrive engaged', `Arrived in galaxy ${nextGalaxyIndex + 1} at ${destinationSystem.data.name}.`)
   };
 }
 

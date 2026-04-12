@@ -353,3 +353,17 @@ export function normalizeCommanderState(
     currentSystem: commander.currentSystem ?? 'Lave'
   };
 }
+
+/**
+ * Applies a shallow patch to an existing commander and then re-normalizes the
+ * result so derived fields stay consistent in one step.
+ */
+export function patchCommanderState(
+  commander: CommanderState,
+  patch: Partial<CommanderState> & { legalStatus?: string; equipment?: string[]; missionTP?: number; missionVariant?: string; rating?: string } = {}
+): CommanderState {
+  return normalizeCommanderState({
+    ...commander,
+    ...patch
+  });
+}

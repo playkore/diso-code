@@ -4,7 +4,7 @@ import { applyLocalMarketTrade } from '../domain/market';
 import { formatCredits } from '../../../shared/utils/money';
 import { formatLightYears } from '../../../shared/utils/distance';
 import { refreshItems } from '../../../shared/store/gameStateFactory';
-import { createUiMessage, withUiMessage } from '../../../shared/store/uiMessages';
+import { setUiMessage } from '../../../shared/store/uiMessages';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 
 export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodity' | 'sellCommodity'>> = (set) => ({
@@ -16,16 +16,13 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
       const purchasedUnits = Math.min(requestedUnits, missingUnits);
       if (purchasedUnits <= 0) {
         return {
-          ui: withUiMessage(state.ui, createUiMessage('error', 'Fuel tank full', `The tank already holds ${formatLightYears(state.commander.fuel)}.`))
+          ui: setUiMessage(state.ui, 'error', 'Fuel tank full', `The tank already holds ${formatLightYears(state.commander.fuel)}.`)
         };
       }
       const cost = getRefuelCost(purchasedUnits);
       if (cost > state.commander.cash) {
         return {
-          ui: withUiMessage(
-            state.ui,
-            createUiMessage('error', 'Not enough credits for fuel', `You need ${formatCredits(cost)} but only have ${formatCredits(state.commander.cash)}.`)
-          )
+          ui: setUiMessage(state.ui, 'error', 'Not enough credits for fuel', `You need ${formatCredits(cost)} but only have ${formatCredits(state.commander.cash)}.`)
         };
       }
       const nextFuel = clampFuel(fuelUnitsToLightYears(currentFuelUnits + purchasedUnits));
@@ -36,10 +33,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           cash: nextCash,
           fuel: nextFuel
         },
-        ui: withUiMessage(
-          state.ui,
-          createUiMessage('success', 'Fuel purchased', `Added ${formatLightYears(fuelUnitsToLightYears(purchasedUnits))}. Fuel now ${formatLightYears(nextFuel)}. Balance ${formatCredits(nextCash)}.`)
-        )
+        ui: setUiMessage(state.ui, 'success', 'Fuel purchased', `Added ${formatLightYears(fuelUnitsToLightYears(purchasedUnits))}. Fuel now ${formatLightYears(nextFuel)}. Balance ${formatCredits(nextCash)}.`)
       };
     }),
   buyCommodity: (commodityKey, amount) =>
@@ -52,19 +46,19 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
       const units = Math.min(Math.max(0, Math.trunc(amount)), available);
       if (units <= 0) {
         return {
-          ui: withUiMessage(state.ui, createUiMessage('error', `Cannot buy ${item.name}`, 'The station has no stock left in this session.'))
+          ui: setUiMessage(state.ui, 'error', `Cannot buy ${item.name}`, 'The station has no stock left in this session.')
         };
       }
       const cargoUsed = totalCargoUsedTonnes(state.commander.cargo);
       if (item.unit === 't' && cargoUsed + units > state.commander.cargoCapacity) {
         return {
-          ui: withUiMessage(state.ui, createUiMessage('error', `Cargo full for ${item.name}`, `Only ${state.commander.cargoCapacity - cargoUsed} t of free space remains.`))
+          ui: setUiMessage(state.ui, 'error', `Cargo full for ${item.name}`, `Only ${state.commander.cargoCapacity - cargoUsed} t of free space remains.`)
         };
       }
       const spent = units * item.price;
       if (spent > state.commander.cash) {
         return {
-          ui: withUiMessage(state.ui, createUiMessage('error', `Not enough credits for ${item.name}`, `You need ${formatCredits(spent)} but only have ${formatCredits(state.commander.cash)}.`))
+          ui: setUiMessage(state.ui, 'error', `Not enough credits for ${item.name}`, `You need ${formatCredits(spent)} but only have ${formatCredits(state.commander.cash)}.`)
         };
       }
       // Buying always updates commander cargo/cash and the docked market
@@ -81,7 +75,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           }
         },
         market: refreshItems(nextSession),
-        ui: withUiMessage(state.ui, createUiMessage('success', `Bought ${units} ${item.name}`, `Spent ${formatCredits(spent)}. Balance now ${formatCredits(nextCash)}.`))
+        ui: setUiMessage(state.ui, 'success', `Bought ${units} ${item.name}`, `Spent ${formatCredits(spent)}. Balance now ${formatCredits(nextCash)}.`)
       };
     }),
   sellCommodity: (commodityKey, amount) =>
@@ -94,7 +88,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
       const units = Math.min(Math.max(0, Math.trunc(amount)), owned);
       if (units <= 0) {
         return {
-          ui: withUiMessage(state.ui, createUiMessage('error', `Cannot sell ${item.name}`, 'You do not have any units of this commodity.'))
+          ui: setUiMessage(state.ui, 'error', `Cannot sell ${item.name}`, 'You do not have any units of this commodity.')
         };
       }
       // Selling uses the same lockstep rule in reverse: increase local station
@@ -112,14 +106,7 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           }
         },
         market: refreshItems(nextSession),
-        ui: withUiMessage(
-          state.ui,
-          createUiMessage(
-            'success',
-            `Sold ${units} ${item.name}`,
-            `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`
-          )
-        )
+        ui: setUiMessage(state.ui, 'success', `Sold ${units} ${item.name}`, `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`)
       };
     })
 });

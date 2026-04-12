@@ -1,4 +1,4 @@
-import { createUiMessage, withUiMessage } from '../shared/store/uiMessages';
+import { setUiMessage } from '../shared/store/uiMessages';
 import { persistInstantTravelEnabled, persistTravelPerfOverlayEnabled } from '../shared/store/gameStateFactory';
 import type { AppTab, GameStore, PriorityState } from '../shared/store/storeTypes';
 
@@ -21,13 +21,11 @@ export function createSettingsActions(set: StoreSetter) {
       set((state: GameStore) => {
         persistInstantTravelEnabled(enabled);
         return {
-          ui: withUiMessage(
+          ui: setUiMessage(
             { ...state.ui, instantTravelEnabled: enabled },
-            createUiMessage(
-              'info',
-              enabled ? 'Instant travel enabled' : 'Space travel enabled',
-              enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
-            )
+            'info',
+            enabled ? 'Instant travel enabled' : 'Space travel enabled',
+            enabled ? 'Travel now skips the arcade flight segment.' : 'Travel now opens the space flight segment before docking.'
           )
         };
       }),
@@ -39,13 +37,11 @@ export function createSettingsActions(set: StoreSetter) {
       set((state: GameStore) => {
         persistTravelPerfOverlayEnabled(enabled);
         return {
-          ui: withUiMessage(
+          ui: setUiMessage(
             { ...state.ui, showTravelPerfOverlay: enabled },
-            createUiMessage(
-              'info',
-              enabled ? 'Travel perf overlay enabled' : 'Travel perf overlay disabled',
-              enabled ? 'Space flight now shows a live frame and React commit overlay.' : 'Space flight hides the live performance overlay.'
-            )
+            'info',
+            enabled ? 'Travel perf overlay enabled' : 'Travel perf overlay disabled',
+            enabled ? 'Space flight now shows a live frame and React commit overlay.' : 'Space flight hides the live performance overlay.'
           )
         };
       })

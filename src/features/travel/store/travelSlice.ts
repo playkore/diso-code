@@ -1,4 +1,3 @@
-import { normalizeCommanderState } from '../../commander/domain/commander';
 import { resolveTravelOutcome } from '../domain/travel';
 import { createDefaultMissionTravelContext } from '../domain/missionContext';
 import { getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../../../shared/domain/fuel';
@@ -6,7 +5,7 @@ import { getSystemDistance } from '../../galaxy/domain/galaxyCatalog';
 import { formatCredits } from '../../../shared/utils/money';
 import { formatLightYears } from '../../../shared/utils/distance';
 import { createArrivalState, createDockedState } from '../../../shared/store/gameStateFactory';
-import { createUiMessage, withUiMessage } from '../../../shared/store/uiMessages';
+import { setUiMessage } from '../../../shared/store/uiMessages';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 
 /**
@@ -38,7 +37,7 @@ export const createTravelSlice: GameSlice<
           ...state.commander,
           cash: state.commander.cash + credits
         },
-        ui: withUiMessage(state.ui, createUiMessage('success', 'Debug credits added', `${formatCredits(credits)} credited for debugging.`))
+        ui: setUiMessage(state.ui, 'success', 'Debug credits added', `${formatCredits(credits)} credited for debugging.`)
       };
     }),
 
@@ -79,10 +78,7 @@ export const createTravelSlice: GameSlice<
     }
     if (jumpFuelUnits > availableFuelUnits) {
       set({
-        ui: withUiMessage(
-          state.ui,
-          createUiMessage('error', `Insufficient fuel for ${systemName}`, `Jump needs ${formatLightYears(jumpFuelCost)} but only ${formatLightYears(state.commander.fuel)} remain.`)
-        )
+        ui: setUiMessage(state.ui, 'error', `Insufficient fuel for ${systemName}`, `Jump needs ${formatLightYears(jumpFuelCost)} but only ${formatLightYears(state.commander.fuel)} remain.`)
       });
       return false;
     }
@@ -165,14 +161,11 @@ export const createTravelSlice: GameSlice<
         return {
           ...state,
           travelSession: null,
-          ui: withUiMessage(state.ui, createUiMessage('error', 'Travel failed', 'The hyperspace solution collapsed before arrival.'))
+          ui: setUiMessage(state.ui, 'error', 'Travel failed', 'The hyperspace solution collapsed before arrival.')
         };
       }
       return {
         ...nextState,
-        commander: normalizeCommanderState({
-          ...nextState.commander
-        }),
         ui: {
           ...nextState.ui,
           selectedChartSystem: null
