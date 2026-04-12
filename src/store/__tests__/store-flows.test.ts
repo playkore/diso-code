@@ -344,7 +344,7 @@ describe('outfitting store flows', () => {
       }
     }));
 
-    useGameStore.getState().startNewGame();
+    useGameStore.getState().startNewGame(2);
 
     expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
     expect(useGameStore.getState().commander.cash).toBe(1000);
@@ -354,6 +354,20 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().ui.activeTab).toBe('market');
     expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
     expect(useGameStore.getState().ui.latestEvent).toBeUndefined();
+    expect(useGameStore.getState().activeSaveSlotId).toBe(2);
+    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe('Lave');
+  });
+
+  it('autosaves the active slot when docking completes', () => {
+    useGameStore.getState().startNewGame(3);
+    const beforeTravelSavedAt = useGameStore.getState().saveStates[3]?.savedAt;
+
+    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+
+    expect(useGameStore.getState().activeSaveSlotId).toBe(3);
+    expect(useGameStore.getState().saveStates[3]?.snapshot.commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().saveStates[3]?.savedAt).not.toBe(beforeTravelSavedAt);
   });
 
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {

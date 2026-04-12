@@ -7,7 +7,6 @@ import { GalaxyChartScreen } from './features/galaxy/components/GalaxyChartScree
 import { InventoryScreen } from './features/commander/components/InventoryScreen';
 import { LoadScreen } from './features/persistence/components/LoadScreen';
 import { MarketScreen } from './features/market/components/MarketScreen';
-import { SaveScreen } from './features/persistence/components/SaveScreen';
 import { SystemDataScreen } from './features/galaxy/components/SystemDataScreen';
 import { StarMapScreen } from './features/galaxy/components/StarMapScreen';
 
@@ -39,7 +38,6 @@ const router = createBrowserRouter([
           </Suspense>
         )
       },
-      { path: 'save', element: <SaveScreen /> },
       { path: 'load', element: <LoadScreen /> },
       { path: 'debug', element: <DebugScreen /> },
       { path: '*', element: <Navigate to="/" replace /> }

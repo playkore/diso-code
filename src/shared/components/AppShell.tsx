@@ -118,7 +118,7 @@ export function AppShell() {
   const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
   const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
-  const isMenuFlowRoute = location.pathname === '/save' || location.pathname === '/load' || location.pathname === '/debug';
+  const isMenuFlowRoute = location.pathname === '/load' || location.pathname === '/debug';
   const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
 
   if (isTravelRoute) {
@@ -161,7 +161,7 @@ export function AppShell() {
                 <dd>{universe.currentSystem}</dd>
               </div>
             </dl>
-            {/* The header shortcut now reopens the start menu so the player can
+            {/* The header shortcut reopens the start menu so the player can
                 reach New Game, Continue, and Load from the same entry point. */}
             <Link
               className="app-shell__utility-link"

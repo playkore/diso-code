@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   hasPersistedDockedSession,
+  SAVE_SLOT_IDS,
   loadStartMenuFullscreenEnabled,
   loadStartMenuMusicEnabled,
   persistStartMenuFullscreenEnabled,
@@ -57,12 +58,11 @@ export function StartScreenGate() {
   const [musicEnabled, setMusicEnabled] = useState(() => loadStartMenuMusicEnabled());
   const [fullscreenEnabled, setFullscreenEnabled] = useState(() => loadStartMenuFullscreenEnabled());
   const [isLaunching, setIsLaunching] = useState(false);
-  const [isConfirmingNewGame, setIsConfirmingNewGame] = useState(false);
+  const [isPickingNewGameSlot, setIsPickingNewGameSlot] = useState(false);
+  const [overwriteSlotId, setOverwriteSlotId] = useState<(typeof SAVE_SLOT_IDS)[number] | null>(null);
   const hasResumeSession = hasPersistedDockedSession();
-  const hasManualSave = Object.keys(saveStates).length > 0;
   const canContinue = hasResumeSession;
-  const canSave = hasResumeSession;
-  const canLoad = hasManualSave;
+  const canLoad = Object.keys(saveStates).length > 0;
 
   useEffect(() => {
     let isCancelled = false;
@@ -116,7 +116,7 @@ export function StartScreenGate() {
     });
   };
 
-  const launchIntoGame = async (mode: 'continue' | 'new-game') => {
+  const launchContinue = async () => {
     if (!isMenuReady || isLaunching) {
       return;
     }
@@ -131,14 +131,41 @@ export function StartScreenGate() {
       }
     }
 
-    if (mode === 'new-game') {
-      // The confirmation dialog stays, but new games now hand off directly.
-      startNewGame();
-    } else {
-      closeMenu();
+    closeMenu();
+    setIsLaunching(false);
+  };
+
+  const launchNewGame = async (slotId: (typeof SAVE_SLOT_IDS)[number]) => {
+    if (!isMenuReady || isLaunching) {
+      return;
     }
 
+    setIsLaunching(true);
+
+    if (fullscreenEnabled) {
+      const enteredFullscreen = await requestDocumentFullscreen().catch(() => false);
+      if (!enteredFullscreen) {
+        setIsLaunching(false);
+        return;
+      }
+    }
+
+    startNewGame(slotId);
+    setIsPickingNewGameSlot(false);
+    setOverwriteSlotId(null);
     setIsLaunching(false);
+  };
+
+  const handleNewGameSlot = (slotId: (typeof SAVE_SLOT_IDS)[number]) => {
+    if (isLaunching || !isMenuReady) {
+      return;
+    }
+    if (saveStates[slotId]) {
+      setIsPickingNewGameSlot(false);
+      setOverwriteSlotId(slotId);
+      return;
+    }
+    void launchNewGame(slotId);
   };
 
   if (!isMenuVisible) {
@@ -185,7 +212,7 @@ export function StartScreenGate() {
               type="button"
               className="start-menu__action"
               onClick={() => {
-                setIsConfirmingNewGame(true);
+                setIsPickingNewGameSlot(true);
               }}
               disabled={!isMenuReady || isLaunching}
             >
@@ -195,22 +222,11 @@ export function StartScreenGate() {
               type="button"
               className="start-menu__action"
               onClick={() => {
-                void launchIntoGame('continue');
+                void launchContinue();
               }}
               disabled={!isMenuReady || isLaunching || !canContinue}
             >
               Continue
-            </button>
-            <button
-              type="button"
-              className="start-menu__action"
-              onClick={() => {
-                closeMenu();
-                navigate('/save');
-              }}
-              disabled={!isMenuReady || !canSave}
-            >
-              Save
             </button>
             <button
               type="button"
@@ -251,25 +267,80 @@ export function StartScreenGate() {
           <span className="start-menu__copyright">© Alexey Korepanov 2026</span>
         </span>
       </div>
-      {isConfirmingNewGame ? (
+      {isPickingNewGameSlot ? (
         <div className="dialog-backdrop" role="presentation">
-          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="new-game-confirm-title">
+          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="new-game-slot-title">
             <p className="dialog-kicker">New Commander</p>
-            <h3 id="new-game-confirm-title">Start a new game?</h3>
-            <p>This will replace the current run with a fresh commander in Lave.</p>
+            <h3 id="new-game-slot-title">Choose a slot</h3>
+            <p>Select one of the three slots. The chosen slot will be autosaved every time you dock.</p>
+            <div className="save-panels">
+              {SAVE_SLOT_IDS.map((slotId) => {
+                const saveState = saveStates[slotId];
+                const savedCommander = saveState?.snapshot.commander;
+                const savedUniverse = saveState?.snapshot.universe;
+
+                return (
+                  <button key={slotId} type="button" className="save-panel save-slot-button" onClick={() => handleNewGameSlot(slotId)}>
+                    <div className="save-slot__header">
+                      <p className="dialog-kicker">Slot {slotId}</p>
+                      <p className="save-slot__cta">{saveState ? 'Overwrite' : 'Start'}</p>
+                    </div>
+                    {savedCommander && savedUniverse ? (
+                      <>
+                        <p className="muted">Saved {new Date(saveState.savedAt).toLocaleString()}</p>
+                        <dl className="detail-grid">
+                          <dt>Name</dt>
+                          <dd>{savedCommander.name}</dd>
+                          <dt>System</dt>
+                          <dd>{savedCommander.currentSystem}</dd>
+                          <dt>Stardate</dt>
+                          <dd>{savedUniverse.stardate}</dd>
+                        </dl>
+                      </>
+                    ) : (
+                      <p className="muted">Empty slot.</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="dialog-actions dialog-actions--single">
+              <button type="button" onClick={() => setIsPickingNewGameSlot(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {overwriteSlotId ? (
+        <div className="dialog-backdrop" role="presentation">
+          <div className="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="new-game-overwrite-title">
+            <p className="dialog-kicker">Overwrite Slot</p>
+            <h3 id="new-game-overwrite-title">Replace Slot {overwriteSlotId}?</h3>
+            <p>
+              This slot already has a save. Starting a new game here will replace that run and make Slot {overwriteSlotId} the
+              active autosave target.
+            </p>
             <div className="dialog-actions">
-              <button type="button" onClick={() => setIsConfirmingNewGame(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOverwriteSlotId(null);
+                  setIsPickingNewGameSlot(true);
+                }}
+              >
                 Cancel
               </button>
               <button
                 type="button"
                 className="button-danger"
                 onClick={() => {
-                  setIsConfirmingNewGame(false);
-                  void launchIntoGame('new-game');
+                  const slotId = overwriteSlotId;
+                  setOverwriteSlotId(null);
+                  void launchNewGame(slotId);
                 }}
               >
-                Start New Game
+                Replace Slot {overwriteSlotId}
               </button>
             </div>
           </div>

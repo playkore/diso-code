@@ -9,7 +9,8 @@ export const createSaveLoadSlice: GameSlice<
   saveToSlot: (slotId) => {
     const state = get();
     // Slots store a full snapshot so loading can rebuild every docked subsystem
-    // without replaying individual actions.
+    // without replaying individual actions. The same helper is reused for the
+    // automatic dock-save, so this function stays silent and idempotent.
     const snapshot = createSnapshot(state);
     const saveState = createSaveState(snapshot);
     const nextSaveStates = {
@@ -17,10 +18,10 @@ export const createSaveLoadSlice: GameSlice<
       [slotId]: saveState
     };
     persistSaveStates(nextSaveStates);
-    set((current) => ({
+    set({
       saveStates: nextSaveStates,
-      ui: setUiMessage(current.ui, 'info', `Slot ${slotId} saved`, `Saved ${snapshot.commander.name} at ${snapshot.commander.currentSystem}.`)
-    }));
+      activeSaveSlotId: slotId
+    });
   },
   loadFromSlot: (slotId) => {
     const state = get();
@@ -34,6 +35,7 @@ export const createSaveLoadSlice: GameSlice<
       // Travel sessions are intentionally transient and cannot survive a restore
       // because their mutable runtime state only exists in memory.
       travelSession: null,
+      activeSaveSlotId: slotId,
       saveStates: state.saveStates,
       ui: setUiMessage(
         {
@@ -48,12 +50,22 @@ export const createSaveLoadSlice: GameSlice<
       )
     }));
   },
-  startNewGame: () => {
+  startNewGame: (slotId) => {
     const freshState = createFreshGameState();
+    const snapshot = createSnapshot(freshState);
+    const saveState = createSaveState(snapshot);
+    const nextSaveStates = {
+      ...get().saveStates,
+      [slotId]: saveState
+    };
+    persistSaveStates(nextSaveStates);
     // Starting a new run now skips all staged intro effects and swaps directly
-    // to the freshly initialized docked state.
+    // to the freshly initialized docked state. The chosen slot becomes the
+    // active autosave target immediately so the next station dock preserves it.
     set((state) => ({
       ...freshState,
+      saveStates: nextSaveStates,
+      activeSaveSlotId: slotId,
       // A new game always returns to the docked market tab with no active trip.
       travelSession: null,
       // The docked shell no longer renders a transient banner, so new-game
@@ -74,6 +86,7 @@ export const createSaveLoadSlice: GameSlice<
       // the title flow, so the attract gate is reopened over a fresh commander.
       travelSession: null,
       saveStates: state.saveStates,
+      activeSaveSlotId: null,
       ui: {
         ...state.ui,
         activeTab: 'market',

@@ -289,6 +289,7 @@ export function loadPersistedDockedSession() {
     });
     return {
       activeTab: state.ui?.activeTab as AppTab,
+      activeSaveSlotId: state.activeSaveSlotId ?? null,
       restoredState: restored
     };
   } catch {
@@ -349,6 +350,19 @@ export function loadPersistedSaveStates(): Partial<Record<SaveSlotId, SaveState>
     window.localStorage.removeItem(SAVE_SLOT_STORAGE_KEY);
     return {};
   }
+}
+
+/**
+ * Picks the most recently written save slot so older app versions can still
+ * infer which slot should be treated as the active run after a reload.
+ */
+export function getMostRecentSaveSlotId(saveStates: Partial<Record<SaveSlotId, SaveState>>): SaveSlotId | null {
+  const mostRecent = SAVE_SLOT_IDS.filter((slotId) => saveStates[slotId]).sort((left, right) => {
+    const leftSavedAt = saveStates[left]?.savedAt ?? '';
+    const rightSavedAt = saveStates[right]?.savedAt ?? '';
+    return rightSavedAt.localeCompare(leftSavedAt);
+  })[0];
+  return mostRecent ?? null;
 }
 
 /**

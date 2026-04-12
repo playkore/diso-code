@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { createDefaultCommander } from '../features/commander/domain/commander';
 import {
   createInitialGameState,
+  getMostRecentSaveSlotId,
   loadPersistedSaveStates,
   loadInstantTravelEnabled,
   loadTravelPerfOverlayEnabled
@@ -30,6 +31,7 @@ export const useGameStore = createWithEqualityFn<GameStore>()(
       const persistedSaveStates = loadPersistedSaveStates();
       const instantTravelEnabled = loadInstantTravelEnabled();
       const showTravelPerfOverlay = loadTravelPerfOverlayEnabled();
+      const bootSaveSlotId = getMostRecentSaveSlotId(persistedSaveStates);
 
       return {
         universe: bootState.universe,
@@ -37,6 +39,7 @@ export const useGameStore = createWithEqualityFn<GameStore>()(
         market: bootState.market,
         travelSession: null,
         saveStates: persistedSaveStates,
+        activeSaveSlotId: bootSaveSlotId,
         ui: {
           activeTab: 'market',
           selectedChartSystem: null,
