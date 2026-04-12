@@ -1,14 +1,16 @@
 import type { CommanderState } from '../../commander/domain/commander';
 import type { DockedMarketSession } from '../../market/domain/market';
-import type { PriorityState, UniverseState } from '../../../shared/store/types';
+import type { UniverseState } from '../../../shared/store/types';
 
-export const GAME_SAVE_SCHEMA_VERSION = 3;
+export const GAME_SAVE_SCHEMA_VERSION = 4;
+// Version 3 saves are still accepted so removing the priority mechanic does
+// not invalidate a player's existing local files.
+const SUPPORTED_GAME_SAVE_SCHEMA_VERSIONS = new Set([3, 4]);
 
 export interface GameSnapshot {
   commander: CommanderState;
   universe: UniverseState;
   marketSession: DockedMarketSession;
-  priority: PriorityState;
 }
 
 export interface GameSaveFile {
@@ -27,11 +29,11 @@ function fnv1a32(input: string): number {
   return hash >>> 0;
 }
 
-export function buildGameSave(snapshot: GameSnapshot, savedAt = new Date().toISOString()): GameSaveFile {
+export function buildGameSave(snapshot: GameSnapshot, savedAt = new Date().toISOString(), version = GAME_SAVE_SCHEMA_VERSION): GameSaveFile {
   const snapshotJson = JSON.stringify(snapshot);
   return {
-    version: GAME_SAVE_SCHEMA_VERSION,
-    checksum: fnv1a32(`${GAME_SAVE_SCHEMA_VERSION}:${savedAt}:${snapshotJson}`),
+    version,
+    checksum: fnv1a32(`${version}:${savedAt}:${snapshotJson}`),
     savedAt,
     snapshot
   };
@@ -44,11 +46,11 @@ export function serializeGameJson(snapshot: GameSnapshot, savedAt?: string): str
 export function loadGameJson(jsonText: string): GameSaveFile {
   const parsed = JSON.parse(jsonText) as GameSaveFile;
 
-  if (parsed.version !== GAME_SAVE_SCHEMA_VERSION) {
+  if (!SUPPORTED_GAME_SAVE_SCHEMA_VERSIONS.has(parsed.version)) {
     throw new Error(`Unsupported game save version: ${parsed.version}`);
   }
 
-  const expectedChecksum = buildGameSave(parsed.snapshot, parsed.savedAt).checksum;
+  const expectedChecksum = buildGameSave(parsed.snapshot, parsed.savedAt, parsed.version).checksum;
   if (expectedChecksum !== parsed.checksum) {
     throw new Error('Game save checksum mismatch');
   }

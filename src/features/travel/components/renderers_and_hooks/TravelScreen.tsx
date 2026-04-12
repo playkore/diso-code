@@ -17,7 +17,6 @@ export function TravelScreen() {
       session: state.travelSession,
       commanderCash: state.commander.cash,
       commanderFuel: state.commander.fuel,
-      priority: state.priority,
       showTravelPerfOverlay: state.ui.showTravelPerfOverlay,
       activeTab: state.ui.activeTab
     }),
@@ -39,19 +38,16 @@ export function TravelScreen() {
   const grantCombatCredits = useGameStore((state) => state.grantCombatCredits);
   const completeTravel = useGameStore((state) => state.completeTravel);
   const resetAfterDeath = useGameStore((state) => state.resetAfterDeath);
-  const acknowledgePriorityAnnouncement = useGameStore((state) => state.acknowledgePriorityAnnouncement);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const travel = useTravelSession(
     { canvasRef, viewportRef },
     screenState.session,
-    screenState.priority,
     combatCommander,
     grantCombatCredits,
     completeTravel,
     resetAfterDeath,
-    acknowledgePriorityAnnouncement,
     navigate
   );
   const handleRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {

@@ -4,7 +4,6 @@ import { loadGameJson, serializeGameJson, type GameSnapshot } from '../../featur
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getJumpFuelUnits } from '../domain/fuel';
 import { getGalaxySystems, getNearbySystemNames, getSystemByName, getSystemDistance } from '../../features/galaxy/domain/galaxyCatalog';
 import { createDockedMarketSession, getSessionMarketItems, type DockedMarketSession } from '../../features/market/domain/market';
-import { createDefaultPriority, syncPriorityProgress } from './priority';
 import { setUiMessage } from './uiMessages';
 import type { GameStore, SaveSlotId, SaveState } from './storeTypes';
 import type { AppTab, MarketState } from './types';
@@ -88,20 +87,21 @@ export function createInitialGameState(commander: CommanderState) {
       marketFluctuation: 0
     },
     commander: normalizedCommander,
-    market: createMarketState(normalizedCommander.currentSystem, economy, 0),
-    priority: createDefaultPriority(normalizedCommander.cash)
+    market: createMarketState(normalizedCommander.currentSystem, economy, 0)
   };
 }
 
 /**
  * Reduces live store state to the subset that belongs in a save file.
+ *
+ * The save payload intentionally tracks only the durable docked world state:
+ * commander, universe, and the current market session.
  */
-export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market' | 'priority'>): GameSnapshot {
+export function createSnapshot(state: Pick<GameStore, 'commander' | 'universe' | 'market'>): GameSnapshot {
   return {
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session,
-    priority: state.priority
+    marketSession: state.market.session
   };
 }
 
@@ -222,10 +222,12 @@ export function createGalacticHyperdriveState(state: Pick<GameStore, 'commander'
 
 /**
  * Rehydrates a saved snapshot into live store-ready state.
+ *
+ * Older save files may still contain now-ignored fields from before the
+ * priority system was removed, but only the durable docked state is restored.
  */
 export function restoreSnapshot(snapshot: GameSnapshot) {
   const commander = normalizeCommanderState(snapshot.commander);
-  const restoredPriority = snapshot.priority ? syncPriorityProgress(snapshot.priority, commander.cash) : createDefaultPriority(commander.cash);
   return {
     commander,
     universe: {
@@ -234,8 +236,7 @@ export function restoreSnapshot(snapshot: GameSnapshot) {
       galaxyIndex: snapshot.universe.galaxyIndex ?? 0,
       nearbySystems: getNearbySystemNames(commander.currentSystem, snapshot.universe.galaxyIndex ?? 0)
     },
-    market: refreshItems(snapshot.marketSession),
-    priority: restoredPriority
+    market: refreshItems(snapshot.marketSession)
   };
 }
 
@@ -284,8 +285,7 @@ export function loadPersistedDockedSession() {
     const restored = restoreSnapshot({
       commander: state.commander,
       universe: state.universe,
-      marketSession: state.marketSession,
-      priority: state.priority
+      marketSession: state.marketSession
     });
     return {
       activeTab: state.ui?.activeTab as AppTab,

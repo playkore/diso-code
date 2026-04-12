@@ -26,7 +26,6 @@ import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/
 import { createBackgroundStar, createStars } from './travelVisuals';
 import { TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
-import type { PriorityState } from '../../../../shared/store/types';
 import type { TravelCompletionReport } from '../../../../shared/store/storeTypes';
 import type { SeedTriplet } from '../../../galaxy/domain/universe';
 import {
@@ -142,12 +141,10 @@ export function getJoystickProjectedThrust(vectorX: number, vectorY: number, shi
 export function useTravelSession(
   refs: TravelRefs,
   session: TravelState | null,
-  priority: PriorityState,
   commander: CombatCommanderSnapshot,
   grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: TravelCompletionReport) => void,
   resetAfterDeath: () => void,
-  acknowledgePriorityAnnouncement: () => void,
   navigate: (to: string, options?: { replace?: boolean }) => void
 ) {
   const [hud, setHud] = useState(INITIAL_HUD);
@@ -204,22 +201,6 @@ export function useTravelSession(
     messageRef.current = next;
     setMessage(next);
   };
-
-  useEffect(() => {
-    if (!session || !priority.pendingAnnouncement) {
-      return undefined;
-    }
-
-    const priorityMessage = `PRIORITY UPDATED\n${priority.label}`;
-    setMessageState(priorityMessage);
-    acknowledgePriorityAnnouncement();
-    const clearTimer = window.setTimeout(() => {
-      if (messageRef.current === priorityMessage) {
-        setMessageState('');
-      }
-    }, 1800);
-    return () => window.clearTimeout(clearTimer);
-  }, [acknowledgePriorityAnnouncement, priority.label, priority.pendingAnnouncement, session]);
 
   const setHyperspaceHiddenState = (next: boolean) => {
     if (hyperspaceHiddenRef.current === next) {

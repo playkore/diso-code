@@ -11,7 +11,6 @@ import { createOutfittingSlice } from '../features/commander/store/outfittingSli
 import { createSaveLoadSlice } from '../features/persistence/store/saveLoadSlice';
 import { createTradeSlice } from '../features/market/store/tradeSlice';
 import { createTravelSlice } from '../features/travel/store/travelSlice';
-import { syncPriorityProgress } from '../shared/store/priority';
 import type { GameStore } from '../shared/store/storeTypes';
 import { createSettingsActions } from './useGameStoreActions';
 import {
@@ -37,7 +36,6 @@ export const useGameStore = createWithEqualityFn<GameStore>()(
         commander: bootState.commander,
         market: bootState.market,
         travelSession: null,
-        priority: bootState.priority,
         saveStates: persistedSaveStates,
         ui: {
           activeTab: 'market',
@@ -63,11 +61,3 @@ export const useGameStore = createWithEqualityFn<GameStore>()(
     }
   )
 );
-
-useGameStore.subscribe((state) => {
-  const syncedPriority = syncPriorityProgress(state.priority, state.commander.cash);
-  if (syncedPriority.progressCredits === state.priority.progressCredits) {
-    return;
-  }
-  useGameStore.setState({ priority: syncedPriority });
-});

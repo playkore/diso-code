@@ -1,5 +1,5 @@
 import { refreshItems } from '../shared/store/gameStateFactory';
-import type { AppTab, CommanderState, MarketState, PriorityState, UniverseState } from '../shared/store/types';
+import type { AppTab, CommanderState, MarketState, UniverseState } from '../shared/store/types';
 import type { GameStore } from '../shared/store/storeTypes';
 
 export interface PersistedDockedState {
@@ -7,7 +7,6 @@ export interface PersistedDockedState {
   commander?: CommanderState;
   universe?: UniverseState;
   marketSession?: MarketState['session'];
-  priority?: PriorityState;
   __isTravelling?: true;
 }
 
@@ -49,7 +48,7 @@ export const storageWrapper = {
 };
 
 export function partializeDockedState(
-  state: Pick<GameStore, 'travelSession' | 'ui' | 'commander' | 'universe' | 'market' | 'priority'>
+  state: Pick<GameStore, 'travelSession' | 'ui' | 'commander' | 'universe' | 'market'>
 ): PersistedDockedState {
   if (state.travelSession) {
     return { __isTravelling: true };
@@ -58,8 +57,7 @@ export function partializeDockedState(
     ui: { activeTab: state.ui.activeTab },
     commander: state.commander,
     universe: state.universe,
-    marketSession: state.market.session,
-    priority: state.priority
+    marketSession: state.market.session
   };
 }
 
@@ -71,7 +69,6 @@ export function mergeDockedState(persistedState: unknown, currentState: GameStor
     ...currentState,
     universe: typedPersistedState.universe ?? currentState.universe,
     commander: typedPersistedState.commander ?? currentState.commander,
-    priority: typedPersistedState.priority ?? currentState.priority,
     market: typedPersistedState.marketSession ? refreshItems(typedPersistedState.marketSession) : currentState.market,
     ui: {
       ...currentState.ui,

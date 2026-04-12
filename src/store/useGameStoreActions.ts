@@ -1,6 +1,6 @@
 import { setUiMessage } from '../shared/store/uiMessages';
 import { persistInstantTravelEnabled, persistTravelPerfOverlayEnabled } from '../shared/store/gameStateFactory';
-import type { AppTab, GameStore, PriorityState } from '../shared/store/storeTypes';
+import type { AppTab, GameStore } from '../shared/store/storeTypes';
 
 type StoreSetter = (
   partial: Partial<GameStore> | ((state: GameStore) => Partial<GameStore> | GameStore),
@@ -29,10 +29,6 @@ export function createSettingsActions(set: StoreSetter) {
           )
         };
       }),
-    setPriority: (priority: PriorityState, options?: { announce?: boolean }) =>
-      set(() => ({ priority: { ...priority, pendingAnnouncement: options?.announce ?? true } })),
-    acknowledgePriorityAnnouncement: () =>
-      set((state: GameStore) => ({ priority: { ...state.priority, pendingAnnouncement: false } })),
     setShowTravelPerfOverlay: (enabled: boolean) =>
       set((state: GameStore) => {
         persistTravelPerfOverlayEnabled(enabled);
