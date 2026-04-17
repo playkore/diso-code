@@ -220,14 +220,11 @@ function rotateOffset(x: number, y: number, angle: number) {
 /**
  * Enemy health bars use plain overlay primitives rather than texture-backed
  * quads. That keeps the meter logic obvious, avoids texture-orientation edge
- * cases, and matches how the original canvas renderer already decomposes the
- * UI into a frame plus four filled banks.
+ * cases, and matches the stripped-down RPG HUD that now uses one continuous
+ * HP fill instead of Elite-style segmented energy banks.
  */
 function createEnemyHealthBarObject(healthBar: NonNullable<ReturnType<typeof getEnemyHealthBarState>>) {
-  const bankCount = 4;
-  const bankWidth = 4;
-  const bankGap = 1;
-  const width = bankCount * bankWidth + (bankCount - 1) * bankGap;
+  const width = 19;
   const height = 4;
   const group = new Group();
   const panel = createQuad(width + 2, height + 2, CGA_BLACK);
@@ -250,20 +247,16 @@ function createEnemyHealthBarObject(healthBar: NonNullable<ReturnType<typeof get
       false
     )
   );
-
-  for (let bankIndex = 0; bankIndex < bankCount; bankIndex += 1) {
-    const bankX = -width / 2 + bankIndex * (bankWidth + bankGap) + bankWidth / 2;
-    const fillWidth = Math.round(bankWidth * healthBar.bankRatios[bankIndex]);
-    const underlay = createQuad(bankWidth, height, CGA_RED);
-    underlay.position.set(bankX, 0, 0.01);
-    group.add(underlay);
-    if (fillWidth > 0) {
-      const fill = createQuad(fillWidth, height, healthBar.fillColor);
-      // Fill grows from the left edge of each bank so partial segments match
-      // the canvas HUD instead of expanding symmetrically around the center.
-      fill.position.set(bankX - (bankWidth - fillWidth) / 2, 0, 0.02);
-      group.add(fill);
-    }
+  const underlay = createQuad(width, height, CGA_RED);
+  underlay.position.set(0, 0, 0.01);
+  group.add(underlay);
+  const fillWidth = Math.round(width * healthBar.ratio);
+  if (fillWidth > 0) {
+    const fill = createQuad(fillWidth, height, healthBar.fillColor);
+    // Fill still grows from the left edge so the remaining HP stays easy to
+    // estimate even while the bar rotates with the enemy ship icon.
+    fill.position.set(-(width - fillWidth) / 2, 0, 0.02);
+    group.add(fill);
   }
 
   return group;

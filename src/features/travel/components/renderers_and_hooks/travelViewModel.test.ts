@@ -17,25 +17,26 @@ describe('travel drive status', () => {
     expect(getDriveStatus('HYPERSPACE', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false }).hyperspace).toBe('ENGAGED');
   });
 
-  it('maps player energy banks and shield fill for the HUD', () => {
+  it('maps player RPG stats and laser heat for the HUD', () => {
     const commander = createDefaultCommander();
-    commander.installedEquipment.shield_generator = true;
     const state = createCombatState([0, 0, 0], {
-      installedEquipment: commander.installedEquipment,
-      energyBanks: 4
+      installedEquipment: commander.installedEquipment
     });
-    state.player.energy = 160;
-    state.player.shield = 128;
+    state.player.level = 3;
+    state.player.hp = 32;
+    state.player.maxHp = 88;
+    state.player.xp = 24;
+    state.player.attack = 15;
     state.player.laserHeat.front = 80;
     state.player.laserHeat.rear = 30;
     state.playerLoadout.laserMounts.rear = 'beam_laser';
     state.playerLoadout.installedEquipment.energy_bomb = true;
     const hud = getHudState(state, 'PLAYING', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false });
-    expect(hud.energyBanks[0]).toBe(1);
-    expect(hud.energyBanks[1]).toBe(1);
-    expect(hud.energyBanks[2]).toBeCloseTo(0.5098, 3);
-    expect(hud.energyBanks[3]).toBe(0);
-    expect(hud.shieldRatio).toBeCloseTo(128 / 255, 5);
+    expect(hud.level).toBe(3);
+    expect(hud.hpRatio).toBeCloseTo(32 / 88, 5);
+    expect(hud.hpLabel).toBe('32 / 88');
+    expect(hud.xpRatio).toBeCloseTo(24 / 88, 5);
+    expect(hud.attackLabel).toBe('15');
     expect(hud.laserHeat).toEqual([
       { mount: 'front', installed: true, ratio: 0.8, color: '#ff5555' },
       { mount: 'rear', installed: true, ratio: 0.3, color: '#55ff55' },

@@ -2,10 +2,10 @@ import type { CommanderState } from '../../commander/domain/commander';
 import type { DockedMarketSession } from '../../market/domain/market';
 import type { UniverseState } from '../../../shared/store/types';
 
-export const GAME_SAVE_SCHEMA_VERSION = 4;
-// Version 3 saves are still accepted so removing the priority mechanic does
-// not invalidate a player's existing local files.
-const SUPPORTED_GAME_SAVE_SCHEMA_VERSIONS = new Set([3, 4]);
+export const GAME_SAVE_SCHEMA_VERSION = 5;
+// Older docked saves remain readable so the RPG migration can rebuild missing
+// fields instead of discarding the player's local progress outright.
+const SUPPORTED_GAME_SAVE_SCHEMA_VERSIONS = new Set([3, 4, 5]);
 
 export interface GameSnapshot {
   commander: CommanderState;

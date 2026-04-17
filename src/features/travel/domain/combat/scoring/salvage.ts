@@ -1,4 +1,3 @@
-import { COMMODITIES, cargoSpaceRequired } from '../../../../market/domain/market';
 import { recordKill } from './killResolution';
 import type { RandomSource, TravelCombatState } from '../types';
 
@@ -40,21 +39,7 @@ export function maybeScoopSalvage(state: TravelCombatState, enemy: TravelCombatS
 
   if (random.nextByte() < 96) {
     state.salvageFuel = Math.min(7, state.salvageFuel + 0.1);
-    return;
   }
-
-  const item = COMMODITIES[(random.nextByte() >> 4) % COMMODITIES.length];
-  const current = state.salvageCargo[item.key] ?? 0;
-  if (item.unit === 't') {
-    const used = Object.entries(state.salvageCargo).reduce((sum, [key, amount]) => {
-      const commodity = COMMODITIES.find((entry: (typeof COMMODITIES)[number]) => entry.key === key);
-      return sum + (commodity ? cargoSpaceRequired(commodity.unit, amount) : 0);
-    }, 0);
-    if (used + cargoSpaceRequired(item.unit, 1) > 35) {
-      return;
-    }
-  }
-  state.salvageCargo[item.key] = current + 1;
 }
 
 export function destroyEnemy(state: TravelCombatState, enemyIndex: number, random: RandomSource) {

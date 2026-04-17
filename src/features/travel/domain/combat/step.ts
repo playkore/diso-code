@@ -5,7 +5,7 @@ import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
 import { firePlayerLasers, refreshPlayerTargetLock } from './weapons/playerWeapons';
-import { clampLaserHeat, rechargePlayerDefense, stepParticles } from './state';
+import { clampLaserHeat, dampVelocity, stepParticles } from './state';
 import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
@@ -99,8 +99,6 @@ export function stepTravelCombat(
       state.player.maxLaserHeat
     );
   }
-  rechargePlayerDefense(state, dt);
-
   if (input.toggleLasers) {
     // The travel UI owns the switch gesture, but the simulation owns the armed
     // state so tests and live gameplay share the exact same behavior.
@@ -137,8 +135,8 @@ export function stepTravelCombat(
       emitPlayerEngineExhaust(state);
     }
 
-    state.player.vx *= 0.99;
-    state.player.vy *= 0.99;
+    state.player.vx = dampVelocity(state.player.vx, 0.99, dt);
+    state.player.vy = dampVelocity(state.player.vy, 0.99, dt);
     if (jumpActive) {
       const jumpSpeed = state.player.maxSpeed * LOCAL_JUMP_SPEED_MULTIPLIER;
       state.player.vx = Math.cos(state.player.angle) * jumpSpeed;
@@ -216,8 +214,8 @@ export function stepTravelCombat(
 
   return {
     state,
-    playerDestroyed: state.player.energy <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
-    playerEscaped: state.player.energy <= 0 && state.playerLoadout.installedEquipment.escape_pod,
+    playerDestroyed: state.player.hp <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
+    playerEscaped: state.player.hp <= 0 && state.playerLoadout.installedEquipment.escape_pod,
     autoDocked: Boolean(
       // Auto-dock is intentionally conservative: the docking computer only
       // resolves the final approach after the player requests it, owns the

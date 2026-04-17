@@ -1,4 +1,4 @@
-import { getDosCombatRatingProgress, getLegalStatus, totalCargoUsedTonnes } from '../domain/commander';
+import { getCommanderXpProgress, getDosCombatRatingProgress, getLegalStatus } from '../domain/commander';
 import { useGameStore } from '../../../store/useGameStore';
 import { formatCredits } from '../../../shared/utils/money';
 import { formatLightYears } from '../../../shared/utils/distance';
@@ -6,8 +6,8 @@ import { formatLightYears } from '../../../shared/utils/distance';
 export function InventoryScreen() {
   const commander = useGameStore((state) => state.commander);
   const galaxyIndex = useGameStore((state) => state.universe.galaxyIndex);
-  const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const ratingProgress = getDosCombatRatingProgress(commander.combatRatingScore);
+  const xpProgress = getCommanderXpProgress(commander);
 
   return (
     <section className="screen">
@@ -19,6 +19,22 @@ export function InventoryScreen() {
         <dd>{formatCredits(commander.cash)}</dd>
         <dt>Fuel</dt>
         <dd>{formatLightYears(commander.fuel)}</dd>
+        <dt>Level</dt>
+        <dd>{commander.level}</dd>
+        <dt>HP</dt>
+        <dd>
+          {commander.hp} / {commander.maxHp}
+        </dd>
+        <dt>Attack</dt>
+        <dd>{commander.attack}</dd>
+        <dt>XP</dt>
+        <dd className="rating-progress">
+          <span className="rating-progress__label">{xpProgress.current}</span>
+          <span className="rating-progress__track" aria-hidden="true">
+            <span className="rating-progress__fill" style={{ width: `${xpProgress.progressRatio * 100}%` }} />
+          </span>
+          <span className="rating-progress__meta">Next level in {xpProgress.remainingXp} XP</span>
+        </dd>
         <dt>Legal</dt>
         <dd>{getLegalStatus(commander.legalValue, { docked: true })} ({commander.legalValue})</dd>
         <dt>Rating</dt>
@@ -39,10 +55,6 @@ export function InventoryScreen() {
         <dd>{commander.tally}</dd>
         <dt>Ship</dt>
         <dd>Cobra Mk III</dd>
-        <dt>Cargo</dt>
-        <dd>
-          {cargoUsed} / {commander.cargoCapacity} t
-        </dd>
         <dt>Missiles</dt>
         <dd>
           {commander.missilesInstalled} / {commander.missileCapacity}

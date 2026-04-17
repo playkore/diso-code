@@ -4,6 +4,7 @@ import { getSystemByName, getSystemDistance, getVisibleSystems, getWrappedChartD
 import { MAX_FUEL, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../../../shared/domain/fuel';
 import { useGameStore } from '../../../store/useGameStore';
 import { formatLightYears } from '../../../shared/utils/distance';
+import { getSystemRpgLevel } from '../../travel/domain/combat/spawn/rpgScaling';
 
 interface StarPoint {
   name: string;
@@ -53,6 +54,7 @@ export function StarMapScreen() {
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
   const detailsSystemName = selectedChartSystem ?? universe.currentSystem;
   const showingCurrentSystem = selectedChartSystem === null;
+  const detailsSystem = getSystemByName(detailsSystemName, universe.galaxyIndex)?.data ?? null;
 
   return (
     <section className="screen">
@@ -99,6 +101,11 @@ export function StarMapScreen() {
             Distance: <strong>{selectedDistance !== null ? formatLightYears(selectedDistance) : 'Unknown'}</strong>
             {' · '}
             Fuel after jump: <strong>{fuelAfterJump !== null ? formatLightYears(fuelAfterJump) : 'Unknown'}</strong>
+          </p>
+        ) : null}
+        {detailsSystem ? (
+          <p>
+            Enemy level band: <strong>{getSystemRpgLevel(detailsSystem.x)}+</strong>
           </p>
         ) : null}
         <div className="star-map__action-row">

@@ -146,8 +146,12 @@ export interface CombatEnemy {
   vx: number;
   vy: number;
   angle: number;
-  energy: number;
-  maxEnergy: number;
+  level: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  xpReward: number;
+  creditReward: number;
   laserPower: number;
   missiles: number;
   targetableArea: number;
@@ -251,12 +255,11 @@ export interface CombatPlayer {
   vy: number;
   angle: number;
   radius: number;
-  energy: number;
-  maxEnergy: number;
-  energyBanks: number;
-  energyPerBank: number;
-  shield: number;
-  maxShield: number;
+  level: number;
+  xp: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
   laserHeat: Record<LaserMountPosition, number>;
   maxLaserHeat: number;
   laserHeatCooldownRate: number;
@@ -264,9 +267,6 @@ export interface CombatPlayer {
   fireCooldown: number;
   tallyKills: number;
   combatReward: number;
-  energyRechargePerTick: number;
-  shieldRechargePerTick: number;
-  rechargeTickAccumulator: number;
 }
 
 /**
@@ -360,6 +360,8 @@ export interface TravelCombatState {
   legalValue: number;
   legalStatus: LegalStatus;
   nextId: number;
+  currentSystemX: number;
+  currentSystemLevel: number;
   currentGovernment: number;
   currentTechLevel: number;
   missionContext: MissionTravelContext;
@@ -380,9 +382,13 @@ export interface TravelCombatInit {
   legalValue: number;
   government: number;
   techLevel: number;
+  systemX: number;
   missionContext: MissionTravelContext;
-  energyBanks: number;
-  energyPerBank: number;
+  level: number;
+  xp: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
   laserMounts: LaserMountState;
   installedEquipment: InstalledEquipmentState;
   missilesInstalled: number;

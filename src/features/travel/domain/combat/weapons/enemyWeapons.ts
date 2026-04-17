@@ -89,7 +89,7 @@ export function tryEnemyLaserAttack(state: TravelCombatState, enemy: CombatEnemy
   const cnt = estimateCnt(angleDiff);
   // Firing and hitting use slightly different CNT thresholds so enemies can
   // visibly shoot even when the shot is not precise enough to connect.
-  if (!canEnemyLaserFireByCnt(cnt) || enemy.laserPower <= 0) {
+  if (!canEnemyLaserFireByCnt(cnt) || enemy.attack <= 0) {
     return;
   }
 
@@ -99,7 +99,7 @@ export function tryEnemyLaserAttack(state: TravelCombatState, enemy: CombatEnemy
     return;
   }
 
-  applyPlayerDamage(state, enemy.laserPower);
+  applyPlayerDamage(state, enemy.attack);
   enemy.vx *= 0.5;
   enemy.vy *= 0.5;
   spawnParticles(state, state.player.x, state.player.y, '#ff5555');

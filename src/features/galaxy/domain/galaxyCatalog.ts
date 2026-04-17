@@ -32,30 +32,19 @@ function getGalaxyCatalog(galaxyIndex: number) {
 }
 
 /**
- * Returns the shortest signed offset on a toroidal axis.
+ * Returns the signed delta on one chart axis without seam wrapping.
  *
- * The galaxy wraps on both axes, so moving left from x=0 enters on the far
- * right and moving up from y=0 enters on the bottom. This helper converts two
- * absolute chart coordinates into the shortest wrapped delta between them.
+ * The original prototype treated the galaxy as a torus, which let left-edge
+ * routes jump straight to the far right. The RPG build removes that looping,
+ * so chart movement now uses plain Cartesian deltas.
  */
 function getWrappedAxisDelta(origin: number, target: number, size: number): number {
-  const direct = target - origin;
-  const wrappedForward = direct + size;
-  const wrappedBackward = direct - size;
-  let shortest = direct;
-
-  if (Math.abs(wrappedForward) < Math.abs(shortest)) {
-    shortest = wrappedForward;
-  }
-  if (Math.abs(wrappedBackward) < Math.abs(shortest)) {
-    shortest = wrappedBackward;
-  }
-
-  return shortest;
+  void size;
+  return target - origin;
 }
 
 /**
- * Computes toroidal chart offsets while preserving the original half-height Y
+ * Computes chart offsets while preserving the original half-height Y
  * projection used by Elite's maps.
  */
 export function getWrappedChartDelta(origin: SystemData, target: SystemData) {
@@ -70,8 +59,8 @@ export function getWrappedChartDelta(origin: SystemData, target: SystemData) {
  *
  * The star charts treat positive Y as "down" on screen, while travel combat
  * uses the same canvas-style orientation for ship movement. Returning the
- * wrapped chart angle here lets the jump sequence point toward the same target
- * direction the player sees on the maps, including seam-crossing shortcuts.
+ * chart angle here lets the jump sequence point toward the same target
+ * direction the player sees on the maps without seam-crossing shortcuts.
  */
 export function getWrappedChartHeading(origin: SystemData, target: SystemData): number {
   const { dx, dy } = getWrappedChartDelta(origin, target);
@@ -110,8 +99,6 @@ export function getVisibleSystems(systemName: string, galaxyIndex = 0, chartRadi
     return [];
   }
 
-  // Visibility uses wrapped deltas too, so systems near the opposite edge of
-  // the torus appear on the local map once they are close across the seam.
   return getGalaxyCatalog(galaxyIndex).filter((system) => {
     const { dx, dy } = getWrappedChartDelta(origin.data, system.data);
 

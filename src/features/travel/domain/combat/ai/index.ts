@@ -3,6 +3,7 @@ import { stepHostileSteering, stepHostileThrust } from './hostileAi';
 import { stepPoliceEnemy } from './policeAi';
 import { enforceSafeZone, getSafeZoneAvoidanceAngle, getSafeZoneContext, isStationTraffic } from './safeZonePolicy';
 import { isStationTrafficDocked, stepStationTraffic } from './stationTrafficAi';
+import { dampVelocity } from '../state';
 import { applyEnemyHostility, tryEnemyLaserAttack, tryEnemyMissileLaunch } from '../weapons/enemyWeapons';
 import type { CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
@@ -52,8 +53,8 @@ export function stepEnemy(state: TravelCombatState, enemy: CombatEnemy, dt: numb
     enemy.vy = (enemy.vy / speed) * enemy.topSpeed;
   }
 
-  enemy.vx *= 0.985;
-  enemy.vy *= 0.985;
+  enemy.vx = dampVelocity(enemy.vx, 0.985, dt);
+  enemy.vy = dampVelocity(enemy.vy, 0.985, dt);
   enemy.x += enemy.vx * dt;
   enemy.y += enemy.vy * dt;
 

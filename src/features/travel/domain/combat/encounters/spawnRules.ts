@@ -1,9 +1,8 @@
-import { getCargoBadness } from '../../../../../shared/domain/legal';
 import { getCombatBlueprint } from '../blueprints';
 import { getAvailablePackHunters, getBlueprintAvailability, getLoneBountySequence, getPackSequence } from './blueprintFiles';
 import { pushMessage } from '../state';
-import { getCargoPirateInterest } from '../scoring/salvage';
 import { spawnCop, spawnEnemyFromBlueprint } from '../spawn/spawnEnemy';
+import { getSystemRpgLevel } from '../spawn/rpgScaling';
 import type { BlueprintFileId, RandomSource, TravelCombatState } from '../types';
 
 const MAX_ACTIVE_ENEMIES = 12;
@@ -185,13 +184,14 @@ function spawnBlockadeWave(state: TravelCombatState, random: RandomSource) {
  * absurd "fresh spawn inside protection radius" behavior.
  */
 function deepSpaceCopShouldSpawn(state: TravelCombatState, random: RandomSource, cargo: Record<string, number>): boolean {
+  void cargo;
   if (state.encounter.safeZone) {
     return false;
   }
   if (state.missionContext.policeSuppressed) {
     return false;
   }
-  let badness = getCargoBadness(cargo) * 2;
+  let badness = Math.max(0, state.legalValue);
   if (state.missionContext.policeHostile) {
     badness = Math.max(badness, 40);
   }
@@ -240,13 +240,19 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
   }
   if (state.currentGovernment !== 0) {
     const gate = random.nextByte();
-    if (gate >= 120 || (gate & 7) < state.currentGovernment) {
+    // Non-anarchy governments should still produce pirates, but at a lower
+    // frequency than lawless space. The old gate suppressed too much traffic.
+    const suppressionThreshold = Math.min(180, 24 + state.currentGovernment * 14);
+    if (gate < suppressionThreshold) {
       return;
     }
   }
 
-  const pirateInterest = Math.min(255, Math.round(getCargoPirateInterest(cargo) * state.missionContext.pirateSpawnMultiplier));
-  if (pirateInterest > 0 && canSpawnEnemy(state, 'pirate') && random.nextByte() < pirateInterest) {
+  // Horizontal galaxy position drives the danger curve. Early systems now
+  // still spawn pirates often enough to make the encounter layer visible, and
+  // the right side ramps up aggressively.
+  const piratePressure = Math.min(255, Math.round(70 + state.currentSystemLevel * 18 * state.missionContext.pirateSpawnMultiplier));
+  if (piratePressure > 0 && canSpawnEnemy(state, 'pirate') && random.nextByte() < piratePressure) {
     if (random.nextByte() >= 96) {
       spawnPackPirates(state, random);
     } else {
@@ -271,9 +277,11 @@ export function tryRareEncounter(state: TravelCombatState, random: RandomSource,
  */
 export function setCombatSystemContext(
   state: TravelCombatState,
-  params: { government: number; techLevel: number; witchspace: boolean },
+  params: { government: number; techLevel: number; systemX: number; witchspace: boolean },
   random: RandomSource
 ) {
+  state.currentSystemX = params.systemX;
+  state.currentSystemLevel = getSystemRpgLevel(params.systemX);
   state.currentGovernment = params.government;
   state.currentTechLevel = params.techLevel;
   state.witchspace = params.witchspace;

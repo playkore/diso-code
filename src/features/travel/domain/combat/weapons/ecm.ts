@@ -1,4 +1,4 @@
-import { pushMessage, spawnParticles, spendPlayerEnergy } from '../state';
+import { pushMessage, spawnParticles } from '../state';
 import type { TravelCombatState } from '../types';
 
 const ECM_EFFECT_RADIUS = 360;
@@ -29,13 +29,6 @@ export function clearEnemyMissiles(state: TravelCombatState) {
 
 export function activatePlayerEcm(state: TravelCombatState) {
   if (!state.playerLoadout.installedEquipment.ecm) {
-    return false;
-  }
-  // The player HUD shows four energy banks, so ECM spends one full bank at
-  // activation time instead of silently draining extra energy afterward.
-  const activationCost = state.player.energyPerBank;
-  if (!spendPlayerEnergy(state, activationCost)) {
-    pushMessage(state, 'ENERGY LOW', 900);
     return false;
   }
   // The screen flash is intentionally much shorter than the gameplay effect so

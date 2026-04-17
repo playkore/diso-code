@@ -35,9 +35,9 @@ export type { TravelCompletionReport };
  * Full public store API exposed to the rest of the application.
  *
  * Data sections:
- * - `universe`: star-system position and economy context
- * - `commander`: player progression, cargo, equipment and money
- * - `market`: current docked market session
+ * - `universe`: star-system position and procedural system context
+ * - `commander`: player progression, equipment, money, and durable stats
+ * - `market`: docked station-services session data kept for compatibility
  * - `travelSession`: active route being flown, if any
  * - `ui`: lightweight UI preferences and recent messages
  * - `saveStates`: loaded save slots
@@ -45,7 +45,7 @@ export type { TravelCompletionReport };
  * Action sections:
  * - navigation / settings
  * - travel lifecycle
- * - trading
+ * - station services
  * - outfitting
  * - save/load/new game
  */
@@ -69,8 +69,6 @@ export interface GameStore {
   completeTravel: (report?: TravelCompletionReport) => void;
   dockAtSystem: (systemName: string) => void;
   buyFuel: (units: number) => void;
-  buyCommodity: (commodityKey: string, amount: number) => void;
-  sellCommodity: (commodityKey: string, amount: number) => void;
   buyEquipment: (equipmentId: EquipmentId) => void;
   buyLaser: (mount: LaserMountPosition, laserId: LaserId) => void;
   buyMissile: () => void;

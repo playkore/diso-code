@@ -1,7 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useState, type ReactNode } from 'react';
 import { TAB_ROUTE_MAP } from '../../appRoutes';
-import { totalCargoUsedTonnes } from '../../features/commander/domain/commander';
 import { useGameStore } from '../../store/useGameStore';
 import type { AppTab } from '../store/types';
 import { formatCredits } from '../utils/money';
@@ -39,13 +38,13 @@ function MenuIcon() {
 const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode }> = [
   {
     tab: 'market',
-    label: 'Market',
+    label: 'Dock',
     to: TAB_ROUTE_MAP.market,
     icon: (
       <NavIcon>
-        <path d="M5 9.5h14l-1.2 7.5H6.2z" />
-        <path d="M8 9.5V7.8a4 4 0 0 1 8 0v1.7" />
-        <path d="M9 13.5h6" />
+        <circle cx="12" cy="12" r="7.5" />
+        <path d="M12 6.5v11" />
+        <path d="M8.5 12h7" />
       </NavIcon>
     )
   },
@@ -128,7 +127,6 @@ export function AppShell() {
   const universe = useGameStore((state) => state.universe);
   const commander = useGameStore((state) => state.commander);
   const startScreenVisible = useGameStore((state) => state.ui.startScreenVisible);
-  const cargoUsed = totalCargoUsedTonnes(commander.cargo);
   const isTravelRoute = location.pathname === '/travel';
   const isMenuFlowRoute = location.pathname === '/load' || location.pathname === '/debug';
   const [hasEnteredStartMenu, setHasEnteredStartMenu] = useState(false);
@@ -163,14 +161,20 @@ export function AppShell() {
                 <dd>{formatCredits(commander.cash)}</dd>
               </div>
               <div>
-                <dt>Cargo</dt>
+                <dt>Level</dt>
                 <dd>
-                  {cargoUsed} / {commander.cargoCapacity} t
+                  {commander.level} · XP {commander.xp}
                 </dd>
               </div>
               <div>
                 <dt>System</dt>
                 <dd>{universe.currentSystem}</dd>
+              </div>
+              <div>
+                <dt>HP</dt>
+                <dd>
+                  {commander.hp} / {commander.maxHp}
+                </dd>
               </div>
             </dl>
           </div>

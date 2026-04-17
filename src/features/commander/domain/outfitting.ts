@@ -12,6 +12,7 @@ import {
   type LaserId,
   type LaserMountPosition
 } from './shipCatalog';
+import { xpToNextLevel } from './rpgProgression';
 
 export interface EquipmentOffer extends EquipmentDefinition {
   available: boolean;
@@ -56,25 +57,11 @@ export function canBuyEquipment(
   equipmentId: EquipmentId
 ): { ok: boolean; reason?: string } {
   const equipment = EQUIPMENT_CATALOG[equipmentId];
+  if (equipment.retired) {
+    return { ok: false, reason: 'This upgrade is no longer sold in the RPG build.' };
+  }
   if (techLevel < equipment.requiredTechLevel) {
     return { ok: false, reason: `Requires tech level ${equipment.requiredTechLevel}.` };
-  }
-  // Sequential upgrades stay explicit here so the equipment screen can explain
-  // why a later bank is visible but not yet orderable.
-  if (equipmentId === 'energy_box_2' && commander.energyBanks >= 2) {
-    return { ok: false, reason: 'Second energy box already installed.' };
-  }
-  if (equipmentId === 'energy_box_3' && !commander.installedEquipment.energy_box_2) {
-    return { ok: false, reason: 'Install the second energy box first.' };
-  }
-  if (equipmentId === 'energy_box_3' && commander.energyBanks >= 3) {
-    return { ok: false, reason: 'Third energy box already installed.' };
-  }
-  if (equipmentId === 'energy_box_4' && !commander.installedEquipment.energy_box_3) {
-    return { ok: false, reason: 'Install the third energy box first.' };
-  }
-  if (equipmentId === 'energy_box_4' && commander.energyBanks >= 4) {
-    return { ok: false, reason: 'Fourth energy box already installed.' };
   }
   if (commander.installedEquipment[equipmentId]) {
     return { ok: false, reason: 'Already installed.' };
@@ -103,7 +90,7 @@ export function isMissileAvailableAtTechLevel(techLevel: number): boolean {
 }
 
 export function getAvailableEquipmentForSystem(techLevel: number, commander: CommanderState): EquipmentOffer[] {
-  return EQUIPMENT_ORDER.filter((id) => techLevel >= EQUIPMENT_CATALOG[id].requiredTechLevel).map((id) => {
+  return EQUIPMENT_ORDER.filter((id) => techLevel >= EQUIPMENT_CATALOG[id].requiredTechLevel && !EQUIPMENT_CATALOG[id].retired).map((id) => {
     const equipment = EQUIPMENT_CATALOG[id];
     const result = canBuyEquipment(commander, techLevel, id);
     return {
@@ -136,9 +123,9 @@ export function getInstalledEquipmentList(commander: CommanderState): string[] {
 export function getShipSummaryLines(commander: CommanderState): string[] {
   return [
     PLAYER_SHIP.name,
-    `Cargo ${commander.cargoCapacity}/${commander.maxCargoCapacity} t`,
     `Fuel ${commander.fuel.toFixed(1)}/${commander.maxFuel.toFixed(1)} LY`,
-    `Energy ${commander.energyBanks}x${commander.energyPerBank}`,
+    `Level ${commander.level} · HP ${commander.hp}/${commander.maxHp}`,
+    `Attack ${commander.attack} · XP ${commander.xp}/${xpToNextLevel(commander.level)}`,
     `Missiles ${commander.missilesInstalled}/${commander.missileCapacity}`
   ];
 }

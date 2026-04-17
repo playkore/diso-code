@@ -62,12 +62,10 @@ describe('outfitting store flows', () => {
       commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Zaonce', cash: 120000 }),
       universe: { ...state.universe, currentSystem: 'Zaonce' }
     }));
-    useGameStore.getState().buyEquipment('shield_generator');
-    expect(useGameStore.getState().commander.installedEquipment.shield_generator).toBe(true);
-    useGameStore.getState().buyEquipment('energy_box_2');
-    expect(useGameStore.getState().commander.energyBanks).toBe(2);
-    useGameStore.getState().buyEquipment('large_cargo_bay');
-    expect(useGameStore.getState().commander.cargoCapacity).toBe(35);
+    useGameStore.getState().buyEquipment('ecm');
+    expect(useGameStore.getState().commander.installedEquipment.ecm).toBe(true);
+    useGameStore.getState().buyEquipment('fuel_scoops');
+    expect(useGameStore.getState().commander.installedEquipment.fuel_scoops).toBe(true);
     useGameStore.getState().buyLaser('rear', 'beam_laser');
     expect(useGameStore.getState().commander.laserMounts.rear).toBe('beam_laser');
     useGameStore.getState().buyMissile();
@@ -92,14 +90,10 @@ describe('outfitting store flows', () => {
     expect(window.localStorage.getItem(SAVE_SLOT_STORAGE_KEY)).not.toBeNull();
   });
 
-  it('autosaves commodity trades into the active slot', () => {
-    useGameStore.getState().startNewGame(1);
-    const beforeCash = useGameStore.getState().saveStates[1]?.snapshot.commander.cash ?? 0;
-
-    useGameStore.getState().buyCommodity('food', 1);
-
-    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.cargo.food).toBe(1);
-    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.cash).toBeLessThan(beforeCash);
+  it('removes commodity trading actions from the store surface', () => {
+    const storeState = useGameStore.getState() as unknown as Record<string, unknown>;
+    expect(storeState.buyCommodity).toBeUndefined();
+    expect(storeState.sellCommodity).toBeUndefined();
   });
 
   it('autosaves outfitting purchases into the active slot', () => {
@@ -114,9 +108,9 @@ describe('outfitting store flows', () => {
       universe: { ...state.universe, currentSystem: 'Zaonce' }
     }));
 
-    useGameStore.getState().buyEquipment('shield_generator');
+    useGameStore.getState().buyEquipment('ecm');
 
-    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.installedEquipment.shield_generator).toBe(true);
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.installedEquipment.ecm).toBe(true);
     expect(useGameStore.getState().saveStates[1]?.snapshot.commander.currentSystem).toBe('Zaonce');
   });
 
@@ -147,18 +141,21 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.laserMounts.rear).toBeNull();
   });
 
-  it('rejects higher energy-box tiers until the previous box is installed', () => {
+  it('rejects retired shield, energy, and cargo upgrades', () => {
     useGameStore.setState((state) => ({
       ...state,
       commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Zaonce', cash: 120000 }),
       universe: { ...state.universe, currentSystem: 'Zaonce' }
     }));
 
+    useGameStore.getState().buyEquipment('shield_generator');
     useGameStore.getState().buyEquipment('energy_box_3');
-    expect(useGameStore.getState().commander.energyBanks).toBe(1);
-    useGameStore.getState().buyEquipment('energy_box_2');
-    useGameStore.getState().buyEquipment('energy_box_3');
-    expect(useGameStore.getState().commander.energyBanks).toBe(3);
+    useGameStore.getState().buyEquipment('large_cargo_bay');
+
+    expect(useGameStore.getState().commander.installedEquipment.shield_generator).toBe(false);
+    expect(useGameStore.getState().commander.installedEquipment.energy_box_3).toBe(false);
+    expect(useGameStore.getState().commander.installedEquipment.large_cargo_bay).toBe(false);
+    expect(useGameStore.getState().commander.cargoCapacity).toBe(createDefaultCommander().cargoCapacity);
   });
 
   it('lets the player redock at the origin without spending fuel', () => {
@@ -228,7 +225,7 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.legalValue).toBe(20);
   });
 
-  it('keeps contraband as a minimum legal floor after a successful jump', () => {
+  it('ignores retired contraband cargo when settling post-jump legal value', () => {
     useGameStore.setState((state) => ({
       ...state,
       commander: normalizeCommanderState({
@@ -242,7 +239,7 @@ describe('outfitting store flows', () => {
 
     expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
     useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
-    expect(useGameStore.getState().commander.legalValue).toBe(5);
+    expect(useGameStore.getState().commander.legalValue).toBe(1);
   });
 
   it('applies the same legal decay rule in instant-travel mode', () => {

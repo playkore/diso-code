@@ -1,4 +1,5 @@
 import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, type ShipType } from './shipCatalog';
+import { awardRpgXp, normalizeRpgProgression, xpToNextLevel } from './rpgProgression';
 
 /**
  * Canonical commander-state model and normalization rules.
@@ -9,8 +10,9 @@ import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, t
  * - default values for missing fields
  * - migration from legacy `legalStatus` and `equipment` shapes
  * - canonical DOS Elite Plus derivation of rating from a dedicated rank score
+ * - RPG-derived HP / XP / attack defaults copied from the prototype engine
  * - preservation of the stored legal byte across docked saves
- * - equipment-derived capacity defaults such as the cargo bay upgrade
+ * - compatibility with retired cargo / shield-era save fields
  */
 export type LegalStatus = 'clean' | 'offender' | 'fugitive';
 export type CombatRating =
@@ -43,8 +45,11 @@ export interface CommanderState {
   cargoCapacity: number;
   maxCargoCapacity: number;
   cargo: Record<string, number>;
-  energyBanks: number;
-  energyPerBank: number;
+  level: number;
+  xp: number;
+  hp: number;
+  maxHp: number;
+  attack: number;
   missileCapacity: number;
   missilesInstalled: number;
   laserMounts: LaserMountState;
@@ -54,8 +59,6 @@ export interface CommanderState {
   rating: CombatRating;
   currentSystem: string;
 }
-
-export const PLAYER_STARTING_ENERGY_BANKS = 1;
 
 function createInstalledEquipmentState(installed: EquipmentId[] = []): InstalledEquipmentState {
   return {
@@ -84,6 +87,7 @@ function createDefaultLaserMounts(front: LaserId | null = PLAYER_SHIP.defaultLas
 }
 
 export function createDefaultCommander(): CommanderState {
+  const progression = normalizeRpgProgression();
   return {
     name: 'Cmdr. Nova',
     cash: 1000,
@@ -95,10 +99,11 @@ export function createDefaultCommander(): CommanderState {
     cargoCapacity: PLAYER_SHIP.baseCargoCapacity,
     maxCargoCapacity: PLAYER_SHIP.maxCargoCapacity,
     cargo: {},
-    // New commanders begin with a stripped-down Cobra so the current
-    // outfitting loop still has early upgrades to sell.
-    energyBanks: PLAYER_STARTING_ENERGY_BANKS,
-    energyPerBank: PLAYER_SHIP.energyPerBank,
+    level: progression.level,
+    xp: progression.xp,
+    hp: progression.hp,
+    maxHp: progression.maxHp,
+    attack: progression.attack,
     missileCapacity: PLAYER_SHIP.missileCapacity,
     missilesInstalled: 0,
     laserMounts: createDefaultLaserMounts(),
@@ -220,20 +225,19 @@ export function getMinimumLegalValue(cargo: Record<string, number>): number {
 }
 
 /**
- * DOS Elite gradually "forgets" crimes after each successful hyperspace jump,
- * but active contraband still imposes a minimum legal pressure on arrival.
+ * Hyperspace travel still decays legal heat between systems, but cargo-driven
+ * contraband pressure has been retired with the trading layer.
  *
- * This helper keeps both pieces of logic together so every arrival path
- * applies the same rule, whether the player used the full travel screen or an
- * instant-travel shortcut.
+ * Keeping the decay in one helper still matters because both manual travel and
+ * instant-travel routes must settle the same post-jump legal state.
  */
 export function getLegalValueAfterHyperspaceJump(
   currentLegalValue: number,
   cargo: Record<string, number>
 ): number {
   const decayedLegalValue = Math.trunc(clampLegalValue(currentLegalValue) / 2);
-  const cargoFloor = getMinimumLegalValue(cargo);
-  return clampLegalValue(Math.max(decayedLegalValue, cargoFloor));
+  void cargo;
+  return clampLegalValue(decayedLegalValue);
 }
 
 function legacyLegalValue(status?: string): number {
@@ -246,30 +250,6 @@ function legacyLegalValue(status?: string): number {
   }
 
   return 0;
-}
-
-function deriveEnergyBanks(installedEquipment: InstalledEquipmentState, explicitEnergyBanks?: number): number {
-  if (typeof explicitEnergyBanks === 'number') {
-    return Math.max(PLAYER_STARTING_ENERGY_BANKS, Math.min(PLAYER_SHIP.energyBanks, Math.trunc(explicitEnergyBanks)));
-  }
-
-  // Energy boxes are purchased in sequence, so the first missing upgrade caps
-  // the effective bank count even if a malformed save has later flags set.
-  let banks = PLAYER_STARTING_ENERGY_BANKS;
-  if (installedEquipment.energy_box_2) {
-    banks = 2;
-  } else {
-    return banks;
-  }
-  if (installedEquipment.energy_box_3) {
-    banks = 3;
-  } else {
-    return banks;
-  }
-  if (installedEquipment.energy_box_4) {
-    banks = 4;
-  }
-  return banks;
 }
 
 // Older save formats stored equipment as ad-hoc camelCase strings. They are
@@ -318,6 +298,13 @@ export function normalizeCommanderState(
     ...createInstalledEquipmentState(mapLegacyEquipment(legacyEquipment)),
     ...commander.installedEquipment
   };
+  const progression = normalizeRpgProgression({
+    level: commander.level,
+    xp: commander.xp,
+    hp: commander.hp,
+    maxHp: commander.maxHp,
+    attack: commander.attack
+  });
   // Cargo capacity defaults from installed equipment unless a caller already
   // provided an explicit capacity, which lets restored saves keep custom values.
   const cargoCapacity =
@@ -335,9 +322,14 @@ export function normalizeCommanderState(
     baseCargoCapacity: commander.baseCargoCapacity ?? PLAYER_SHIP.baseCargoCapacity,
     cargoCapacity,
     maxCargoCapacity: commander.maxCargoCapacity ?? PLAYER_SHIP.maxCargoCapacity,
-    cargo: commander.cargo ?? {},
-    energyBanks: deriveEnergyBanks(installedEquipment, commander.energyBanks),
-    energyPerBank: commander.energyPerBank ?? PLAYER_SHIP.energyPerBank,
+    // Trading is retired, so cargo is normalized to an empty hold even when an
+    // old save still carries commodities from the previous economy loop.
+    cargo: {},
+    level: progression.level,
+    xp: progression.xp,
+    hp: progression.hp,
+    maxHp: progression.maxHp,
+    attack: progression.attack,
     missileCapacity: commander.missileCapacity ?? PLAYER_SHIP.missileCapacity,
     missilesInstalled: commander.missilesInstalled ?? 0,
     laserMounts: {
@@ -366,4 +358,40 @@ export function patchCommanderState(
     ...commander,
     ...patch
   });
+}
+
+/**
+ * Applies an XP reward directly to commander progression and returns both the
+ * updated commander and the number of promotions triggered by that reward.
+ */
+export function awardCommanderXp(commander: CommanderState, amount: number) {
+  const { progression, grantedXp, levelUps } = awardRpgXp(
+    {
+      level: commander.level,
+      xp: commander.xp,
+      hp: commander.hp,
+      maxHp: commander.maxHp,
+      attack: commander.attack
+    },
+    amount
+  );
+  return {
+    commander: patchCommanderState(commander, progression),
+    grantedXp,
+    levelUps
+  };
+}
+
+/**
+ * The docked status UI only needs one scalar progress ratio and the remaining
+ * XP distance, so this helper mirrors the combat-rank API above.
+ */
+export function getCommanderXpProgress(commander: Pick<CommanderState, 'level' | 'xp'>) {
+  const threshold = xpToNextLevel(commander.level);
+  return {
+    current: commander.xp,
+    threshold,
+    progressRatio: threshold > 0 ? Math.max(0, Math.min(1, commander.xp / threshold)) : 1,
+    remainingXp: Math.max(0, threshold - commander.xp)
+  };
 }

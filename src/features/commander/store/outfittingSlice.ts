@@ -22,7 +22,6 @@ export const createOutfittingSlice: GameSlice<Pick<GameStore, 'buyEquipment' | '
       // capacity, so the result is always re-normalized before storing it.
       const nextCommander = patchCommanderState(state.commander, {
         cash: state.commander.cash - equipment.price,
-        energyBanks: equipment.setsEnergyBanksTo ?? state.commander.energyBanks,
         cargoCapacity: equipment.expandsCargoBayTo ?? state.commander.cargoCapacity,
         installedEquipment: {
           ...state.commander.installedEquipment,

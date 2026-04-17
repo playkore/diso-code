@@ -14,6 +14,7 @@ export interface TravelCompletionReport {
   cargo?: Record<string, number>;
   fuelDelta?: number;
   rewardDelta?: number;
+  playerProgress?: Pick<CommanderState, 'level' | 'xp' | 'hp' | 'maxHp' | 'attack'>;
   choicePrompts?: string[];
   installedEquipment?: CommanderState['installedEquipment'];
   missilesInstalled?: number;
@@ -36,6 +37,16 @@ export function resolveTravelOutcome(
     report?.outcome === 'rescued'
       ? Math.min(commander.cash, Math.max(250, Math.trunc(commander.cash * 0.1)))
       : 0;
+  const repairedProgress = report?.playerProgress
+    ? {
+        ...report.playerProgress,
+        // Docked repairs fully restore hull integrity once the commander makes
+        // it back to a station, whether that was a normal docking or a rescue.
+        hp: report.playerProgress.maxHp
+      }
+    : {
+        hp: commander.maxHp
+      };
 
   return normalizeCommanderState({
     ...commander,
@@ -47,6 +58,7 @@ export function resolveTravelOutcome(
     combatRatingScore: commander.combatRatingScore + (report?.tallyDelta ?? 0),
     cargo: mergedCargo,
     fuel: commander.fuel + (report?.fuelDelta ?? 0),
+    ...repairedProgress,
     installedEquipment: report?.installedEquipment ?? commander.installedEquipment,
     missilesInstalled: report?.missilesInstalled ?? commander.missilesInstalled
   });

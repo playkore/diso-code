@@ -2,6 +2,7 @@ import { getCombatBlueprint } from '../blueprints';
 import { projectileId, pushMessage } from '../state';
 import { isEnemyExcludedFromSafeZone } from '../ai/safeZonePolicy';
 import { keepEnemyOutsideSafeZone } from '../station/safeZone';
+import { getEnemyRpgProfile } from './rpgScaling';
 import type { BlueprintId, CombatEnemy, RandomSource, TravelCombatState } from '../types';
 
 export function spawnEnemyFromBlueprint(
@@ -11,6 +12,7 @@ export function spawnEnemyFromBlueprint(
   overrides: Partial<CombatEnemy> = {}
 ): CombatEnemy {
   const blueprint = getCombatBlueprint(blueprintId);
+  const rpgProfile = getEnemyRpgProfile(blueprintId, state.currentSystemX);
   const spawnDistance = overrides.kind === 'thargon' ? 100 : 820;
   const angle = random.nextFloat() * Math.PI * 2;
   const enemy: CombatEnemy = {
@@ -24,8 +26,12 @@ export function spawnEnemyFromBlueprint(
     vx: overrides.vx ?? 0,
     vy: overrides.vy ?? 0,
     angle: overrides.angle ?? Math.atan2(Math.sin(angle + Math.PI), Math.cos(angle + Math.PI)),
-    energy: overrides.energy ?? blueprint.maxEnergy,
-    maxEnergy: blueprint.maxEnergy,
+    level: overrides.level ?? rpgProfile.level,
+    hp: overrides.hp ?? rpgProfile.maxHp,
+    maxHp: overrides.maxHp ?? rpgProfile.maxHp,
+    attack: overrides.attack ?? rpgProfile.attack,
+    xpReward: overrides.xpReward ?? rpgProfile.xpReward,
+    creditReward: overrides.creditReward ?? rpgProfile.creditReward,
     laserPower: blueprint.laserPower,
     missiles: overrides.missiles ?? blueprint.missiles,
     targetableArea: blueprint.targetableArea,

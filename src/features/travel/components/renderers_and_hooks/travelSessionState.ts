@@ -4,10 +4,14 @@ import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
 import { CGA_GREEN, CGA_RED } from './renderers/constants';
 
 export interface TravelSessionHudState {
-  energyBanks: number[];
-  energyColor: string;
-  shieldRatio: number;
-  shieldColor: string;
+  level: number;
+  hpRatio: number;
+  hpColor: string;
+  hpLabel: string;
+  xpRatio: number;
+  xpColor: string;
+  xpLabel: string;
+  attackLabel: string;
   laserHeat: { mount: LaserMountPosition; installed: boolean; ratio: number; color: string }[];
   jump: string;
   jumpColor: string;
@@ -36,8 +40,11 @@ export interface CombatCommanderSnapshot {
   cargo: CommanderState['cargo'];
   legalValue: CommanderState['legalValue'];
   galaxyIndex: number;
-  energyBanks: CommanderState['energyBanks'];
-  energyPerBank: CommanderState['energyPerBank'];
+  level: CommanderState['level'];
+  xp: CommanderState['xp'];
+  hp: CommanderState['hp'];
+  maxHp: CommanderState['maxHp'];
+  attack: CommanderState['attack'];
   laserMounts: CommanderState['laserMounts'];
   installedEquipment: CommanderState['installedEquipment'];
   missilesInstalled: CommanderState['missilesInstalled'];
@@ -70,10 +77,14 @@ export interface DockingAnimationState {
 }
 
 export const INITIAL_HUD: TravelSessionHudState = {
-  energyBanks: [1, 1, 1, 1],
-  energyColor: CGA_GREEN,
-  shieldRatio: 1,
-  shieldColor: CGA_GREEN,
+  level: 1,
+  hpRatio: 1,
+  hpColor: CGA_GREEN,
+  hpLabel: '60 / 60',
+  xpRatio: 0,
+  xpColor: CGA_GREEN,
+  xpLabel: '0 / 48',
+  attackLabel: '9',
   laserHeat: [
     { mount: 'front', installed: true, ratio: 0, color: CGA_GREEN },
     { mount: 'rear', installed: false, ratio: 0, color: CGA_GREEN },
@@ -95,9 +106,14 @@ export const INITIAL_HUD: TravelSessionHudState = {
 
 export function areTravelSessionHudStatesEqual(previous: TravelSessionHudState, next: TravelSessionHudState) {
   return (
-    previous.energyColor === next.energyColor &&
-    previous.shieldRatio === next.shieldRatio &&
-    previous.shieldColor === next.shieldColor &&
+    previous.level === next.level &&
+    previous.hpRatio === next.hpRatio &&
+    previous.hpColor === next.hpColor &&
+    previous.hpLabel === next.hpLabel &&
+    previous.xpRatio === next.xpRatio &&
+    previous.xpColor === next.xpColor &&
+    previous.xpLabel === next.xpLabel &&
+    previous.attackLabel === next.attackLabel &&
     previous.laserHeat.length === next.laserHeat.length &&
     previous.laserHeat.every(
       (entry, index) =>
@@ -106,8 +122,6 @@ export function areTravelSessionHudStatesEqual(previous: TravelSessionHudState, 
         entry.ratio === next.laserHeat[index].ratio &&
         entry.color === next.laserHeat[index].color
     ) &&
-    previous.energyBanks.length === next.energyBanks.length &&
-    previous.energyBanks.every((ratio, index) => ratio === next.energyBanks[index]) &&
     previous.jump === next.jump &&
     previous.jumpColor === next.jumpColor &&
     previous.hyperspace === next.hyperspace &&

@@ -12,9 +12,9 @@ describe('travel combat hostile AI', () => {
       blueprintId: 'asp-mk2',
       label: 'Asp Mk II',
       x: 100,
-      energy: 100,
-      maxEnergy: 150,
-      laserPower: 5,
+      hp: 100,
+      maxHp: 150,
+      attack: 13,
       missiles: 1,
       targetableArea: 280,
       laserRange: 380,
@@ -32,7 +32,7 @@ describe('travel combat hostile AI', () => {
     state.enemies.push(createTestEnemy({
       id: 100,
       x: 120,
-      energy: 50,
+      hp: 50,
       roles: { pirate: true, hostile: true },
       fireCooldown: 0,
       isFiringLaser: false
@@ -52,9 +52,7 @@ describe('travel combat hostile AI', () => {
     state.station = { x: 0, y: 0, radius: 80, angle: 0, rotSpeed: 0, safeZoneRadius: 360 };
     state.player.x = 0;
     state.player.y = 0;
-    state.player.shield = 70;
-    state.player.energyRechargePerTick = 0;
-    state.player.shieldRechargePerTick = 0;
+    state.player.hp = 70;
     state.enemies.push(createTestEnemy({
       id: 8,
       x: 355,
@@ -69,7 +67,7 @@ describe('travel combat hostile AI', () => {
     // Pirates should now stay outside two full safe-zone radii instead of only
     // bouncing off the single-ring station perimeter.
     expect(Math.hypot(state.enemies[0].x - state.station.x, state.enemies[0].y - state.station.y)).toBeGreaterThan(737.5);
-    expect(state.player.shield).toBe(70);
+    expect(state.player.hp).toBe(70);
     expect(state.enemies[0].isFiringLaser).toBe(false);
   });
 
@@ -85,8 +83,9 @@ describe('travel combat hostile AI', () => {
       label: 'Asp Mk II',
       x: 350,
       vx: -3,
-      maxEnergy: 150,
-      laserPower: 5,
+      hp: 150,
+      maxHp: 150,
+      attack: 13,
       missiles: 1,
       targetableArea: 280,
       laserRange: 380,
@@ -111,7 +110,7 @@ describe('travel combat hostile AI', () => {
     state.enemies.push(createTestEnemy({
       id: 10,
       x: 140,
-      energy: 37,
+      hp: 37,
       roles: { hostile: true, pirate: true },
       fireCooldown: 999,
       isFiringLaser: false
@@ -119,7 +118,7 @@ describe('travel combat hostile AI', () => {
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 10, 'PLAYING', {}, rng);
 
-    expect(state.enemies[0].energy).toBe(37);
+    expect(state.enemies[0].hp).toBe(37);
   });
 
   it('breaks hostile ships to the side after a frontal attack run', () => {

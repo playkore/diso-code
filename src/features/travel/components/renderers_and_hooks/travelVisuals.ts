@@ -1,7 +1,7 @@
 import type { CombatEnemy, CombatProjectile, CombatShipRoles, TravelCombatState } from '../../domain/travelCombat';
 import type { SeedTriplet } from '../../../galaxy/domain/universe';
 import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
-import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
+import { getCgaBarFillColor } from './renderers/bars';
 
 /**
  * Shared visual-state helpers for the travel screens.
@@ -126,21 +126,18 @@ export function getProjectileColor(projectile: CombatProjectile) {
 }
 
 export interface EnemyHealthBarState {
-  bankRatios: number[];
+  ratio: number;
   fillColor: string;
 }
 
 export function getEnemyHealthBarState(enemy: CombatEnemy): EnemyHealthBarState | null {
-  if (enemy.energy >= enemy.maxEnergy) {
+  if (enemy.hp >= enemy.maxHp) {
     return null;
   }
 
-  const ratio = Math.max(0, Math.min(1, enemy.maxEnergy > 0 ? enemy.energy / enemy.maxEnergy : 0));
-  // Enemy overlays use the exact same bank decomposition as the player HUD so
-  // the fight reads as one shared energy language across the whole screen.
-  const bankRatios = getSegmentedBankRatios(enemy.energy, enemy.maxEnergy, 4);
+  const ratio = Math.max(0, Math.min(1, enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0));
   return {
-    bankRatios,
+    ratio,
     fillColor: getCgaBarFillColor(ratio)
   };
 }

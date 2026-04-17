@@ -43,19 +43,27 @@ describe('travel combat encounters', () => {
     expect(state.enemies.length).toBeGreaterThan(0);
   });
 
-  it('spawns cops more readily when cargo badness is present', () => {
+  it('spawns cops more readily when legal heat is present', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0]);
     const state = createCombatState([0, 0, 0, 0, 0, 0], { government: 7, techLevel: 12 });
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', { narcotics: 10 }, rng);
+    state.legalValue = 80;
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(true);
   });
 
-  it('spawns pirate pressure from valuable legal cargo without cops', () => {
+  it('spawns pirate pressure from higher-level systems without cargo bait', () => {
     const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
-    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { government: 0, techLevel: 12 });
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', { luxuries: 12, computers: 8 }, rng);
+    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { government: 0, techLevel: 12, systemX: 255 });
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', {}, rng);
     expect(state.enemies.some((enemy) => enemy.roles.pirate || enemy.roles.hostile)).toBe(true);
     expect(state.enemies.some((enemy) => enemy.roles.cop)).toBe(false);
+  });
+
+  it('still spawns pirates in early systems often enough to feel active', () => {
+    const rng = createDeterministicRandomSource([0, 0, 0, 0, 0, 0, 0, 0]);
+    const state = createCombatState([0, 0, 0, 0, 0, 0, 0, 0], { government: 0, techLevel: 7, systemX: 20 });
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 256, 'PLAYING', {}, rng);
+    expect(state.enemies.some((enemy) => enemy.roles.pirate || enemy.roles.hostile)).toBe(true);
   });
 
   it('caps pirate encounters so repeated rare ticks do not accumulate endless packs', () => {
@@ -73,28 +81,25 @@ describe('travel combat encounters', () => {
 
   it('despawns ambient pirates once they drift far from the player', () => {
     const state = createCombatState([0, 0, 0, 0]);
-    const blueprint = getCombatBlueprint('sidewinder');
     state.enemies.push({
+      ...getCombatBlueprint('sidewinder'),
       id: 1,
       kind: 'ship',
-      blueprintId: blueprint.id,
-      label: blueprint.label,
-      behavior: blueprint.behavior,
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      behavior: 'hostile',
       x: 2_000,
       y: 0,
       vx: 0,
       vy: 0,
       angle: 0,
-      energy: blueprint.maxEnergy,
-      maxEnergy: blueprint.maxEnergy,
-      laserPower: blueprint.laserPower,
-      missiles: blueprint.missiles,
-      targetableArea: blueprint.targetableArea,
-      laserRange: blueprint.laserRange,
-      topSpeed: blueprint.topSpeed,
-      acceleration: blueprint.acceleration,
-      turnRate: blueprint.turnRate,
-      roles: { ...blueprint.roles },
+      level: 1,
+      hp: 70,
+      maxHp: 70,
+      attack: 7,
+      xpReward: 10,
+      creditReward: 50,
+      roles: { hostile: true },
       aggression: 42,
       baseAggression: 42,
       fireCooldown: 0,
@@ -109,28 +114,25 @@ describe('travel combat encounters', () => {
 
   it('keeps nearby ambient pirates alive even after a long time in the encounter', () => {
     const state = createCombatState([0, 0, 0, 0]);
-    const blueprint = getCombatBlueprint('sidewinder');
     state.enemies.push({
+      ...getCombatBlueprint('sidewinder'),
       id: 1,
       kind: 'ship',
-      blueprintId: blueprint.id,
-      label: blueprint.label,
-      behavior: blueprint.behavior,
+      blueprintId: 'sidewinder',
+      label: 'Sidewinder',
+      behavior: 'hostile',
       x: 150,
       y: 0,
       vx: 0,
       vy: 0,
       angle: 0,
-      energy: blueprint.maxEnergy,
-      maxEnergy: blueprint.maxEnergy,
-      laserPower: blueprint.laserPower,
-      missiles: blueprint.missiles,
-      targetableArea: blueprint.targetableArea,
-      laserRange: blueprint.laserRange,
-      topSpeed: blueprint.topSpeed,
-      acceleration: blueprint.acceleration,
-      turnRate: blueprint.turnRate,
-      roles: { ...blueprint.roles },
+      level: 1,
+      hp: 70,
+      maxHp: 70,
+      attack: 7,
+      xpReward: 10,
+      creditReward: 50,
+      roles: { hostile: true },
       aggression: 42,
       baseAggression: 42,
       fireCooldown: 0,

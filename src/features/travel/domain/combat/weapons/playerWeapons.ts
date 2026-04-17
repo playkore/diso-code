@@ -1,4 +1,4 @@
-import { clampAngle, clampLaserHeat, getLaserEnergyCost, getLaserHeatPerShot, getLaserProjectileProfile, projectileId, pushMessage, spendPlayerEnergy } from '../state';
+import { clampAngle, clampLaserHeat, getLaserHeatPerShot, getLaserProjectileProfile, projectileId, pushMessage } from '../state';
 import type { CombatEnemy, PlayerTargetLock, TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../../../commander/domain/shipCatalog';
 import { PLAYER_TARGET_LOCK_RANGE } from '../navigation';
@@ -212,7 +212,10 @@ function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, l
     y: originY,
     vx: directionX * profile.speed + state.player.vx,
     vy: directionY * profile.speed + state.player.vy,
-    damage: profile.damage,
+    // Weapon tiers now add onto the commander's RPG attack stat instead of
+    // drawing from a separate ship-energy pool, so progression affects every
+    // mounted laser without removing the reason to upgrade the hardware.
+    damage: profile.damage + state.player.attack,
     life: profile.life,
     sourceMount: mount,
     targetEnemyId: enemy?.id
@@ -246,11 +249,6 @@ export function firePlayerLasers(state: TravelCombatState) {
   if (state.player.laserHeat[resolvedTarget.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
     state.player.laserHeat[resolvedTarget.mount] = state.player.maxLaserHeat;
     pushMessage(state, 'LASER OVERHEAT', 900);
-    return false;
-  }
-
-  if (!spendPlayerEnergy(state, getLaserEnergyCost(laserId))) {
-    pushMessage(state, 'ENERGY LOW', 900);
     return false;
   }
 

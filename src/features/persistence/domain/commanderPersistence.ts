@@ -11,7 +11,8 @@ import type { LaserId } from '../../commander/domain/shipCatalog';
  * Both formats normalize commander state before encoding so legacy inputs are
  * upgraded once at the boundary, then protected with checksums on readback.
  */
-export const COMMANDER_SCHEMA_VERSION = 2;
+export const COMMANDER_SCHEMA_VERSION = 3;
+const SUPPORTED_COMMANDER_SCHEMA_VERSIONS = new Set([2, 3]);
 
 export interface CommanderSaveFile {
   version: number;
@@ -37,13 +38,12 @@ type CompactCommanderPayload = [
   number,
   number,
   number,
-  Record<string, number>,
+  number,
   number,
   number,
   number,
   number,
   [LaserId | null, LaserId | null, LaserId | null, LaserId | null],
-  number,
   number,
   number,
   string
@@ -95,21 +95,20 @@ function toCompactPayload(commander: CommanderState): CompactCommanderPayload {
     commander.fuel,
     commander.maxFuel,
     commander.legalValue,
-    commander.baseCargoCapacity,
-    commander.cargoCapacity,
-    commander.maxCargoCapacity,
-    commander.cargo,
-    commander.energyBanks,
-    commander.energyPerBank,
+    commander.level,
+    commander.xp,
+    commander.hp,
+    commander.maxHp,
+    commander.attack,
     commander.missileCapacity,
     commander.missilesInstalled,
+    encodeInstalledEquipmentBits(commander),
     [
       commander.laserMounts.front,
       commander.laserMounts.rear,
       commander.laserMounts.left,
       commander.laserMounts.right
     ],
-    encodeInstalledEquipmentBits(commander),
     commander.tally,
     commander.combatRatingScore,
     commander.currentSystem
@@ -123,24 +122,23 @@ function fromCompactPayload(payload: CompactCommanderPayload): CommanderState {
     fuel: payload[2],
     maxFuel: payload[3],
     legalValue: payload[4],
-    baseCargoCapacity: payload[5],
-    cargoCapacity: payload[6],
-    maxCargoCapacity: payload[7],
-    cargo: payload[8],
-    energyBanks: payload[9],
-    energyPerBank: payload[10],
-    missileCapacity: payload[11],
-    missilesInstalled: payload[12],
+    level: payload[5],
+    xp: payload[6],
+    hp: payload[7],
+    maxHp: payload[8],
+    attack: payload[9],
+    missileCapacity: payload[10],
+    missilesInstalled: payload[11],
+    installedEquipment: decodeInstalledEquipmentBits(payload[12]),
     laserMounts: {
       front: payload[13][0],
       rear: payload[13][1],
       left: payload[13][2],
       right: payload[13][3]
     },
-    installedEquipment: decodeInstalledEquipmentBits(payload[14]),
-    tally: payload[15],
-    combatRatingScore: payload[16],
-    currentSystem: payload[17]
+    tally: payload[14],
+    combatRatingScore: payload[15],
+    currentSystem: payload[16]
   });
 }
 
@@ -161,12 +159,12 @@ export function serializeCommanderJson(commander: CommanderState): string {
 export function loadCommanderJson(jsonText: string): CommanderState {
   const parsed = JSON.parse(jsonText) as CommanderSaveFile;
 
-  if (parsed.version !== COMMANDER_SCHEMA_VERSION) {
+  if (!SUPPORTED_COMMANDER_SCHEMA_VERSIONS.has(parsed.version)) {
     throw new Error(`Unsupported commander save version: ${parsed.version}`);
   }
 
   const commander = normalizeCommanderState(parsed.commander);
-  const expectedChecksum = buildCommanderSave(commander).checksum;
+  const expectedChecksum = fnv1a32(`${parsed.version}:${JSON.stringify(commander)}`);
   if (expectedChecksum !== parsed.checksum) {
     throw new Error('Commander save checksum mismatch');
   }

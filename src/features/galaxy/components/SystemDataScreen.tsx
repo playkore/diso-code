@@ -1,6 +1,7 @@
 import { getSystemByName } from '../domain/galaxyCatalog';
 import { getSystemFacts } from '../../../shared/domain/systemPresentation';
 import { useGameStore } from '../../../store/useGameStore';
+import { getSystemRpgLevel } from '../../travel/domain/combat/spawn/rpgScaling';
 
 export function SystemDataScreen() {
   const universe = useGameStore((state) => state.universe);
@@ -39,6 +40,8 @@ export function SystemDataScreen() {
         <dd>{facts.government}</dd>
         <dt>Tech Level</dt>
         <dd>{facts.techLevel}</dd>
+        <dt>Enemy Level</dt>
+        <dd>{getSystemRpgLevel(system.x)}+</dd>
         <dt>Population</dt>
         <dd>{facts.population}</dd>
         <dt>Productivity</dt>

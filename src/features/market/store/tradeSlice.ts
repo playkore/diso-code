@@ -1,13 +1,10 @@
-import { totalCargoUsedTonnes } from '../../commander/domain/commander';
 import { clampFuel, fuelUnitsToLightYears, getFuelUnits, getRefuelCost, MAX_FUEL } from '../../../shared/domain/fuel';
-import { applyLocalMarketTrade } from '../domain/market';
 import { formatCredits } from '../../../shared/utils/money';
 import { formatLightYears } from '../../../shared/utils/distance';
-import { refreshItems } from '../../../shared/store/gameStateFactory';
 import { setUiMessage } from '../../../shared/store/uiMessages';
 import type { GameSlice, GameStore } from '../../../shared/store/storeTypes';
 
-export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodity' | 'sellCommodity'>> = (set, get) => ({
+export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel'>> = (set, get) => ({
   buyFuel: (units) => {
     let committed = false;
     set((state) => {
@@ -38,91 +35,6 @@ export const createTradeSlice: GameSlice<Pick<GameStore, 'buyFuel' | 'buyCommodi
           fuel: nextFuel
         },
         ui: setUiMessage(state.ui, 'success', 'Fuel purchased', `Added ${formatLightYears(fuelUnitsToLightYears(purchasedUnits))}. Fuel now ${formatLightYears(nextFuel)}. Balance ${formatCredits(nextCash)}.`)
-      };
-    });
-    if (committed) {
-      get().autosaveDockedState();
-    }
-  },
-  buyCommodity: (commodityKey, amount) => {
-    let committed = false;
-    set((state) => {
-      const item = state.market.items.find((entry) => entry.key === commodityKey);
-      if (!item) {
-        return state;
-      }
-      const available = state.market.session.localQuantities[commodityKey] ?? 0;
-      const units = Math.min(Math.max(0, Math.trunc(amount)), available);
-      if (units <= 0) {
-        return {
-          ui: setUiMessage(state.ui, 'error', `Cannot buy ${item.name}`, 'The station has no stock left in this session.')
-        };
-      }
-      const cargoUsed = totalCargoUsedTonnes(state.commander.cargo);
-      if (item.unit === 't' && cargoUsed + units > state.commander.cargoCapacity) {
-        return {
-          ui: setUiMessage(state.ui, 'error', `Cargo full for ${item.name}`, `Only ${state.commander.cargoCapacity - cargoUsed} t of free space remains.`)
-        };
-      }
-      const spent = units * item.price;
-      if (spent > state.commander.cash) {
-        return {
-          ui: setUiMessage(state.ui, 'error', `Not enough credits for ${item.name}`, `You need ${formatCredits(spent)} but only have ${formatCredits(state.commander.cash)}.`)
-        };
-      }
-      committed = true;
-      // Buying always updates commander cargo/cash and the docked market
-      // session together so inventory and station stock never drift apart.
-      const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, -units);
-      const nextCash = state.commander.cash - spent;
-      return {
-        commander: {
-          ...state.commander,
-          cash: nextCash,
-          cargo: {
-            ...state.commander.cargo,
-            [commodityKey]: (state.commander.cargo[commodityKey] ?? 0) + units
-          }
-        },
-        market: refreshItems(nextSession),
-        ui: setUiMessage(state.ui, 'success', `Bought ${units} ${item.name}`, `Spent ${formatCredits(spent)}. Balance now ${formatCredits(nextCash)}.`)
-      };
-    });
-    if (committed) {
-      get().autosaveDockedState();
-    }
-  },
-  sellCommodity: (commodityKey, amount) => {
-    let committed = false;
-    set((state) => {
-      const item = state.market.items.find((entry) => entry.key === commodityKey);
-      if (!item) {
-        return state;
-      }
-      const owned = state.commander.cargo[commodityKey] ?? 0;
-      const units = Math.min(Math.max(0, Math.trunc(amount)), owned);
-      if (units <= 0) {
-        return {
-          ui: setUiMessage(state.ui, 'error', `Cannot sell ${item.name}`, 'You do not have any units of this commodity.')
-        };
-      }
-      committed = true;
-      // Selling uses the same lockstep rule in reverse: increase local station
-      // stock, decrease commander cargo, then report the completed trade once.
-      const nextSession = applyLocalMarketTrade(state.market.session, commodityKey, units);
-      const earnings = units * item.price;
-      const nextCash = state.commander.cash + earnings;
-      return {
-        commander: {
-          ...state.commander,
-          cash: nextCash,
-          cargo: {
-            ...state.commander.cargo,
-            [commodityKey]: owned - units
-          }
-        },
-        market: refreshItems(nextSession),
-        ui: setUiMessage(state.ui, 'success', `Sold ${units} ${item.name}`, `Earned ${formatCredits(earnings)}. Balance now ${formatCredits(nextCash)}.`)
       };
     });
     if (committed) {

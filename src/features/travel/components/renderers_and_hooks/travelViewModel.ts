@@ -1,8 +1,10 @@
 import { getLegalStatus, type CommanderState } from '../../../commander/domain/commander';
+import { xpToNextLevel } from '../../../commander/domain/rpgProgression';
 import type { MissionTravelContext } from '../../domain/missionContext';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
-import { getCgaBarFillColor, getSegmentedBankRatios } from './renderers/bars';
+import { getCgaBarFillColor } from './renderers/bars';
 import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
+import { CGA_YELLOW } from './renderers/constants';
 
 /**
  * Maps combat simulation data into HUD-friendly strings.
@@ -16,10 +18,14 @@ export interface TravelDriveStatus {
 }
 
 export interface TravelHudState {
-  energyBanks: number[];
-  energyColor: string;
-  shieldRatio: number;
-  shieldColor: string;
+  level: number;
+  hpRatio: number;
+  hpColor: string;
+  hpLabel: string;
+  xpRatio: number;
+  xpColor: string;
+  xpLabel: string;
+  attackLabel: string;
   laserHeat: { mount: LaserMountPosition; installed: boolean; ratio: number; color: string }[];
   jump: string;
   hyperspace: string;
@@ -49,8 +55,9 @@ export function getHudState(
 ): TravelHudState {
   const hostileCount = state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length;
   const drives = getDriveStatus(flightState, options);
-  const energyRatio = state.player.maxEnergy > 0 ? state.player.energy / state.player.maxEnergy : 0;
-  const shieldRatio = state.player.maxShield > 0 ? state.player.shield / state.player.maxShield : 0;
+  const hpRatio = state.player.maxHp > 0 ? state.player.hp / state.player.maxHp : 0;
+  const xpThreshold = xpToNextLevel(state.player.level);
+  const xpRatio = xpThreshold > 0 ? state.player.xp / xpThreshold : 1;
   const bombVisible = state.playerLoadout.installedEquipment.energy_bomb;
   const laserHeat = (['front', 'rear', 'left', 'right'] as LaserMountPosition[]).map((mount) => {
     const installed = Boolean(state.playerLoadout.laserMounts[mount]);
@@ -63,16 +70,20 @@ export function getHudState(
     };
   });
   return {
-    energyBanks: getSegmentedBankRatios(state.player.energy, state.player.maxEnergy, state.player.energyBanks),
-    energyColor: getCgaBarFillColor(energyRatio),
-    shieldRatio: Math.max(0, Math.min(1, shieldRatio)),
-    shieldColor: getCgaBarFillColor(shieldRatio),
+    level: state.player.level,
+    hpRatio: Math.max(0, Math.min(1, hpRatio)),
+    hpColor: getCgaBarFillColor(hpRatio),
+    hpLabel: `${Math.ceil(state.player.hp)} / ${state.player.maxHp}`,
+    xpRatio: Math.max(0, Math.min(1, xpRatio)),
+    xpColor: CGA_YELLOW,
+    xpLabel: `${state.player.xp} / ${xpThreshold}`,
+    attackLabel: `${state.player.attack}`,
     laserHeat,
     jump: drives.jump,
     hyperspace: drives.hyperspace,
     legal: `${getLegalStatus(state.legalValue, { docked: false })} ${state.legalValue}`,
     hostileCount,
-    threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount}`,
+    threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount} / L${state.currentSystemLevel}`,
     arc: `${state.lastPlayerArc.toUpperCase()} ${state.encounter.ecmTimer > 0 ? ' ECM' : ''}${bombVisible ? ' BOMB' : ''}`,
     bombVisible,
     lasersActive: state.playerLasersActive
@@ -81,16 +92,20 @@ export function getHudState(
 
 export function createCombatInit(
   commander: CommanderState,
-  originSystem: { government: number; techLevel: number },
+  originSystem: { government: number; techLevel: number; x: number },
   missionContext: MissionTravelContext
 ) {
   return {
     legalValue: Math.max(commander.legalValue, 0),
     government: originSystem.government,
     techLevel: originSystem.techLevel,
+    systemX: originSystem.x,
     missionContext,
-    energyBanks: commander.energyBanks,
-    energyPerBank: commander.energyPerBank,
+    level: commander.level,
+    xp: commander.xp,
+    hp: commander.hp,
+    maxHp: commander.maxHp,
+    attack: commander.attack,
     laserMounts: commander.laserMounts,
     installedEquipment: commander.installedEquipment,
     missilesInstalled: commander.missilesInstalled

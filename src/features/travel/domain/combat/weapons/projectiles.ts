@@ -8,7 +8,7 @@ import type { RandomSource, TravelCombatState } from '../types';
  * Projectile simulation and collision side effects.
  *
  * This pass owns all transient projectile state after firing: homing missiles,
- * hit detection, station safe-zone penalties, player shield/energy damage, and cleanup.
+ * hit detection, station safe-zone penalties, player HP damage, and cleanup.
  */
 export function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
@@ -31,7 +31,7 @@ export function moveProjectiles(state: TravelCombatState, dt: number, random: Ra
         const enemy = state.enemies[j];
         const distanceSq = (projectile.x - enemy.x) ** 2 + (projectile.y - enemy.y) ** 2;
         if (distanceSq <= enemy.targetableArea) {
-          enemy.energy -= projectile.damage;
+          enemy.hp = Math.max(0, enemy.hp - projectile.damage);
           hit = true;
           spawnParticles(state, projectile.x, projectile.y, '#55ff55');
           if (enemy.roles.innocent && state.encounter.safeZone) {
@@ -40,18 +40,17 @@ export function moveProjectiles(state: TravelCombatState, dt: number, random: Ra
             updateLegalStatus(state);
             pushMessage(state, 'STATION DEFENSE ALERT', 1600);
           }
-          if (enemy.energy <= 0) {
+          if (enemy.hp <= 0) {
             destroyEnemy(state, j, random);
           }
           break;
         }
       }
     } else if (Math.hypot(projectile.x - state.player.x, projectile.y - state.player.y) < state.player.radius + (projectile.kind === 'missile' ? 6 : 0)) {
-      const shieldBeforeHit = state.player.shield;
       applyPlayerDamage(state, projectile.damage);
       hit = true;
       spawnParticles(state, projectile.x, projectile.y, '#ff5555');
-      if (projectile.kind === 'missile' && shieldBeforeHit > 0) {
+      if (projectile.kind === 'missile') {
         pushMessage(state, 'MISSILE IMPACT', 900);
       }
     }

@@ -6,6 +6,7 @@ import { moveProjectiles } from '../projectiles';
 import { getLaserProjectileProfile } from '../../state';
 import { canEnemyBePlayerTarget, getPlayerTargetIndicatorState, refreshPlayerTargetLock, setPlayerTargetLock } from '../playerWeapons';
 import { PLAYER_TARGET_LOCK_RANGE, RADAR_SHIP_RANGE } from '../../navigation';
+import { getEnemyRpgProfile } from '../../spawn/rpgScaling';
 
 describe('travel combat weapons', () => {
   it('uses documented CNT thresholds for enemy laser fire and hit gating', () => {
@@ -24,9 +25,9 @@ describe('travel combat weapons', () => {
       label: 'Thargoid',
       behavior: 'thargoid',
       x: 100,
-      energy: 180,
-      maxEnergy: 180,
-      laserPower: 4,
+      hp: 180,
+      maxHp: 180,
+      attack: 13,
       missiles: 6,
       targetableArea: 330,
       laserRange: 380,
@@ -52,14 +53,14 @@ describe('travel combat weapons', () => {
     commander.laserMounts.left = 'beam_laser';
     commander.laserMounts.rear = 'mining_laser';
     const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 11, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
-    state.enemies.push(createTestEnemy({ id: 12, x: -110, y: 0, energy: 400, maxEnergy: 400 }));
-    state.enemies.push(createTestEnemy({ id: 13, x: 0, y: 220, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 11, x: 0, y: -180, hp: 400, maxHp: 400 }));
+    state.enemies.push(createTestEnemy({ id: 12, x: -110, y: 0, hp: 400, maxHp: 400 }));
+    state.enemies.push(createTestEnemy({ id: 13, x: 0, y: 220, hp: 400, maxHp: 400 }));
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0, 0, 0, 0]));
     expect(state.projectiles).toHaveLength(1);
     expect(state.projectiles[0]).toEqual(
       expect.objectContaining({
-        damage: 16,
+        damage: 25,
         sourceMount: 'left',
         targetEnemyId: 12
       })
@@ -72,8 +73,8 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.playerLoadout.laserMounts.front = 'pulse_laser';
     state.playerLoadout.laserMounts.right = 'beam_laser';
-    state.enemies.push(createTestEnemy({ id: 21, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
-    state.enemies.push(createTestEnemy({ id: 22, x: 220, y: -40, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 21, x: 0, y: -180, hp: 400, maxHp: 400 }));
+    state.enemies.push(createTestEnemy({ id: 22, x: 220, y: -40, hp: 400, maxHp: 400 }));
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.playerTargetLock).toEqual({ enemyId: 21, mount: 'front' });
     expect(state.projectiles[0]).toEqual(expect.objectContaining({ sourceMount: 'front', targetEnemyId: 21 }));
@@ -84,15 +85,15 @@ describe('travel combat weapons', () => {
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.playerTargetLock).toEqual({ enemyId: 21, mount: 'right' });
-    expect(state.projectiles[1]).toEqual(expect.objectContaining({ sourceMount: 'right', targetEnemyId: 21, damage: 16 }));
+    expect(state.projectiles[1]).toEqual(expect.objectContaining({ sourceMount: 'right', targetEnemyId: 21, damage: 25 }));
   });
 
   it('switches to the next nearest armed-sector hostile when the current target leaves range', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.playerLoadout.laserMounts.front = 'pulse_laser';
     state.playerLoadout.laserMounts.rear = 'beam_laser';
-    state.enemies.push(createTestEnemy({ id: 31, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
-    state.enemies.push(createTestEnemy({ id: 32, x: 0, y: 220, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 31, x: 0, y: -180, hp: 400, maxHp: 400 }));
+    state.enemies.push(createTestEnemy({ id: 32, x: 0, y: 220, hp: 400, maxHp: 400 }));
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.playerTargetLock).toEqual({ enemyId: 31, mount: 'front' });
     state.projectiles.length = 0;
@@ -109,7 +110,7 @@ describe('travel combat weapons', () => {
   it('shows target indicator state for the current nearest armed-sector hostile', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.playerLoadout.laserMounts.front = 'pulse_laser';
-    state.enemies.push(createTestEnemy({ id: 41, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 41, x: 0, y: -180, hp: 400, maxHp: 400 }));
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(getPlayerTargetIndicatorState(state)).toBe('ready');
@@ -137,7 +138,7 @@ describe('travel combat weapons', () => {
     commander.laserMounts.left = 'beam_laser';
     commander.laserMounts.rear = 'mining_laser';
     const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 44, x: 180, y: 0, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 44, x: 180, y: 0, hp: 400, maxHp: 400 }));
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
 
@@ -148,8 +149,8 @@ describe('travel combat weapons', () => {
   it('locks only enemies inside the dedicated engagement radius even when a farther ship shares the same arc', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.playerLoadout.laserMounts.front = 'pulse_laser';
-    state.enemies.push(createTestEnemy({ id: 46, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE - 10), energy: 400, maxEnergy: 400 }));
-    state.enemies.push(createTestEnemy({ id: 47, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE + 40), energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 46, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE - 10), hp: 400, maxHp: 400 }));
+    state.enemies.push(createTestEnemy({ id: 47, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE + 40), hp: 400, maxHp: 400 }));
 
     expect(refreshPlayerTargetLock(state)).toEqual({ enemyId: 46, mount: 'front' });
 
@@ -163,7 +164,7 @@ describe('travel combat weapons', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'pulse_laser';
     const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 45, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 45, x: 0, y: -180, hp: 400, maxHp: 400 }));
 
     stepTravelCombat(state, { thrust: 0, turn: 0, toggleLasers: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.playerLasersActive).toBe(false);
@@ -237,9 +238,9 @@ describe('travel combat weapons', () => {
       blueprintId: 'mamba',
       label: 'Mamba',
       x: 100,
-      energy: 90,
-      maxEnergy: 90,
-      laserPower: 2,
+      hp: 90,
+      maxHp: 90,
+      attack: 10,
       missiles: 2,
       targetableArea: 220,
       laserRange: 320,
@@ -258,7 +259,7 @@ describe('travel combat weapons', () => {
       expect.objectContaining({ id: 6, kind: 'missile', owner: 'enemy' })
     ]);
     expect(state.encounter.ecmTimer).toBeGreaterThan(0);
-    expect(state.player.energy).toBe(state.player.maxEnergy - state.player.energyPerBank);
+    expect(state.enemies[0].missiles).toBe(2);
   });
 
   it('keeps enemy missiles faster than the player while homing toward the ship', () => {
@@ -290,9 +291,9 @@ describe('travel combat weapons', () => {
       blueprintId: 'constrictor',
       label: 'Constrictor',
       x: 110,
-      energy: 220,
-      maxEnergy: 220,
-      laserPower: 5,
+      hp: 220,
+      maxHp: 220,
+      attack: 15,
       missiles: 4,
       targetableArea: 300,
       laserRange: 420,
@@ -312,9 +313,9 @@ describe('travel combat weapons', () => {
       blueprintId: 'mamba',
       label: 'Mamba',
       x: 590,
-      energy: 90,
-      maxEnergy: 90,
-      laserPower: 3,
+      hp: 90,
+      maxHp: 90,
+      attack: 11,
       missiles: 2,
       targetableArea: 220,
       laserRange: 320,
@@ -333,9 +334,9 @@ describe('travel combat weapons', () => {
       blueprintId: 'adder',
       label: 'Adder',
       x: 610,
-      energy: 85,
-      maxEnergy: 85,
-      laserPower: 2,
+      hp: 85,
+      maxHp: 85,
+      attack: 9,
       roles: { hostile: true },
       aggression: 38,
       baseAggression: 38,
@@ -358,9 +359,9 @@ describe('travel combat weapons', () => {
     commander.installedEquipment.escape_pod = true;
     commander.installedEquipment.energy_bomb = true;
     const state = createCombatState([0], { installedEquipment: commander.installedEquipment });
-    state.player.energy = 2;
+    state.player.hp = 2;
     const result = stepTravelCombat(state, { thrust: 0, turn: 0, triggerEnergyBomb: true }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    state.player.energy = 0;
+    state.player.hp = 0;
     const escaped = stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(result.state.playerLoadout.installedEquipment.energy_bomb).toBe(false);
     expect(escaped.playerEscaped).toBe(true);
@@ -368,12 +369,13 @@ describe('travel combat weapons', () => {
     expect(getPlayerCombatSnapshot(state).installedEquipment.escape_pod).toBe(false);
   });
 
-  it('destroys enemies when a player projectile depletes their remaining energy', () => {
+  it('destroys enemies when a player projectile depletes their remaining HP', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.enemies.push(createTestEnemy({
       id: 11,
       x: 10,
-      energy: 8,
+      hp: 8,
+      maxHp: 8,
       topSpeed: 6.2,
       roles: { hostile: true, pirate: true },
       isFiringLaser: false
@@ -397,17 +399,25 @@ describe('travel combat weapons', () => {
     expect(state.player.combatReward).toBe(50);
   });
 
-  it('awards classic blueprint bounties instead of role-based payouts', () => {
+  it('awards RPG-scaled blueprint payouts and XP when multiple kills land', () => {
     const commander = createDefaultCommander();
     commander.installedEquipment.energy_bomb = true;
     const state = createCombatState([0, 0, 0, 0], { installedEquipment: commander.installedEquipment });
+    const mambaProfile = getEnemyRpgProfile('mamba', state.currentSystemX);
+    const aspProfile = getEnemyRpgProfile('asp-mk2', state.currentSystemX);
+    const ferDeLanceProfile = getEnemyRpgProfile('fer-de-lance', state.currentSystemX);
+    const thargoidProfile = getEnemyRpgProfile('thargoid', state.currentSystemX);
     state.enemies.push(createTestEnemy({
       id: 21,
       blueprintId: 'mamba',
       label: 'Mamba',
       x: 100,
-      energy: 8,
-      maxEnergy: 90,
+      level: mambaProfile.level,
+      hp: 8,
+      maxHp: mambaProfile.maxHp,
+      attack: mambaProfile.attack,
+      xpReward: mambaProfile.xpReward,
+      creditReward: mambaProfile.creditReward,
       roles: { hostile: true, pirate: true },
       isFiringLaser: false
     }));
@@ -416,9 +426,12 @@ describe('travel combat weapons', () => {
       blueprintId: 'asp-mk2',
       label: 'Asp Mk II',
       x: 110,
-      energy: 8,
-      maxEnergy: 150,
-      laserPower: 5,
+      level: aspProfile.level,
+      hp: 8,
+      maxHp: aspProfile.maxHp,
+      attack: aspProfile.attack,
+      xpReward: aspProfile.xpReward,
+      creditReward: aspProfile.creditReward,
       missiles: 1,
       targetableArea: 280,
       laserRange: 380,
@@ -437,9 +450,12 @@ describe('travel combat weapons', () => {
       blueprintId: 'fer-de-lance',
       label: 'Fer-de-Lance',
       x: 115,
-      energy: 8,
-      maxEnergy: 160,
-      laserPower: 2,
+      level: ferDeLanceProfile.level,
+      hp: 8,
+      maxHp: ferDeLanceProfile.maxHp,
+      attack: ferDeLanceProfile.attack,
+      xpReward: ferDeLanceProfile.xpReward,
+      creditReward: ferDeLanceProfile.creditReward,
       missiles: 2,
       targetableArea: 260,
       laserRange: 340,
@@ -459,9 +475,12 @@ describe('travel combat weapons', () => {
       label: 'Thargoid',
       behavior: 'thargoid',
       x: 120,
-      energy: 8,
-      maxEnergy: 180,
-      laserPower: 4,
+      level: thargoidProfile.level,
+      hp: 8,
+      maxHp: thargoidProfile.maxHp,
+      attack: thargoidProfile.attack,
+      xpReward: thargoidProfile.xpReward,
+      creditReward: thargoidProfile.creditReward,
       missiles: 6,
       targetableArea: 330,
       laserRange: 380,
@@ -480,73 +499,66 @@ describe('travel combat weapons', () => {
 
     expect(state.enemies).toHaveLength(0);
     expect(state.player.tallyKills).toBe(4);
-    expect(state.player.combatReward).toBe(850);
-    expect(state.messages.some((message) => message.text === 'MAMBA DESTROYED: 15.0 Cr')).toBe(true);
-    expect(state.messages.some((message) => message.text === 'ASP MK II DESTROYED: 20.0 Cr')).toBe(true);
-    expect(state.messages.some((message) => message.text === 'FER-DE-LANCE DESTROYED: 0.0 Cr')).toBe(true);
-    expect(state.messages.some((message) => message.text === 'THARGOID DESTROYED: 50.0 Cr')).toBe(true);
+    expect(state.player.combatReward).toBe(
+      mambaProfile.creditReward + aspProfile.creditReward + ferDeLanceProfile.creditReward + thargoidProfile.creditReward
+    );
+    expect(state.player.level).toBe(4);
+    expect(state.player.attack).toBe(18);
+    expect(state.messages.some((message) => message.text.includes('THARGOID L'))).toBe(true);
+    expect(state.messages.some((message) => message.text.includes('+82 XP'))).toBe(true);
+    expect(state.messages.some((message) => message.text.includes('LEVEL UP'))).toBe(true);
   });
 
-  it('initializes the player energy pool from commander bank data', () => {
-    const state = createCombatState([0, 0, 0], { energyBanks: 4, energyPerBank: 64 });
-    expect(state.player.energyBanks).toBe(4);
-    expect(state.player.energyPerBank).toBe(64);
-    expect(state.player.maxEnergy).toBe(255);
-    expect(state.player.energy).toBe(255);
+  it('initializes the player RPG combat stats from the docked commander', () => {
+    const state = createCombatState([0, 0, 0], { level: 3, xp: 17, hp: 74, maxHp: 88, attack: 15 });
+    expect(state.player.level).toBe(3);
+    expect(state.player.xp).toBe(17);
+    expect(state.player.hp).toBe(74);
+    expect(state.player.maxHp).toBe(88);
+    expect(state.player.attack).toBe(15);
   });
 
-  it('lets the shield absorb damage before energy banks collapse', () => {
-    const commander = createDefaultCommander();
-    commander.installedEquipment.shield_generator = true;
-    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
-    state.player.shield = 5;
+  it('applies incoming damage directly to player HP', () => {
+    const state = createCombatState([0, 0, 0]);
+    state.player.hp = 20;
     state.projectiles.push({ id: 20, kind: 'laser', owner: 'enemy', x: 0, y: 0, vx: 0, vy: 0, damage: 12, life: 20 });
     moveProjectiles(state, 0, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBe(0);
-    expect(state.player.energy).toBe(state.player.maxEnergy - 7);
+    expect(state.player.hp).toBe(8);
   });
 
-  it('blocks ECM activation when the player cannot afford the energy cost', () => {
-    const commander = createDefaultCommander();
-    commander.installedEquipment.ecm = true;
-    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
-    state.player.energy = 0;
+  it('ignores ECM activation when the ship does not have the equipment installed', () => {
+    const state = createCombatState([0, 0, 0]);
     stepTravelCombat(state, { thrust: 0, turn: 0, activateEcm: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.encounter.ecmTimer).toBe(0);
-    expect(state.messages.some((message) => message.text === 'ENERGY LOW')).toBe(true);
+    expect(state.messages.some((message) => message.text.startsWith('ECM'))).toBe(false);
   });
 
-  it('drains energy when firing and suppresses fire when energy is too low', () => {
+  it('keeps laser fire independent from the player HP pool', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'beam_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 41, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+    state.player.hp = 1;
+    state.enemies.push(createTestEnemy({ id: 41, x: 0, y: -180, hp: 400, maxHp: 400 }));
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(state.projectiles).toHaveLength(1);
-    expect(state.player.energy).toBe(state.player.maxEnergy - 0.8);
-
-    state.projectiles.length = 0;
-    state.player.fireCooldown = 0;
-    state.player.energy = 0.5;
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.projectiles).toHaveLength(0);
-    expect(state.messages.some((message) => message.text === 'ENERGY LOW')).toBe(true);
+    expect(state.projectiles[0].damage).toBe(25);
+    expect(state.player.hp).toBe(1);
   });
 
-  it('keeps laser energy drain low enough that heat remains the main sustained-fire limiter', () => {
+  it('keeps heat as the main sustained-fire limiter', () => {
     const commander = createDefaultCommander();
     commander.laserMounts.front = 'pulse_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
     // Sustained-fire coverage needs a durable hostile inside the engagement
     // bubble so the pulse laser can keep heating without the lock dropping.
-    state.enemies.push(createTestEnemy({ id: 51, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE - 20), energy: 5000, maxEnergy: 5000 }));
-    const startingEnergy = state.player.energy;
+    state.enemies.push(createTestEnemy({ id: 51, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE - 20), hp: 5000, maxHp: 5000 }));
+    const startingHp = state.player.hp;
 
     for (let frame = 0; frame < 24; frame += 1) {
       stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
     }
 
-    expect(state.player.energy).toBe(startingEnergy);
+    expect(state.player.hp).toBe(startingHp);
     expect(state.player.laserHeat.front).toBeGreaterThan(0);
   });
 
@@ -555,7 +567,7 @@ describe('travel combat weapons', () => {
     commander.laserMounts.front = 'beam_laser';
     commander.laserMounts.rear = 'military_laser';
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 61, x: 0, y: -180, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 61, x: 0, y: -180, hp: 400, maxHp: 400 }));
     setPlayerTargetLock(state, 61);
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
@@ -583,37 +595,25 @@ describe('travel combat weapons', () => {
     const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
     state.player.laserHeat.front = 97;
     state.player.laserHeat.rear = 0;
-    state.enemies.push(createTestEnemy({ id: 71, x: 0, y: 180, energy: 400, maxEnergy: 400 }));
+    state.enemies.push(createTestEnemy({ id: 71, x: 0, y: 180, hp: 400, maxHp: 400 }));
     setPlayerTargetLock(state, 71);
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
 
     expect(state.projectiles).toHaveLength(1);
-    expect(state.projectiles[0].damage).toBe(16);
+    expect(state.projectiles[0].damage).toBe(25);
     expect(state.projectiles[0].sourceMount).toBe('rear');
     expect(state.player.laserHeat.front).toBe(97);
     expect(state.player.laserHeat.rear).toBe(6);
     expect(state.messages.some((message) => message.text === 'LASER OVERHEAT')).toBe(false);
   });
 
-  it('recharges shields on the classic cadence and only above half energy', () => {
-    const commander = createDefaultCommander();
-    commander.installedEquipment.shield_generator = true;
-    const state = createCombatState([0, 0, 0], { installedEquipment: commander.installedEquipment });
-    state.player.shield = 250;
-    state.player.energy = 200;
+  it('does not passively regenerate player HP between combat ticks', () => {
+    const state = createCombatState([0, 0, 0]);
+    state.player.hp = 25;
 
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 9, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBe(250);
+    stepTravelCombat(state, { thrust: 0, turn: 0 }, 120, 'PLAYING', {}, createDeterministicRandomSource([0]));
 
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBe(251);
-    expect(state.player.energy).toBe(200);
-
-    state.player.shield = 250;
-    state.player.energy = 100;
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 10, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.shield).toBe(250);
-    expect(state.player.energy).toBe(101);
+    expect(state.player.hp).toBe(25);
   });
 });

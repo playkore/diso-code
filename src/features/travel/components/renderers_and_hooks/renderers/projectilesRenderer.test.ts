@@ -16,8 +16,12 @@ function createEnemy(overrides: Partial<CombatEnemy> = {}): CombatEnemy {
     vx: 0,
     vy: 0,
     angle: 0,
-    energy: 70,
-    maxEnergy: 70,
+    level: 1,
+    hp: 70,
+    maxHp: 70,
+    attack: 7,
+    xpReward: 10,
+    creditReward: 50,
     laserPower: 2,
     missiles: 0,
     targetableArea: 210,
@@ -47,22 +51,18 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
       vy: 0,
       angle: 0,
       radius: 12,
-      energy: 255,
-      maxEnergy: 255,
-      energyBanks: 4,
-      energyPerBank: 64,
-      shield: 255,
-      maxShield: 255,
+      level: 1,
+      xp: 0,
+      hp: 60,
+      maxHp: 60,
+      attack: 9,
       laserHeat: { front: 0, rear: 0, left: 0, right: 0 },
       maxLaserHeat: 100,
       laserHeatCooldownRate: 12,
       maxSpeed: 6,
       fireCooldown: 0,
       tallyKills: 0,
-      combatReward: 0,
-      energyRechargePerTick: 1,
-      shieldRechargePerTick: 1,
-      rechargeTickAccumulator: 0
+      combatReward: 0
     },
     playerLoadout: {
       laserMounts: { front: 'pulse_laser', rear: null, left: null, right: null },
@@ -104,6 +104,8 @@ function createTraceState(enemyOverrides: Partial<CombatEnemy> = {}): TravelComb
     legalValue: 0,
     legalStatus: 'clean',
     nextId: 1,
+    currentSystemX: 20,
+    currentSystemLevel: 1,
     currentGovernment: 0,
     currentTechLevel: 0,
     missionContext: {
@@ -132,28 +134,28 @@ describe('getEnemyHealthBarState', () => {
   });
 
   it('shows the bar and clamps the ratio for damaged enemies', () => {
-    expect(getEnemyHealthBarState(createEnemy({ energy: 35 }))).toEqual({
-      bankRatios: [1, 1, 0, 0],
+    expect(getEnemyHealthBarState(createEnemy({ hp: 35 }))).toEqual({
+      ratio: 0.5,
       fillColor: CGA_YELLOW
     });
 
-    expect(getEnemyHealthBarState(createEnemy({ energy: 120 }))).toBeNull();
+    expect(getEnemyHealthBarState(createEnemy({ hp: 120 }))).toBeNull();
 
-    expect(getEnemyHealthBarState(createEnemy({ energy: -10 }))).toEqual({
-      bankRatios: [0, 0, 0, 0],
+    expect(getEnemyHealthBarState(createEnemy({ hp: -10 }))).toEqual({
+      ratio: 0,
       fillColor: CGA_RED
     });
   });
 
-  it('splits partial energy into four Elite-style banks', () => {
-    expect(getEnemyHealthBarState(createEnemy({ energy: 52.5, maxEnergy: 70 }))?.bankRatios).toEqual([1, 1, 1, 0]);
-    expect(getEnemyHealthBarState(createEnemy({ energy: 43.75, maxEnergy: 70 }))?.bankRatios).toEqual([1, 1, 0.5, 0]);
+  it('reports a normalized HP ratio for partial damage', () => {
+    expect(getEnemyHealthBarState(createEnemy({ hp: 52.5, maxHp: 70 }))?.ratio).toBeCloseTo(0.75, 5);
+    expect(getEnemyHealthBarState(createEnemy({ hp: 43.75, maxHp: 70 }))?.ratio).toBeCloseTo(0.625, 5);
   });
 
   it('uses CGA fill colors for high, mid, and low health', () => {
-    expect(getEnemyHealthBarState(createEnemy({ energy: 55 }))?.fillColor).toBe(CGA_GREEN);
-    expect(getEnemyHealthBarState(createEnemy({ energy: 28 }))?.fillColor).toBe(CGA_YELLOW);
-    expect(getEnemyHealthBarState(createEnemy({ energy: 20 }))?.fillColor).toBe(CGA_RED);
+    expect(getEnemyHealthBarState(createEnemy({ hp: 55 }))?.fillColor).toBe(CGA_GREEN);
+    expect(getEnemyHealthBarState(createEnemy({ hp: 28 }))?.fillColor).toBe(CGA_YELLOW);
+    expect(getEnemyHealthBarState(createEnemy({ hp: 20 }))?.fillColor).toBe(CGA_RED);
   });
 });
 

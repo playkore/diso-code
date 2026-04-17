@@ -21,12 +21,6 @@ const MOUNT_LABELS: Record<LaserMountPosition, string> = {
  * container can stay focused on wiring and route fallback behavior.
  */
 export function TravelHudPanel({ routeLabel, fuelLabel, commanderCash, hud }: TravelHudPanelProps) {
-  const energyBanks = hud.energyBanks.map((ratio, index) => (
-    <span key={`energy-bank-${index}`} className="travel-screen__hud-bank">
-      <span className="travel-screen__hud-bank-fill" style={{ width: `${ratio * 100}%`, backgroundColor: hud.energyColor }} />
-    </span>
-  ));
-
   const laserHeat = hud.laserHeat.map((entry) => (
     <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
       <span className="travel-screen__hud-heat-label">{MOUNT_LABELS[entry.mount]}</span>
@@ -52,18 +46,36 @@ export function TravelHudPanel({ routeLabel, fuelLabel, commanderCash, hud }: Tr
           <span className="travel-screen__hud-value">{formatCredits(commanderCash)}</span>
         </span>
         <span className="travel-screen__hud-stat travel-screen__hud-stat--bar">
-          <span className="travel-screen__hud-key">Energy</span>
-          <span className="travel-screen__hud-banks">{energyBanks}</span>
+          <span className="travel-screen__hud-key">HP</span>
+          <span className="travel-screen__hud-meter">
+            <span className="travel-screen__hud-meter-fill" style={{ width: `${hud.hpRatio * 100}%`, backgroundColor: hud.hpColor }} />
+          </span>
         </span>
         <span className="travel-screen__hud-stat travel-screen__hud-stat--bar">
-          <span className="travel-screen__hud-key">Shield</span>
+          <span className="travel-screen__hud-key">XP</span>
           <span className="travel-screen__hud-meter">
-            <span className="travel-screen__hud-meter-fill" style={{ width: `${hud.shieldRatio * 100}%`, backgroundColor: hud.shieldColor }} />
+            <span className="travel-screen__hud-meter-fill" style={{ width: `${hud.xpRatio * 100}%`, backgroundColor: hud.xpColor }} />
           </span>
         </span>
         <span className="travel-screen__hud-stat travel-screen__hud-stat--heat">
           <span className="travel-screen__hud-key">Heat</span>
           <span className="travel-screen__hud-heat-grid">{laserHeat}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Level</span>
+          <span className="travel-screen__hud-value">{hud.level}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">Attack</span>
+          <span className="travel-screen__hud-value">{hud.attackLabel}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">HP Readout</span>
+          <span className="travel-screen__hud-value">{hud.hpLabel}</span>
+        </span>
+        <span className="travel-screen__hud-stat">
+          <span className="travel-screen__hud-key">XP Readout</span>
+          <span className="travel-screen__hud-value">{hud.xpLabel}</span>
         </span>
         <span className="travel-screen__hud-stat">
           <span className="travel-screen__hud-key">Drive</span>

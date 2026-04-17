@@ -29,8 +29,8 @@ export function EquipmentScreen() {
     <section className="screen">
       <h2>Equip Ship</h2>
       <p className="muted">
-        Galaxy {galaxyIndex + 1} · {currentSystem} tech level {techLevel} · Cash {formatCredits(commander.cash)} · Fuel {formatLightYears(commander.fuel)} · Missiles{' '}
-        {commander.missilesInstalled}/{commander.missileCapacity}
+        Galaxy {galaxyIndex + 1} · {currentSystem} tech level {techLevel} · Cash {formatCredits(commander.cash)} · Fuel {formatLightYears(commander.fuel)} · Level{' '}
+        {commander.level} · HP {commander.hp}/{commander.maxHp} · Missiles {commander.missilesInstalled}/{commander.missileCapacity}
       </p>
 
       <section className="subpanel">

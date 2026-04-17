@@ -322,9 +322,13 @@ export function useTravelSession(
         legalValue: commander.legalValue,
         government: originSystem.data.government,
         techLevel: originSystem.data.techLevel,
+        systemX: originSystem.data.x,
         missionContext: session.missionContext,
-        energyBanks: commander.energyBanks,
-        energyPerBank: commander.energyPerBank,
+        level: commander.level,
+        xp: commander.xp,
+        hp: commander.hp,
+        maxHp: commander.maxHp,
+        attack: commander.attack,
         laserMounts: commander.laserMounts,
         installedEquipment: commander.installedEquipment,
         missilesInstalled: commander.missilesInstalled
@@ -393,10 +397,14 @@ export function useTravelSession(
       const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
       const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
       setHudState({
-        energyBanks: nextHud.energyBanks,
-        energyColor: nextHud.energyColor,
-        shieldRatio: nextHud.shieldRatio,
-        shieldColor: nextHud.shieldColor,
+        level: nextHud.level,
+        hpRatio: nextHud.hpRatio,
+        hpColor: nextHud.hpColor,
+        hpLabel: nextHud.hpLabel,
+        xpRatio: nextHud.xpRatio,
+        xpColor: nextHud.xpColor,
+        xpLabel: nextHud.xpLabel,
+        attackLabel: nextHud.attackLabel,
         laserHeat: nextHud.laserHeat,
         lasersActive: nextHud.lasersActive,
         jump: nextHud.jump,
@@ -444,6 +452,7 @@ export function useTravelSession(
         tallyDelta: combatState.player.tallyKills,
         cargo: snapshot.cargo,
         fuelDelta: snapshot.fuel,
+        playerProgress: snapshot.progression,
         installedEquipment: snapshot.installedEquipment,
         missilesInstalled: snapshot.missilesInstalled
       });
@@ -462,6 +471,7 @@ export function useTravelSession(
           tallyDelta: combatState.player.tallyKills,
           cargo: snapshot.cargo,
           fuelDelta: snapshot.fuel,
+          playerProgress: snapshot.progression,
           installedEquipment: snapshot.installedEquipment,
           missilesInstalled: snapshot.missilesInstalled
         });
@@ -592,7 +602,7 @@ export function useTravelSession(
       if (hyperspaceTimer <= 0) {
         setCombatSystemContext(
           combatState,
-          { government: destinationSystem.data.government, techLevel: destinationSystem.data.techLevel, witchspace: false },
+          { government: destinationSystem.data.government, techLevel: destinationSystem.data.techLevel, systemX: destinationSystem.data.x, witchspace: false },
           random
         );
         enterArrivalSpace(combatState, random, { systemSeed: destinationSystem.seed });
@@ -947,7 +957,7 @@ export function useTravelSession(
         if (docking.collidesWithHull) {
           // The station hull is unforgiving in the original game: clipping the
           // solid ring is a fatal mistake, not a recoverable bumper impact.
-          combatState.player.energy = 0;
+          combatState.player.hp = 0;
           startPlayerDeathSequence();
           finalizeFrame(timestamp, workStart, perfAccumulator);
           return;

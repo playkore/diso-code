@@ -27,8 +27,11 @@ export function TravelScreen() {
       cargo: state.commander.cargo,
       legalValue: state.commander.legalValue,
       galaxyIndex: state.universe.galaxyIndex,
-      energyBanks: state.commander.energyBanks,
-      energyPerBank: state.commander.energyPerBank,
+      level: state.commander.level,
+      xp: state.commander.xp,
+      hp: state.commander.hp,
+      maxHp: state.commander.maxHp,
+      attack: state.commander.attack,
       laserMounts: state.commander.laserMounts,
       installedEquipment: state.commander.installedEquipment,
       missilesInstalled: state.commander.missilesInstalled

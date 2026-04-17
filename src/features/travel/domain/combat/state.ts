@@ -1,7 +1,9 @@
 import { getLegalStatus } from '../../../commander/domain/commander';
+import { awardRpgXp } from '../../../commander/domain/rpgProgression';
 import type { LaserId, LaserMountPosition } from '../../../commander/domain/shipCatalog';
 import { CLASSIC_PLAYER_TOP_SPEED, toWorldSpeed } from './classicFlightModel';
 import { selectBlueprintFile } from './encounters/spawnRules';
+import { getSystemRpgLevel } from './spawn/rpgScaling';
 import type { RandomSource, TravelCombatInit, TravelCombatState } from './types';
 
 /**
@@ -32,27 +34,30 @@ export function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.trunc(value)));
 }
 
-export const PLAYER_MAX_ENERGY = 255;
-export const PLAYER_MAX_SHIELD = 255;
 export const PLAYER_MAX_LASER_HEAT = 100;
 export const PLAYER_LASER_COOL_RATE = 12;
-export const ELITE_RECHARGE_INTERVAL = (8 / 50) * 60;
-export const ELITE_SHIELD_RECHARGE_THRESHOLD = 127;
 
 /**
- * Player defensive stats are still modeled as byte-like values, so every write
- * goes through explicit clamps to preserve Elite-style bounds.
+ * Player HP is a straight RPG stat, so combat only clamps it into the valid
+ * [0, maxHp] range rather than routing damage through separate shield banks.
  */
-export function clampShield(value: number, maxShield: number): number {
-  return Math.max(0, Math.min(maxShield, value));
-}
-
-export function clampEnergy(value: number, maxEnergy: number): number {
-  return Math.max(0, Math.min(maxEnergy, value));
+export function clampHp(value: number, maxHp: number) {
+  return Math.max(0, Math.min(maxHp, value));
 }
 
 export function clampLaserHeat(value: number, maxLaserHeat: number): number {
   return Math.max(0, Math.min(maxLaserHeat, value));
+}
+
+/**
+ * Applies a per-tick damping factor in a time-step aware way.
+ *
+ * The caller passes the amount that should remain after one canonical combat
+ * tick, and this helper raises it to `dt` so the same motion feels consistent
+ * whether the simulation advances in small or large steps.
+ */
+export function dampVelocity(value: number, dampingPerTick: number, dt: number): number {
+  return value * Math.pow(dampingPerTick, dt);
 }
 
 /**
@@ -107,72 +112,42 @@ function getPlayerMaxSpeed(_laserMounts: TravelCombatInit['laserMounts']): numbe
   return toWorldSpeed(CLASSIC_PLAYER_TOP_SPEED);
 }
 
-function getPlayerMaxShield(installedEquipment: TravelCombatInit['installedEquipment']): number {
-  return installedEquipment.shield_generator ? PLAYER_MAX_SHIELD : 0;
-}
-
 /**
- * Elite recharges one energy point on each classic recharge event, or two when
- * the extra energy unit is installed.
- */
-function getPlayerEnergyRechargePerTick(installedEquipment: TravelCombatInit['installedEquipment']): number {
-  return installedEquipment.extra_energy_unit ? 2 : 1;
-}
-
-/**
- * Damage follows Elite's original ordering: shield first, then energy overflow.
+ * Incoming damage now lands directly on RPG HP so the travel combat loop and
+ * the docked status UI both talk about the same survivability stat.
  */
 export function applyPlayerDamage(state: TravelCombatState, damage: number) {
   const appliedDamage = Math.max(0, damage);
   if (appliedDamage <= 0) {
     return;
   }
-
-  const absorbedByShield = Math.min(state.player.shield, appliedDamage);
-  state.player.shield = clampShield(state.player.shield - absorbedByShield, state.player.maxShield);
-  const overflow = appliedDamage - absorbedByShield;
-  if (overflow > 0) {
-    state.player.energy = clampEnergy(state.player.energy - overflow, state.player.maxEnergy);
-  }
+  state.player.hp = clampHp(state.player.hp - appliedDamage, state.player.maxHp);
 }
 
 /**
- * Some systems still spend energy immediately in this clone, even though Elite
- * also has time-based drains such as ECM while active.
+ * XP rewards resolve immediately inside the live combat state so the HUD can
+ * surface mid-flight level-ups before docking persists the updated commander.
  */
-export function spendPlayerEnergy(state: TravelCombatState, amount: number) {
-  const cost = Math.max(0, amount);
-  if (state.player.energy < cost) {
-    return false;
-  }
-  state.player.energy = clampEnergy(state.player.energy - cost, state.player.maxEnergy);
-  return true;
-}
-
-/**
- * Elite updates energy and shield charging on a fixed cadence: once every
- * eight 50 Hz ticks. We emulate that cadence in the 60 fps render loop by
- * accumulating frame time and replaying one or more classic recharge events.
- *
- * Each recharge event:
- * - adds 1 energy, or 2 with the extra energy unit
- * - converts 1 energy into 1 shield only when energy is above 127
- *
- * ECM still has an active timer for UI feedback and temporary launch
- * suppression, but its energy cost is paid up front when the pilot presses the
- * control rather than hidden inside the recharge loop.
- */
-export function rechargePlayerDefense(state: TravelCombatState, dt: number) {
-  state.player.rechargeTickAccumulator += dt;
-  while (state.player.rechargeTickAccumulator >= ELITE_RECHARGE_INTERVAL) {
-    state.player.rechargeTickAccumulator -= ELITE_RECHARGE_INTERVAL;
-    state.player.energy = clampEnergy(state.player.energy + state.player.energyRechargePerTick, state.player.maxEnergy);
-
-    if (state.player.shield < state.player.maxShield && state.player.energy > ELITE_SHIELD_RECHARGE_THRESHOLD) {
-      state.player.shield = clampShield(state.player.shield + state.player.shieldRechargePerTick, state.player.maxShield);
-      state.player.energy = clampEnergy(state.player.energy - 1, state.player.maxEnergy);
-    }
-  }
+export function awardPlayerCombatXp(state: TravelCombatState, amount: number) {
+  const { progression, grantedXp, levelUps } = awardRpgXp(
+    {
+      level: state.player.level,
+      xp: state.player.xp,
+      hp: state.player.hp,
+      maxHp: state.player.maxHp,
+      attack: state.player.attack
+    },
+    amount
+  );
+  state.player.level = progression.level;
+  state.player.xp = progression.xp;
+  state.player.hp = progression.hp;
+  state.player.maxHp = progression.maxHp;
+  state.player.attack = progression.attack;
+  return {
+    grantedXp,
+    levelUps
+  };
 }
 
 /**
@@ -186,8 +161,6 @@ export function rechargePlayerDefense(state: TravelCombatState, dt: number) {
  */
 export function createTravelCombatState(init: TravelCombatInit, random: RandomSource): TravelCombatState {
   const maxSpeed = getPlayerMaxSpeed(init.laserMounts);
-  const maxEnergy = PLAYER_MAX_ENERGY;
-  const maxShield = getPlayerMaxShield(init.installedEquipment);
   const activeBlueprintFile = selectBlueprintFile({
     government: init.government,
     techLevel: init.techLevel,
@@ -203,14 +176,11 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       vy: 0,
       angle: -Math.PI / 2,
       radius: 12,
-      energy: maxEnergy,
-      maxEnergy,
-      energyBanks: init.energyBanks,
-      energyPerBank: Math.ceil(maxEnergy / init.energyBanks),
-      // Shield presence is now loadout-driven, so a fresh combat session starts
-      // with either a full shield buffer or none at all.
-      shield: maxShield,
-      maxShield,
+      level: init.level,
+      xp: init.xp,
+      hp: init.hp,
+      maxHp: init.maxHp,
+      attack: init.attack,
       laserHeat: createLaserHeatState(),
       maxLaserHeat: PLAYER_MAX_LASER_HEAT,
       laserHeatCooldownRate: PLAYER_LASER_COOL_RATE,
@@ -219,10 +189,7 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       tallyKills: 0,
       // Rewards earned during the live encounter are buffered here until the
       // travel screen hands control back to the docked commander state.
-      combatReward: 0,
-      energyRechargePerTick: getPlayerEnergyRechargePerTick(init.installedEquipment),
-      shieldRechargePerTick: 1,
-      rechargeTickAccumulator: 0
+      combatReward: 0
     },
     playerLoadout: {
       laserMounts: { ...init.laserMounts },
@@ -258,6 +225,8 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
     legalValue: init.legalValue,
     legalStatus: getLegalStatus(init.legalValue),
     nextId: 1,
+    currentSystemX: init.systemX,
+    currentSystemLevel: getSystemRpgLevel(init.systemX),
     currentGovernment: init.government,
     currentTechLevel: init.techLevel,
     missionContext: init.missionContext,
@@ -358,6 +327,13 @@ export function getPlayerCombatSnapshot(state: TravelCombatState) {
   return {
     cargo: { ...state.salvageCargo },
     fuel: state.salvageFuel,
+    progression: {
+      level: state.player.level,
+      xp: state.player.xp,
+      hp: state.player.hp,
+      maxHp: state.player.maxHp,
+      attack: state.player.attack
+    },
     installedEquipment: { ...state.playerLoadout.installedEquipment },
     missilesInstalled: state.playerLoadout.missilesInstalled
   };
@@ -366,8 +342,9 @@ export function getPlayerCombatSnapshot(state: TravelCombatState) {
 /**
  * Central weapon tuning table for player laser mounts.
  *
- * Keeping this here makes it easy to reason about the current combat balance
- * without hunting through fire-control logic.
+ * The projectile `damage` field is now a weapon bonus added on top of the
+ * commander's RPG attack stat, which keeps equipment upgrades meaningful while
+ * still letting level-ups raise raw combat output.
  */
 const PLAYER_LASER_RANGE_MULTIPLIER = 3;
 
@@ -382,24 +359,6 @@ export function getLaserProjectileProfile(laserId: LaserId) {
     case 'pulse_laser':
     default:
       return { damage: 15, speed: 14, life: 18 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 12 };
-  }
-}
-
-/**
- * Laser energy cost stays detached from projectile damage so balance tweaks can
- * preserve the documented "tiered draw" behavior without overwhelming the
- * classic recharge loop. Heat, not energy, is meant to be the primary limiter.
- */
-export function getLaserEnergyCost(laserId: LaserId) {
-  switch (laserId) {
-    case 'military_laser':
-    case 'mining_laser':
-      return 1.2;
-    case 'beam_laser':
-      return 0.8;
-    case 'pulse_laser':
-    default:
-      return 0.4;
   }
 }
 
