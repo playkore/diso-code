@@ -64,6 +64,10 @@ const DOCKING_CAMERA_LOOKAHEAD = 8;
 const DOCKING_CAMERA_MOUTH_FOCUS = 0.78;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
+const TRAVEL_RENDER_LOW_RESOLUTION_BOX = {
+  width: 200,
+  height: 400
+};
 
 const JOYSTICK_TARGET_TURN_ANGLE = 0.12;
 
@@ -314,7 +318,14 @@ export function useTravelSession(
       return undefined;
     }
 
-    const travelSceneRenderer = new TravelSceneRenderer(canvas);
+    const travelSceneRenderer = new TravelSceneRenderer(canvas, {
+      // The route viewport keeps its current CSS footprint, but the WebGL
+      // framebuffer is clamped into this smaller portrait-oriented box and
+      // then stretched back to fit the same on-screen canvas. Swapping the
+      // box axes inside the renderer preserves the live viewport aspect ratio
+      // instead of forcing the scene into a 200x400 distortion.
+      lowResolutionBox: TRAVEL_RENDER_LOW_RESOLUTION_BOX
+    });
 
     const random = createMathRandomSource();
     const combatState = createTravelCombatState(
@@ -342,8 +353,8 @@ export function useTravelSession(
     const radarInsetTop = RADAR_INSET_TOP;
     const radarInsetRight = RADAR_INSET_RIGHT;
     const resize = () => {
-      cw = canvas.width = viewport.clientWidth;
-      ch = canvas.height = viewport.clientHeight;
+      cw = Math.max(1, viewport.clientWidth);
+      ch = Math.max(1, viewport.clientHeight);
       travelSceneRenderer.resize(cw, ch);
     };
     resize();

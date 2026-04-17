@@ -65,6 +65,13 @@ interface TravelSceneRenderArgs {
   radarInsetRight: number;
 }
 
+interface TravelSceneRendererOptions {
+  lowResolutionBox?: {
+    width: number;
+    height: number;
+  };
+}
+
 const CAMERA_FOV_DEGREES = 36;
 const CAMERA_NEAR = 1;
 const CAMERA_FAR = 5000;
@@ -277,6 +284,7 @@ function createEnemyHealthBarObject(healthBar: NonNullable<ReturnType<typeof get
  */
 export class TravelSceneRenderer {
   private readonly renderer: WebGLRenderer;
+  private readonly lowResolutionBox: TravelSceneRendererOptions['lowResolutionBox'];
   private readonly starScene = new Scene();
   private readonly worldScene = new Scene();
   private readonly overlayScene = new Scene();
@@ -290,7 +298,8 @@ export class TravelSceneRenderer {
   private width = 1;
   private height = 1;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, options: TravelSceneRendererOptions = {}) {
+    this.lowResolutionBox = options.lowResolutionBox;
     this.renderer = new WebGLRenderer({
       canvas,
       antialias: false,
@@ -315,8 +324,17 @@ export class TravelSceneRenderer {
   resize(width: number, height: number) {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setSize(this.width, this.height, false);
+    if (this.lowResolutionBox) {
+      const { width: renderWidth, height: renderHeight } = this.getLowResolutionSize(this.width, this.height);
+      // Once the route opts into a fixed low-resolution box we must lock the
+      // backing buffer to one device pixel per sample. Reintroducing DPR here
+      // would silently undo the downscale and put the GPU cost right back.
+      this.renderer.setPixelRatio(1);
+      this.renderer.setSize(renderWidth, renderHeight, false);
+    } else {
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      this.renderer.setSize(this.width, this.height, false);
+    }
     this.starCamera.left = 0;
     this.starCamera.right = this.width;
     this.starCamera.top = 0;
@@ -332,6 +350,17 @@ export class TravelSceneRenderer {
     this.flashMesh.geometry.dispose();
     this.flashMesh.geometry = new PlaneGeometry(this.width, this.height);
     this.flashMesh.position.set(this.width / 2, this.height / 2, 0);
+  }
+
+  private getLowResolutionSize(width: number, height: number) {
+    const isLandscape = width >= height;
+    const boxWidth = Math.max(1, isLandscape ? this.lowResolutionBox?.height ?? width : this.lowResolutionBox?.width ?? width);
+    const boxHeight = Math.max(1, isLandscape ? this.lowResolutionBox?.width ?? height : this.lowResolutionBox?.height ?? height);
+    const scale = Math.min(boxWidth / width, boxHeight / height, 1);
+    return {
+      width: Math.max(1, Math.round(width * scale)),
+      height: Math.max(1, Math.round(height * scale))
+    };
   }
 
   renderFrame({
