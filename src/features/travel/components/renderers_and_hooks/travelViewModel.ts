@@ -32,7 +32,6 @@ export interface TravelHudState {
   threat: string;
   arc: string;
   bombVisible: boolean;
-  lasersActive: boolean;
 }
 
 export function getDriveStatus(flightState: FlightPhase, options: { jumpBlocked: boolean; hyperspaceBlocked: boolean; jumpCompleted: boolean }): TravelDriveStatus {
@@ -68,8 +67,7 @@ export function getHudState(
     hostileCount,
     threat: `F${state.encounter.activeBlueprintFile} / ${hostileCount} / L${state.currentSystemLevel}`,
     arc: `${state.lastPlayerArc.toUpperCase()} ${state.encounter.ecmTimer > 0 ? ' ECM' : ''}${bombVisible ? ' BOMB' : ''}`,
-    bombVisible,
-    lasersActive: state.playerLasersActive
+    bombVisible
   };
 }
 

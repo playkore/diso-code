@@ -1,5 +1,5 @@
 import { tryRareEncounter } from './encounters/spawnRules';
-import { canAutoDock, LOCAL_JUMP_SPEED_MULTIPLIER, RADAR_SHIP_RANGE } from './navigation';
+import { LOCAL_JUMP_SPEED_MULTIPLIER, RADAR_SHIP_RANGE } from './navigation';
 import { stepEnemy } from './ai';
 import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
@@ -68,11 +68,10 @@ function emitPlayerEngineExhaust(state: TravelCombatState) {
  *
  * The frame order is deliberate:
  * 1. recharge timers and player-only instant actions
- * 2. update station state and safe-zone flags
- * 3. apply player steering/thrust and laser-controller updates for manual-flight phases
- * 4. roll ambient encounters and station police reactions
- * 5. step enemies, projectiles, particles, and legal-state fallout
- * 6. age transient UI messages and compute exit conditions
+ * 2. apply player steering/thrust for manual-flight phases
+ * 3. roll ambient encounters and police reactions
+ * 4. step enemies, projectiles, particles, and legal-state fallout
+ * 5. age transient UI messages and compute exit conditions
  *
  * Most systems mutate `state` in place so callers can keep a single simulation
  * object alive across frames without rebuilding references for the renderer.
@@ -86,34 +85,19 @@ export function stepTravelCombat(
   random: RandomSource
 ): CombatTickResult {
   if (phase === 'GAMEOVER') {
-    return { state, playerDestroyed: true, playerEscaped: false, autoDocked: false };
+    return { state, playerDestroyed: true, playerEscaped: false };
   }
 
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
   state.encounter.ecmFlashTimer = Math.max(0, state.encounter.ecmFlashTimer - dt);
   state.encounter.bombEffectTimer = Math.max(0, state.encounter.bombEffectTimer - dt);
   state.player.laserTrace = null;
-  if (input.toggleLasers) {
-    // The travel UI owns the switch gesture, but the simulation owns the armed
-    // state so tests and live gameplay share the exact same behavior.
-    state.playerLasersActive = !state.playerLasersActive;
-    if (!state.playerLasersActive) {
-      state.playerTargetLock = null;
-    }
-  }
 
   if (input.activateEcm) {
     activatePlayerEcm(state);
   }
   if (input.triggerEnergyBomb) {
     triggerEnergyBomb(state, random);
-  }
-
-  if (state.station) {
-    state.station.spinAngle = (state.station.spinAngle ?? 0) + state.station.rotSpeed * dt;
-    state.encounter.safeZone = Math.hypot(state.player.x - state.station.x, state.player.y - state.station.y) <= state.station.safeZoneRadius;
-  } else {
-    state.encounter.safeZone = false;
   }
 
   // READY, PLAYING, ARRIVED, and JUMPING all share the same low-level flight
@@ -146,11 +130,8 @@ export function stepTravelCombat(
     state.player.x += state.player.vx * dt;
     state.player.y += state.player.vy * dt;
     state.player.fireCooldown = Math.max(0, state.player.fireCooldown - dt);
-    const targetLock = state.playerLasersActive ? refreshPlayerTargetLock(state) : null;
-    if (!state.playerLasersActive) {
-      state.playerTargetLock = null;
-    }
-    if (state.playerLasersActive && targetLock && state.player.fireCooldown <= 0) {
+    const targetLock = refreshPlayerTargetLock(state);
+    if (targetLock && state.player.fireCooldown <= 0) {
       firePlayerLasers(state, random);
     }
   }
@@ -196,11 +177,6 @@ export function stepTravelCombat(
     // second, converted through the normalized tick scale used by combat.
     state.player.hp = clampHp(state.player.hp + state.player.maxHp * 0.05 * (dt / 60), state.player.maxHp);
   }
-  if (state.playerLasersActive) {
-    refreshPlayerTargetLock(state);
-  } else {
-    state.playerTargetLock = null;
-  }
   stepParticles(state, dt);
   updateLegalStatus(state);
 
@@ -214,17 +190,6 @@ export function stepTravelCombat(
   return {
     state,
     playerDestroyed: state.player.hp <= 0 && !state.playerLoadout.installedEquipment.escape_pod,
-    playerEscaped: state.player.hp <= 0 && state.playerLoadout.installedEquipment.escape_pod,
-    autoDocked: Boolean(
-      // Auto-dock is intentionally conservative: the docking computer only
-      // resolves the final approach after the player requests it, owns the
-      // equipment, is inside the station safe zone, and has cleared all
-      // hostile traffic.
-      input.autoDock &&
-      canAutoDock(state) &&
-      state.enemies.filter((enemy) => enemy.roles.hostile || enemy.missionTag).length === 0 &&
-      state.station &&
-      Math.hypot(state.station.x - state.player.x, state.station.y - state.player.y) <= state.station.safeZoneRadius
-    )
+    playerEscaped: state.player.hp <= 0 && state.playerLoadout.installedEquipment.escape_pod
   };
 }

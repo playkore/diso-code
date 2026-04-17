@@ -30,7 +30,7 @@ import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
  * - `HYPERSPACE`: inter-system tunnel transition
  * - `GAMEOVER`: destruction/reset state
  */
-export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'HYPERSPACE' | 'DOCKING_ANIMATION' | 'GAMEOVER';
+export type FlightPhase = 'READY' | 'PLAYING' | 'JUMPING' | 'ARRIVED' | 'HYPERSPACE' | 'GAMEOVER';
 
 /**
  * Stable identifier for every NPC ship archetype used in encounter space.
@@ -352,14 +352,6 @@ export interface CombatPlayerLoadout {
 export interface TravelCombatState {
   player: CombatPlayer;
   playerLoadout: CombatPlayerLoadout;
-  /**
-   * Master laser switch toggled from the travel UI.
-   *
-   * When armed, the combat step auto-selects the nearest hostile ship inside
-   * any currently installed laser sector and keeps firing until no eligible
-   * target remains or the pilot switches the controller off.
-   */
-  playerLasersActive: boolean;
   playerTargetLock: PlayerTargetLock | null;
   enemies: CombatEnemy[];
   projectiles: CombatProjectile[];
@@ -412,12 +404,10 @@ export interface TravelCombatInit {
 export interface CombatInput {
   thrust: number;
   turn: number;
-  toggleLasers?: boolean;
   jump?: boolean;
   hyperspace?: boolean;
   activateEcm?: boolean;
   triggerEnergyBomb?: boolean;
-  autoDock?: boolean;
 }
 
 /**
@@ -428,7 +418,6 @@ export interface CombatTickResult {
   state: TravelCombatState;
   playerDestroyed: boolean;
   playerEscaped: boolean;
-  autoDocked: boolean;
 }
 
 /**

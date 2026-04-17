@@ -28,14 +28,6 @@ export function isPlayerInStationSafeZone(state: TravelCombatState) {
   return Boolean(state.station && getDistanceToStation(state) <= state.station.safeZoneRadius);
 }
 
-/**
- * Auto-dock may only be requested once the commander owns the docking computer
- * and has flown back into the protected station approach corridor.
- */
-export function canAutoDock(state: TravelCombatState) {
-  return state.playerLoadout.installedEquipment.docking_computer && isPlayerInStationSafeZone(state);
-}
-
 export function getVisibleRadarContacts(state: TravelCombatState, distance = RADAR_SHIP_RANGE) {
   return state.enemies.filter((enemy) => Math.hypot(enemy.x - state.player.x, enemy.y - state.player.y) <= distance);
 }

@@ -1,19 +1,16 @@
 import type { TravelJoystickView, TravelPressHandlers, TravelTapHandlers } from './useTravelInput';
-import type { AutoDockUiState, BombUiState, EcmUiState } from './travelSessionState';
+import type { BombUiState, EcmUiState } from './travelSessionState';
 
 interface TravelControlsProps {
   joystickView: TravelJoystickView;
   hyperspaceHidden: boolean;
-  hudLasersActive: boolean;
-  autoDock: AutoDockUiState;
   bomb: BombUiState;
   ecm: EcmUiState;
   jumpButtonHandlers: TravelPressHandlers;
-  toggleLasersButtonHandlers: TravelTapHandlers;
   hyperspaceButtonHandlers: TravelTapHandlers;
   ecmButtonHandlers: TravelTapHandlers;
   bombButtonHandlers: TravelTapHandlers;
-  dockButtonHandlers: TravelTapHandlers;
+  onOpenConsole: () => void;
 }
 
 /**
@@ -23,16 +20,13 @@ interface TravelControlsProps {
 export function TravelControls({
   joystickView,
   hyperspaceHidden,
-  hudLasersActive,
-  autoDock,
   bomb,
   ecm,
   jumpButtonHandlers,
-  toggleLasersButtonHandlers,
   hyperspaceButtonHandlers,
   ecmButtonHandlers,
   bombButtonHandlers,
-  dockButtonHandlers
+  onOpenConsole
 }: TravelControlsProps) {
   return (
     <div className="travel-screen__controls">
@@ -43,7 +37,7 @@ export function TravelControls({
         <div className="travel-screen__joystick-knob" style={{ left: joystickView.knobLeft, top: joystickView.knobTop }} />
       </div>
       <div className="travel-screen__controls-cluster">
-        {(ecm.visible || bomb.visible || autoDock.visible) ? (
+        {(ecm.visible || bomb.visible) ? (
           <div className="travel-screen__controls-aux">
             {ecm.visible ? (
               <button type="button" className="travel-screen__button travel-screen__button--aux" {...ecmButtonHandlers}>
@@ -53,19 +47,6 @@ export function TravelControls({
             {bomb.visible ? (
               <button type="button" className="travel-screen__button travel-screen__button--aux" {...bombButtonHandlers}>
                 BOMB
-              </button>
-            ) : null}
-            {autoDock.visible ? (
-              <button
-                type="button"
-                aria-disabled={!autoDock.enabled}
-                aria-pressed={autoDock.active}
-                className={`travel-screen__button travel-screen__button--aux travel-screen__button--dock${
-                  autoDock.enabled ? '' : ' travel-screen__button--dock-disabled'
-                }${autoDock.active ? ' travel-screen__button--dock-active' : ''}`}
-                {...(autoDock.enabled ? dockButtonHandlers : {})}
-              >
-                DOCK
               </button>
             ) : null}
           </div>
@@ -83,11 +64,10 @@ export function TravelControls({
           </button>
           <button
             type="button"
-            aria-pressed={hudLasersActive}
-            className={`travel-screen__button travel-screen__button--laser${hudLasersActive ? ' travel-screen__button--laser-on' : ' travel-screen__button--laser-off'}`}
-            {...toggleLasersButtonHandlers}
+            className="travel-screen__button travel-screen__button--console"
+            onClick={onOpenConsole}
           >
-            LASER
+            CONSOLE
           </button>
         </div>
       </div>

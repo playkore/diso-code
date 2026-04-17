@@ -147,20 +147,6 @@ describe('travel combat weapons', () => {
     expect(state.playerTargetLock).toBeNull();
   });
 
-  it('stops auto-fire immediately when the laser master switch is turned off', () => {
-    const commander = createDefaultCommander();
-    commander.laserMounts.front = 'pulse_laser';
-    const state = createCombatState([0, 0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 45, x: 0, y: -180, hp: 400, maxHp: 400 }));
-
-    stepTravelCombat(state, { thrust: 0, turn: 0, toggleLasers: true }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.playerLasersActive).toBe(false);
-
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.playerTargetLock).toBeNull();
-    expect(state.projectiles).toHaveLength(0);
-  });
-
   it('ignores friendly ships and picks the nearest hostile instead', () => {
     const state = createCombatState([0, 0, 0, 0]);
     state.playerLoadout.laserMounts.front = 'pulse_laser';

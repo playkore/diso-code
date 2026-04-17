@@ -98,7 +98,6 @@ export function StartScreenScene({
     // The attract scene reuses the real travel renderer, but it keeps a frozen
     // simulation state so only one hull is visible at a time and controls stay
     // deterministic while the user browses ships manually.
-    combatState.playerLasersActive = false;
     combatState.encounter.safeZone = true;
     combatState.station = null;
 

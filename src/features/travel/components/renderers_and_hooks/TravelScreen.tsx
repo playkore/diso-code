@@ -1,10 +1,11 @@
-import { Profiler, useRef, type ProfilerOnRenderCallback } from 'react';
+import { Profiler, useRef, useState, type ProfilerOnRenderCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { shallow } from 'zustand/shallow';
+import type { AppTab } from '../../../../shared/store/types';
 import { getRouteForTab } from '../../../../appRoutes';
-import { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from '../../domain/travelCombat';
 import { useGameStore } from '../../../../store/useGameStore';
 import { formatLightYears } from '../../../../shared/utils/distance';
+import { TravelConsoleOverlay } from './TravelConsoleOverlay';
 import { TravelControls } from './TravelControls';
 import { TravelHudPanel } from './TravelHudPanel';
 import { TravelOverlays } from './TravelOverlays';
@@ -43,6 +44,8 @@ export function TravelScreen() {
   const resetAfterDeath = useGameStore((state) => state.resetAfterDeath);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [consoleOpen, setConsoleOpen] = useState(false);
+  const [consoleTab, setConsoleTab] = useState<AppTab>('status');
 
   const travel = useTravelSession(
     { canvasRef, viewportRef },
@@ -51,10 +54,24 @@ export function TravelScreen() {
     grantCombatCredits,
     completeTravel,
     resetAfterDeath,
-    navigate
+    navigate,
+    consoleOpen
   );
   const handleRender: ProfilerOnRenderCallback = (_id, _phase, actualDuration) => {
     travel.recordReactCommit(actualDuration);
+  };
+
+  const openConsole = () => {
+    travel.resetInput();
+    setConsoleOpen(true);
+  };
+
+  const closeConsole = () => {
+    // Closing the ship console must resume the paused flight route rather than
+    // leaving the shell to re-resolve whatever tab was active before travel.
+    travel.resetInput();
+    navigate('/travel', { replace: true });
+    setConsoleOpen(false);
   };
 
   if (!screenState.session) {
@@ -63,9 +80,6 @@ export function TravelScreen() {
     return <Navigate to={getRouteForTab(screenState.activeTab)} replace />;
   }
 
-  // Undocking reuses the travel screen with a zero-cost local-space session.
-  // In that mode there is no selected hyperspace destination, so the HUD should
-  // present the route as absent and fuel as the ship's remaining reserve.
   const hasHyperspaceRoute = screenState.session.fuelUnits > 0 && screenState.session.originSystem !== screenState.session.destinationSystem;
   const routeLabel = hasHyperspaceRoute ? `${screenState.session.originSystem} -> ${screenState.session.destinationSystem}` : 'none';
   const fuelLabel = hasHyperspaceRoute ? formatLightYears(screenState.session.fuelCost) : formatLightYears(screenState.commanderFuel);
@@ -82,24 +96,21 @@ export function TravelScreen() {
             message={travel.message}
             gameOverVisible={travel.gameOverOverlay.visible}
           />
-          <TravelControls
-            joystickView={travel.joystickView}
-            hyperspaceHidden={travel.hyperspaceHidden}
-            hudLasersActive={travel.hud.lasersActive}
-            autoDock={travel.autoDock}
-            bomb={travel.bomb}
-            ecm={travel.ecm}
-            jumpButtonHandlers={travel.jumpButtonHandlers}
-            toggleLasersButtonHandlers={travel.toggleLasersButtonHandlers}
-            hyperspaceButtonHandlers={travel.hyperspaceButtonHandlers}
-            ecmButtonHandlers={travel.ecmButtonHandlers}
-            bombButtonHandlers={travel.bombButtonHandlers}
-            dockButtonHandlers={travel.dockButtonHandlers}
-          />
-
-          <div className="travel-screen__help">
-            Space Laser On/Off / J Jump / H Hyper / CNT {canEnemyLaserFireByCnt(-32) ? 'FIRE' : 'HOLD'} {canEnemyLaserHitByCnt(-35) ? 'HIT' : 'MISS'}
-          </div>
+          {consoleOpen ? (
+            <TravelConsoleOverlay activeTab={consoleTab} onSelectTab={setConsoleTab} onClose={closeConsole} />
+          ) : (
+            <TravelControls
+              joystickView={travel.joystickView}
+              hyperspaceHidden={travel.hyperspaceHidden}
+              bomb={travel.bomb}
+              ecm={travel.ecm}
+              jumpButtonHandlers={travel.jumpButtonHandlers}
+              hyperspaceButtonHandlers={travel.hyperspaceButtonHandlers}
+              ecmButtonHandlers={travel.ecmButtonHandlers}
+              bombButtonHandlers={travel.bombButtonHandlers}
+              onOpenConsole={openConsole}
+            />
+          )}
         </div>
       </section>
     </Profiler>

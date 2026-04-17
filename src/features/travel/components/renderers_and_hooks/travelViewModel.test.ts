@@ -36,7 +36,6 @@ describe('travel drive status', () => {
     expect(hud.xpRatio).toBeCloseTo(24 / 88, 5);
     expect(hud.attackLabel).toBe('15');
     expect(hud.bombVisible).toBe(true);
-    expect(hud.lasersActive).toBe(true);
     expect(hud.arc).toContain('BOMB');
   });
 });

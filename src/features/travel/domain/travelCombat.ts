@@ -21,7 +21,6 @@ export type {
 } from './combat/types';
 export { BLUEPRINTS, getCombatBlueprint } from './combat/blueprints';
 export {
-  canAutoDock,
   getVisibleRadarContacts,
   isMassNearby,
   isPlayerInStationSafeZone,
@@ -42,6 +41,4 @@ export {
 } from './combat/state';
 export { getBlueprintAvailability, getAvailablePackHunters } from './combat/encounters/blueprintFiles';
 export { selectBlueprintFile, setCombatSystemContext } from './combat/encounters/spawnRules';
-export { assessDockingApproach, getStationSlotAngle } from './combat/station/docking';
-export { enterArrivalSpace, enterStationSpace } from './combat/station/stationPlacement';
 export { canEnemyLaserFireByCnt, canEnemyLaserHitByCnt } from './combat/weapons/enemyWeapons';

@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { getSystemByName, getSystemDistance, getVisibleSystems, getWrappedChartDelta } from '../domain/galaxyCatalog';
 import { MAX_FUEL, getFuelUnits, getJumpFuelUnits } from '../../../shared/domain/fuel';
 import { useGameStore } from '../../../store/useGameStore';
@@ -31,11 +30,9 @@ function getRelativePoint(currentSystem: string, targetSystem: string, galaxyInd
 }
 
 export function StarMapScreen() {
-  const navigate = useNavigate();
   const universe = useGameStore((state) => state.universe);
   const currentFuel = useGameStore((state) => state.commander.fuel);
   const buyFuel = useGameStore((state) => state.buyFuel);
-  const beginTravel = useGameStore((state) => state.beginTravel);
   const selectedChartSystem = useGameStore((state) => state.ui.selectedChartSystem);
   const setSelectedChartSystem = useGameStore((state) => state.setSelectedChartSystem);
 
@@ -46,10 +43,7 @@ export function StarMapScreen() {
       ),
     [currentFuel, universe.currentSystem, universe.galaxyIndex]
   );
-  const selectedPoint = starPoints.find((star) => star.name === selectedChartSystem) ?? null;
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
-  const detailsSystemName = selectedChartSystem ?? universe.currentSystem;
-  const showingCurrentSystem = selectedChartSystem === null;
 
   return (
     <section className="screen">
@@ -64,9 +58,9 @@ export function StarMapScreen() {
               key={star.name}
               transform={`translate(${star.x} ${star.y})`}
               className={`star-map__point ${star.isCurrent ? 'is-current' : ''} ${selectedChartSystem === star.name ? 'is-selected' : ''} ${star.inRange ? 'is-in-range' : 'is-out-of-range'}`}
-              onClick={() => {
+            onClick={() => {
                 // Selecting the current system returns the chart to its neutral
-                // "no destination" state, which doubles as the undock mode.
+                // "no destination" state.
                 setSelectedChartSystem(star.isCurrent ? null : star.name);
               }}
             >
@@ -83,17 +77,6 @@ export function StarMapScreen() {
         <div className="star-map__action-row">
           <button type="button" disabled={missingFuelUnits < 1} onClick={() => buyFuel(missingFuelUnits)}>
             Fill Fuel
-          </button>
-          <button
-            type="button"
-            disabled={!showingCurrentSystem && !selectedPoint?.inRange}
-            onClick={() => {
-              if (beginTravel(detailsSystemName)) {
-                navigate('/travel');
-              }
-            }}
-          >
-            {showingCurrentSystem ? 'Undock' : `Travel to ${detailsSystemName}`}
           </button>
         </div>
       </div>

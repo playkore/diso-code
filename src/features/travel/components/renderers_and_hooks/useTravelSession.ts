@@ -2,16 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getSystemByName, getSystemHeading } from '../../../galaxy/domain/galaxyCatalog';
 import { clampAngle } from '../../domain/combat/state';
 import {
-  assessDockingApproach,
   consumeEscapePod,
   createMathRandomSource,
   createTravelCombatState,
-  enterArrivalSpace,
-  enterStationSpace,
   getPlayerCombatSnapshot,
   isMassNearby,
-  canAutoDock,
-  isPlayerInStationSafeZone,
   setCombatSystemContext,
   stepTravelCombat,
   type FlightPhase
@@ -21,8 +16,6 @@ import { CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { getHyperspaceDurationFrames } from './travelTiming';
 import { getHudState } from './travelViewModel';
 import { useTravelInput } from './useTravelInput';
-import { createAutoDockState, stepAutoDockState, type AutoDockState } from '../../domain/combat/station/autoDock';
-import { getStationDockDirection, getStationDockMouthPoint } from '../../domain/combat/station/stationGeometry';
 import { createBackgroundStar, createStars } from './travelVisuals';
 import { TravelSceneRenderer } from './TravelSceneRenderer';
 import { createShipBankState, getPerspectiveCameraDistance, stepShipBankState, type ShipBankState } from './renderers/travelSceneMath';
@@ -31,10 +24,8 @@ import type { SeedTriplet } from '../../../galaxy/domain/universe';
 import {
   areTravelSessionHudStatesEqual,
   INITIAL_HUD,
-  type AutoDockUiState,
   type BombUiState,
   type CombatCommanderSnapshot,
-  type DockingAnimationState,
   type EcmUiState,
   type GameOverOverlayState,
   type TravelRefs,
@@ -56,12 +47,6 @@ interface PlayerDeathState {
 const PLAYER_DEATH_ANIMATION_MS = 1800;
 const PLAYER_DEATH_GAME_OVER_MS = 900;
 const PERF_REPORT_INTERVAL_MS = 500;
-const DOCKING_ANIMATION_DURATION_MS = 1100;
-const DOCKING_CAMERA_FOLLOW_DISTANCE = 13;
-const DOCKING_CAMERA_SIDE_OFFSET = 6;
-const DOCKING_CAMERA_HEIGHT_FACTOR = 0.58;
-const DOCKING_CAMERA_LOOKAHEAD = 8;
-const DOCKING_CAMERA_MOUTH_FOCUS = 0.78;
 const RADAR_INSET_TOP = 20;
 const RADAR_INSET_RIGHT = 20;
 
@@ -145,16 +130,12 @@ export function useTravelSession(
   grantCombatCredits: (amount: number) => void,
   completeTravel: (report?: TravelCompletionReport) => void,
   resetAfterDeath: () => void,
-  navigate: (to: string, options?: { replace?: boolean }) => void
+  navigate: (to: string, options?: { replace?: boolean }) => void,
+  isConsoleOpen: boolean
 ) {
   const [hud, setHud] = useState(INITIAL_HUD);
   const [message, setMessage] = useState('');
   const [hyperspaceHidden, setHyperspaceHidden] = useState(false);
-  const [autoDock, setAutoDock] = useState<AutoDockUiState>({
-    visible: commander.installedEquipment.docking_computer,
-    enabled: false,
-    active: false
-  });
   const [bomb, setBomb] = useState<BombUiState>({
     visible: commander.installedEquipment.energy_bomb
   });
@@ -166,9 +147,9 @@ export function useTravelSession(
   const hudRef = useRef(hud);
   const messageRef = useRef(message);
   const hyperspaceHiddenRef = useRef(hyperspaceHidden);
-  const autoDockRef = useRef(autoDock);
   const bombRef = useRef(bomb);
   const ecmRef = useRef(ecm);
+  const pausedRef = useRef(isConsoleOpen);
   const perfRef = useRef<PerfAccumulator>(createPerfAccumulator(typeof performance === 'undefined' ? 0 : performance.now()));
   const {
     inputRef,
@@ -178,11 +159,9 @@ export function useTravelSession(
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
-    toggleLasersButtonHandlers,
     hyperspaceButtonHandlers,
     ecmButtonHandlers,
     bombButtonHandlers,
-    dockButtonHandlers,
     resetInput
   } = useTravelInput(refs.viewportRef);
 
@@ -208,18 +187,6 @@ export function useTravelSession(
     }
     hyperspaceHiddenRef.current = next;
     setHyperspaceHidden(next);
-  };
-
-  const setAutoDockState = (next: AutoDockUiState) => {
-    if (
-      autoDockRef.current.visible === next.visible &&
-      autoDockRef.current.enabled === next.enabled &&
-      autoDockRef.current.active === next.active
-    ) {
-      return;
-    }
-    autoDockRef.current = next;
-    setAutoDock(next);
   };
 
   const setBombState = (next: BombUiState) => {
@@ -269,6 +236,13 @@ export function useTravelSession(
     accumulator.reactCommitTotalMs += actualDuration;
     accumulator.reactCommitMaxMs = Math.max(accumulator.reactCommitMaxMs, actualDuration);
   }, []);
+
+  useEffect(() => {
+    pausedRef.current = isConsoleOpen;
+    if (isConsoleOpen) {
+      resetInput();
+    }
+  }, [isConsoleOpen, resetInput]);
 
   useEffect(() => {
     // Long-task entries capture unrelated main-thread stalls as well, which is
@@ -335,11 +309,9 @@ export function useTravelSession(
       },
       random
     );
-    // Every travel session starts in the origin system's station space. Routed
-    // travel later rebinds the combat state to the destination system and calls
-    // `enterArrivalSpace(...)`, which replaces this origin station with the
-    // destination station after hyperspace completes.
-    enterStationSpace(combatState, random, { systemSeed: originSystem.seed });
+    // Travel sessions now begin in open space. The combat state still keeps
+    // the current system metadata, but there is no station entry or undock
+    // sequence to complete before the player can fly.
 
     let cw = 0;
     let ch = 0;
@@ -357,34 +329,21 @@ export function useTravelSession(
     let jumpActivationFrames = 0;
     let animationFrameId = 0;
     let lastTimestamp = 0;
-    let stationaryTicks = 0;
     let stars = createStars();
     let backgroundStar = createBackgroundStar(getTravelBackgroundStarSeed(originSystem.seed, destinationSystem.seed, false));
     let overlayMessage = '';
     let overlayTimer = 0;
     let jumpCompleted = false;
     let creditedCombatReward = 0;
-    let autoDockActive = false;
-    let autoDockState: AutoDockState | null = null;
-    let dockingAnimationState: DockingAnimationState | null = null;
     let playerDeathState: PlayerDeathState | null = null;
     let playerBankState = createShipBankState();
     let enemyBankStates = new Map<number, ShipBankState>();
-    let elapsedFlightMs = 0;
     let continueAfterDeathRequested = false;
     const onAnyContinueInput = () => {
       if (playerDeathState && playerDeathState.elapsedMs >= PLAYER_DEATH_ANIMATION_MS) {
         continueAfterDeathRequested = true;
       }
     };
-    const syncAutoDockUi = () => {
-      setAutoDockState({
-        visible: combatState.playerLoadout.installedEquipment.docking_computer,
-        enabled: canAutoDock(combatState),
-        active: autoDockActive
-      });
-    };
-
     const getManualFlightState = (): FlightPhase => {
       if (jumpCompleted) {
         return 'ARRIVED';
@@ -394,8 +353,7 @@ export function useTravelSession(
 
     const updateHud = () => {
       const jumpBlocked = isMassNearby(combatState);
-      const hyperspaceBlocked = !jumpCompleted && isPlayerInStationSafeZone(combatState);
-      const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked, jumpCompleted });
+      const nextHud = getHudState(combatState, flightState, { jumpBlocked, hyperspaceBlocked: false, jumpCompleted });
       setHudState({
         level: nextHud.level,
         hpRatio: nextHud.hpRatio,
@@ -405,7 +363,6 @@ export function useTravelSession(
         xpColor: nextHud.xpColor,
         xpLabel: nextHud.xpLabel,
         attackLabel: nextHud.attackLabel,
-        lasersActive: nextHud.lasersActive,
         jump: nextHud.jump,
         jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,
         hyperspace: nextHud.hyperspace,
@@ -428,34 +385,12 @@ export function useTravelSession(
         visible: combatState.playerLoadout.installedEquipment.ecm
       });
       setHyperspaceHiddenState(!hasHyperspaceRoute || jumpCompleted);
-      // The DOCK control is a purchased capability. Once owned, it stays on
-      // screen so the player can see when station position enables it again,
-      // and whether the docking computer currently owns the controls.
-      syncAutoDockUi();
     };
 
     const showMessage = (text: string, duration: number) => {
       overlayMessage = text;
       overlayTimer = duration;
       setMessageState(text);
-    };
-
-    // All successful exits funnel through this helper so the store receives the
-    // same snapshot shape whether docking happens manually or via auto-dock.
-    const completeDocking = (dockSystemName: string, spendJumpFuel: boolean) => {
-      const snapshot = getPlayerCombatSnapshot(combatState);
-      completeTravel({
-        dockSystemName,
-        spendJumpFuel,
-        legalValue: combatState.legalValue,
-        tallyDelta: combatState.player.tallyKills,
-        cargo: snapshot.cargo,
-        fuelDelta: snapshot.fuel,
-        playerProgress: snapshot.progression,
-        installedEquipment: snapshot.installedEquipment,
-        missilesInstalled: snapshot.missilesInstalled
-      });
-      navigate('/', { replace: true });
     };
 
     const finishPlayerLoss = () => {
@@ -497,8 +432,6 @@ export function useTravelSession(
       // the encounter stays visible while the player hull disintegrates and the
       // title prompt waits for explicit acknowledgement.
       flightState = 'GAMEOVER';
-      autoDockActive = false;
-      autoDockState = null;
       combatState.player.vx = 0;
       combatState.player.vy = 0;
       playerDeathState = { elapsedMs: 0 };
@@ -506,23 +439,6 @@ export function useTravelSession(
       overlayMessage = '';
       overlayTimer = 0;
       setMessageState('');
-      updateHud();
-    };
-
-    const startDockingAnimation = (dockSystemName: string, spendJumpFuel: boolean) => {
-      dockingAnimationState = {
-        elapsedMs: 0,
-        dockSystemName,
-        spendJumpFuel,
-        startX: combatState.player.x,
-        startY: combatState.player.y
-      };
-      flightState = 'DOCKING_ANIMATION';
-      autoDockActive = false;
-      autoDockState = null;
-      combatState.player.vx = 0;
-      combatState.player.vy = 0;
-      showMessage('DOCKING', DOCKING_ANIMATION_DURATION_MS);
       updateHud();
     };
 
@@ -550,12 +466,6 @@ export function useTravelSession(
         return;
       }
       if (!hasHyperspaceRoute) {
-        inputRef.current.hyperspace = false;
-        updateHud();
-        return;
-      }
-      if (isPlayerInStationSafeZone(combatState)) {
-        showMessage('SAFE ZONE', 900);
         inputRef.current.hyperspace = false;
         updateHud();
         return;
@@ -604,102 +514,13 @@ export function useTravelSession(
           { government: destinationSystem.data.government, techLevel: destinationSystem.data.techLevel, systemX: destinationSystem.data.x, witchspace: false },
           random
         );
-        enterArrivalSpace(combatState, random, { systemSeed: destinationSystem.seed });
         backgroundStar = createBackgroundStar(getTravelBackgroundStarSeed(originSystem.seed, destinationSystem.seed, true));
         jumpCompleted = true;
         flightState = 'ARRIVED';
+        combatState.player.vx = 0;
+        combatState.player.vy = 0;
         showMessage(`SYSTEM REACHED: ${session.destinationSystem.toUpperCase()}`, 1800);
       }
-    };
-
-    const runDockingAnimationFrame = (timestamp: number, deltaMs: number, dt: number, workStart: number, perfAccumulator: PerfAccumulator) => {
-      if (flightState !== 'DOCKING_ANIMATION' || !dockingAnimationState || !combatState.station) {
-        return false;
-      }
-
-      const animationProgress = Math.min(1, dockingAnimationState.elapsedMs / DOCKING_ANIMATION_DURATION_MS);
-      // Advance station rotation first so camera framing uses the same dock
-      // orientation that the renderer will show on this exact frame.
-      combatState.station.spinAngle = (combatState.station.spinAngle ?? 0) + combatState.station.rotSpeed * dt;
-      const dockDirection = getStationDockDirection(combatState.station);
-      const inwardDirection = {
-        x: -dockDirection.x,
-        y: -dockDirection.y
-      };
-      const lateralDirection = {
-        // World rendering mirrors gameplay Y through `toSceneY(...)`, so the
-        // visually consistent "camera on the ship's right" offset uses the
-        // mirrored 2D perpendicular rather than the raw gameplay-space one.
-        x: inwardDirection.y,
-        y: -inwardDirection.x
-      };
-      const cameraBlend = animationProgress * animationProgress * (3 - 2 * animationProgress);
-      // Docking should finish at the station center instead of flying
-      // through and out the back. Interpolating from the player's entry
-      // point to the center makes the cinematic deterministic and keeps the
-      // ship visually swallowed by the station interior.
-      combatState.player.x =
-        dockingAnimationState.startX + (combatState.station.x - dockingAnimationState.startX) * cameraBlend;
-      combatState.player.y =
-        dockingAnimationState.startY + (combatState.station.y - dockingAnimationState.startY) * cameraBlend;
-      combatState.player.angle = Math.atan2(inwardDirection.y, inwardDirection.x);
-      playerBankState = createShipBankState();
-
-      const baseCameraDistance = getPerspectiveCameraDistance(ch, 36);
-      const dockMouth = getStationDockMouthPoint(combatState.station);
-      // Docking readability matters more than a perfectly centered view. Keep
-      // the camera trailing behind the ship and slightly off-axis so the hull
-      // stays inside frame while the station mouth remains visible ahead.
-      const cameraPosition = {
-        x:
-          combatState.player.x -
-          inwardDirection.x * DOCKING_CAMERA_FOLLOW_DISTANCE +
-          lateralDirection.x * DOCKING_CAMERA_SIDE_OFFSET * cameraBlend,
-        y:
-          combatState.player.y -
-          inwardDirection.y * DOCKING_CAMERA_FOLLOW_DISTANCE +
-          lateralDirection.y * DOCKING_CAMERA_SIDE_OFFSET * cameraBlend,
-        z: baseCameraDistance * (1 - cameraBlend * (1 - DOCKING_CAMERA_HEIGHT_FACTOR))
-      };
-      const cameraLookAt = {
-        // Focus the shot on the tunnel mouth instead of the station center.
-        // Blending from the ship toward the mouth keeps entry readable while
-        // still letting the player hull anchor the composition.
-        x:
-          combatState.player.x +
-          inwardDirection.x * DOCKING_CAMERA_LOOKAHEAD * (1 - cameraBlend) +
-          (dockMouth.x - combatState.player.x) * DOCKING_CAMERA_MOUTH_FOCUS * cameraBlend,
-        y:
-          combatState.player.y +
-          inwardDirection.y * DOCKING_CAMERA_LOOKAHEAD * (1 - cameraBlend) +
-          (dockMouth.y - combatState.player.y) * DOCKING_CAMERA_MOUTH_FOCUS * cameraBlend,
-        z: 0
-      };
-
-      dockingAnimationState.elapsedMs += deltaMs;
-      updateHud();
-      travelSceneRenderer.renderFrame({
-        combatState,
-        stars,
-        flightState,
-        systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
-        showTargetLock: false,
-        playerBankAngle: 0,
-        enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
-        backgroundStar,
-        cameraOverride: {
-          position: cameraPosition,
-          lookAt: cameraLookAt
-        },
-        radarInsetTop,
-        radarInsetRight
-      });
-      if (dockingAnimationState.elapsedMs >= DOCKING_ANIMATION_DURATION_MS) {
-        completeDocking(dockingAnimationState.dockSystemName, dockingAnimationState.spendJumpFuel);
-        return true;
-      }
-      finalizeFrame(timestamp, workStart, perfAccumulator);
-      return true;
     };
 
     const runPlayerDeathFrame = (timestamp: number, deltaMs: number, dt: number, workStart: number, perfAccumulator: PerfAccumulator) => {
@@ -725,12 +546,10 @@ export function useTravelSession(
         {
           thrust: 0,
           turn: 0,
-          toggleLasers: false,
           jump: false,
           hyperspace: false,
           activateEcm: false,
-          triggerEnergyBomb: false,
-          autoDock: false
+          triggerEnergyBomb: false
         },
         dt,
         deathWorldFlightState,
@@ -783,15 +602,30 @@ export function useTravelSession(
     const loop = (timestamp: number) => {
       const deltaMs = lastTimestamp === 0 ? 16.6667 : timestamp - lastTimestamp;
       lastTimestamp = timestamp;
-      elapsedFlightMs += deltaMs;
       const dt = Math.min(deltaMs, 32) / 16.6667;
       const workStart = performance.now();
       const perfAccumulator = perfRef.current;
       pushPerfSample(perfAccumulator.frameDeltas, deltaMs);
-      if (runDockingAnimationFrame(timestamp, deltaMs, dt, workStart, perfAccumulator)) {
+      if (runPlayerDeathFrame(timestamp, deltaMs, dt, workStart, perfAccumulator)) {
         return;
       }
-      if (runPlayerDeathFrame(timestamp, deltaMs, dt, workStart, perfAccumulator)) {
+      if (pausedRef.current) {
+        updateHud();
+        setGameOverOverlay({ visible: false });
+        travelSceneRenderer.renderFrame({
+          combatState,
+          stars,
+          flightState,
+          systemLabel: jumpCompleted ? session.destinationSystem : session.originSystem,
+          showTargetLock: Boolean(combatState.playerTargetLock),
+          playerBankAngle: playerBankState.visualAngle,
+          enemyBankAngles: new Map(Array.from(enemyBankStates, ([enemyId, state]) => [enemyId, state.visualAngle])),
+          backgroundStar,
+          playerDeathEffect: null,
+          radarInsetTop,
+          radarInsetRight
+        });
+        finalizeFrame(timestamp, workStart, perfAccumulator);
         return;
       }
       const liveInput = inputRef.current;
@@ -815,29 +649,10 @@ export function useTravelSession(
         liveInput.vectorStrength = 0;
       }
 
-      const manualSteeringRequested = Math.abs(liveInput.turn) > 0.08 || liveInput.thrust > 0.08;
-      if (autoDockActive && manualSteeringRequested) {
-        autoDockActive = false;
-        autoDockState = null;
-        showMessage('AUTO-DOCK CANCELLED', 900);
-      }
-      if (autoDockActive && (!canAutoDock(combatState) || flightState === 'HYPERSPACE' || flightState === 'JUMPING')) {
-        autoDockActive = false;
-        autoDockState = null;
-        showMessage('AUTO-DOCK CANCELLED', 900);
-      }
-
       liveInput.jump = keys.j || keys.J || liveInput.jump;
       liveInput.hyperspace = keys.h || keys.H || liveInput.hyperspace;
       liveInput.activateEcm = keys.e || keys.E || liveInput.activateEcm;
       liveInput.triggerEnergyBomb = keys.b || keys.B || liveInput.triggerEnergyBomb;
-      liveInput.autoDock = autoDockRef.current.enabled && (keys.d || keys.D || liveInput.autoDock);
-
-      if (liveInput.autoDock && autoDockRef.current.enabled && !autoDockActive && flightState !== 'HYPERSPACE' && flightState !== 'JUMPING') {
-        autoDockActive = true;
-        autoDockState = createAutoDockState();
-        showMessage('AUTO-DOCK ENGAGED', 900);
-      }
 
       if (flightState === 'READY' && (Math.abs(combatState.player.vx) > 0.02 || Math.abs(combatState.player.vy) > 0.02 || liveInput.thrust > 0 || Math.abs(liveInput.turn) > 0.1)) {
         flightState = 'PLAYING';
@@ -863,32 +678,20 @@ export function useTravelSession(
         }
       }
 
-      let autoDockCommand = null;
-      if (autoDockActive && combatState.station && autoDockState) {
-        const autoDockStep = stepAutoDockState(autoDockState, combatState.station, combatState.player);
-        autoDockState = autoDockStep.state;
-        autoDockCommand = autoDockStep.command;
-      }
-
       const playerTurnCommand = flightState === 'HYPERSPACE' || flightState === 'JUMPING'
         ? 0
-        : autoDockCommand?.turn ?? (joystickHeading === null ? liveInput.turn : getJoystickTurnCommand(combatState.player.angle, joystickHeading));
+        : joystickHeading === null ? liveInput.turn : getJoystickTurnCommand(combatState.player.angle, joystickHeading);
       const previousPlayerAngle = combatState.player.angle;
       const previousEnemyAngles = new Map<number, number>(combatState.enemies.map((enemy) => [enemy.id, enemy.angle]));
       const result = stepTravelCombat(
         combatState,
         {
-          // While auto-dock is active, the docking computer injects the same
-          // low-level turn/thrust controls a pilot would use, so the ship
-          // still follows the normal flight model and station collision rules.
-          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : autoDockCommand?.thrust ?? joystickThrust ?? liveInput.thrust,
+          thrust: flightState === 'HYPERSPACE' || flightState === 'JUMPING' ? 0 : joystickThrust ?? liveInput.thrust,
           turn: playerTurnCommand,
-          toggleLasers: flightState === 'HYPERSPACE' ? false : liveInput.toggleLasers,
           jump: flightState === 'JUMPING' && jumpRequested && !jumpBlocked,
           hyperspace: flightState === 'HYPERSPACE',
           activateEcm: flightState === 'HYPERSPACE' ? false : liveInput.activateEcm,
-          triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : liveInput.triggerEnergyBomb,
-          autoDock: false
+          triggerEnergyBomb: flightState === 'HYPERSPACE' ? false : liveInput.triggerEnergyBomb
         },
         dt,
         flightState,
@@ -918,13 +721,6 @@ export function useTravelSession(
         creditedCombatReward = combatState.player.combatReward;
       }
 
-      if (result.autoDocked) {
-        autoDockActive = false;
-        autoDockState = null;
-        completeDocking(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
-        return;
-      }
-
       if ((flightState === 'READY' || flightState === 'PLAYING' || flightState === 'ARRIVED') && liveInput.jump) {
         startLocalJump();
       }
@@ -933,39 +729,7 @@ export function useTravelSession(
         startHyperspace();
       }
 
-      if ((keys.d || keys.D) && autoDockRef.current.visible && !autoDockRef.current.enabled && flightState !== 'HYPERSPACE') {
-        showMessage('AUTO-DOCK REQUIRES SAFE ZONE', 900);
-      }
-
       stepHyperspaceFlight(dt);
-
-      if (combatState.station && flightState !== 'HYPERSPACE') {
-        // Manual docking is resolved outside the combat step so the hook can
-        // decide whether to finish travel or destroy the ship before the UI
-        // commits the next frame.
-        const docking = assessDockingApproach(combatState.station, combatState.player);
-        // Successful docking must win over hull collision once the ship has
-        // already crossed the accepted doorway depth. Otherwise a pilot can
-        // fly deep enough into the station to satisfy `canDock`, yet still be
-        // blown up because the transient "mouth" check no longer matches.
-        if (docking.canDock) {
-          startDockingAnimation(jumpCompleted ? session.destinationSystem : session.originSystem, jumpCompleted);
-          finalizeFrame(timestamp, workStart, perfAccumulator);
-          return;
-        }
-        if (docking.collidesWithHull) {
-          // The station hull is unforgiving in the original game: clipping the
-          // solid ring is a fatal mistake, not a recoverable bumper impact.
-          combatState.player.hp = 0;
-          startPlayerDeathSequence();
-          finalizeFrame(timestamp, workStart, perfAccumulator);
-          return;
-        } else if (docking.isInDockingGap) {
-          if (!docking.isFacingHangar || docking.speed >= 3.6) {
-            showMessage('ENTER SLOT NOSE-IN AT LOW SPEED', 1000);
-          }
-        }
-      }
 
       if (result.playerDestroyed) {
         startPlayerDeathSequence();
@@ -976,16 +740,6 @@ export function useTravelSession(
       if (result.playerEscaped) {
         finishPlayerLoss();
         return;
-      }
-
-      if (flightState === 'ARRIVED' && Math.hypot(combatState.player.vx, combatState.player.vy) < 0.05) {
-        stationaryTicks += 1;
-        if (stationaryTicks > 120) {
-          showMessage('LINE UP WITH THE SPLIT IN THE STATION RING', 1400);
-          stationaryTicks = 0;
-        }
-      } else {
-        stationaryTicks = 0;
       }
 
       if (overlayTimer > 0) {
@@ -1001,7 +755,6 @@ export function useTravelSession(
         // sustain local jump for as long as the player keeps holding the button.
         liveInput.jump = jumpPointerIdRef.current !== null;
       }
-      liveInput.toggleLasers = false;
       if (!keys.h && !keys.H) {
         liveInput.hyperspace = false;
       }
@@ -1010,9 +763,6 @@ export function useTravelSession(
       }
       if (!keys.b && !keys.B) {
         liveInput.triggerEnergyBomb = false;
-      }
-      if (!keys.d && !keys.D) {
-        liveInput.autoDock = false;
       }
 
       updateHud();
@@ -1061,7 +811,6 @@ export function useTravelSession(
     message,
     gameOverOverlay,
     hyperspaceHidden,
-    autoDock,
     bomb,
     ecm,
     perf,
@@ -1069,10 +818,9 @@ export function useTravelSession(
     joystickView,
     viewportHandlers,
     jumpButtonHandlers,
-    toggleLasersButtonHandlers,
     hyperspaceButtonHandlers,
     ecmButtonHandlers,
     bombButtonHandlers,
-    dockButtonHandlers
+    resetInput
   };
 }

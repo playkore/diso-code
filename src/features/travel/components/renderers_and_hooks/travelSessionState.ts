@@ -19,7 +19,6 @@ export interface TravelSessionHudState {
   legalColor: string;
   threat: string;
   threatColor: string;
-  lasersActive: boolean;
   arc: string;
   arcColor: string;
 }
@@ -48,12 +47,6 @@ export interface CombatCommanderSnapshot {
   missilesInstalled: CommanderState['missilesInstalled'];
 }
 
-export interface AutoDockUiState {
-  visible: boolean;
-  enabled: boolean;
-  active: boolean;
-}
-
 export interface BombUiState {
   visible: boolean;
 }
@@ -64,14 +57,6 @@ export interface EcmUiState {
 
 export interface GameOverOverlayState {
   visible: boolean;
-}
-
-export interface DockingAnimationState {
-  elapsedMs: number;
-  dockSystemName: string;
-  spendJumpFuel: boolean;
-  startX: number;
-  startY: number;
 }
 
 export const INITIAL_HUD: TravelSessionHudState = {
@@ -91,7 +76,6 @@ export const INITIAL_HUD: TravelSessionHudState = {
   legalColor: CGA_GREEN,
   threat: 'F- / 0',
   threatColor: CGA_GREEN,
-  lasersActive: true,
   arc: 'FRONT',
   arcColor: CGA_RED
 };
@@ -115,7 +99,6 @@ export function areTravelSessionHudStatesEqual(previous: TravelSessionHudState, 
     previous.threat === next.threat &&
     previous.threatColor === next.threatColor &&
     previous.arc === next.arc &&
-    previous.arcColor === next.arcColor &&
-    previous.lasersActive === next.lasersActive
+    previous.arcColor === next.arcColor
   );
 }
