@@ -1,10 +1,8 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSystemByName, getSystemDistance, getVisibleSystems, getWrappedChartDelta } from '../domain/galaxyCatalog';
-import { MAX_FUEL, getFuelUnits, getJumpFuelCost, getJumpFuelUnits } from '../../../shared/domain/fuel';
+import { MAX_FUEL, getFuelUnits, getJumpFuelUnits } from '../../../shared/domain/fuel';
 import { useGameStore } from '../../../store/useGameStore';
-import { formatLightYears } from '../../../shared/utils/distance';
-import { getSystemRpgLevel } from '../../travel/domain/combat/spawn/rpgScaling';
 
 interface StarPoint {
   name: string;
@@ -49,12 +47,9 @@ export function StarMapScreen() {
     [currentFuel, universe.currentSystem, universe.galaxyIndex]
   );
   const selectedPoint = starPoints.find((star) => star.name === selectedChartSystem) ?? null;
-  const selectedDistance = selectedChartSystem ? getJumpFuelCost(getSystemDistance(universe.currentSystem, selectedChartSystem, universe.galaxyIndex)) : null;
-  const fuelAfterJump = selectedDistance === null ? null : Math.max(0, currentFuel - selectedDistance);
   const missingFuelUnits = Math.max(0, getFuelUnits(MAX_FUEL) - getFuelUnits(currentFuel));
   const detailsSystemName = selectedChartSystem ?? universe.currentSystem;
   const showingCurrentSystem = selectedChartSystem === null;
-  const detailsSystem = getSystemByName(detailsSystemName, universe.galaxyIndex)?.data ?? null;
 
   return (
     <section className="screen">
@@ -85,29 +80,6 @@ export function StarMapScreen() {
         </svg>
       </div>
       <div className="star-map__actions">
-        <p>
-          {showingCurrentSystem ? (
-            <>
-              Current system: <strong>{detailsSystemName}</strong>
-            </>
-          ) : (
-            <>
-              Selected destination: <strong>{detailsSystemName}</strong>
-            </>
-          )}
-        </p>
-        {!showingCurrentSystem ? (
-          <p>
-            Distance: <strong>{selectedDistance !== null ? formatLightYears(selectedDistance) : 'Unknown'}</strong>
-            {' · '}
-            Fuel after jump: <strong>{fuelAfterJump !== null ? formatLightYears(fuelAfterJump) : 'Unknown'}</strong>
-          </p>
-        ) : null}
-        {detailsSystem ? (
-          <p>
-            Enemy level band: <strong>{getSystemRpgLevel(detailsSystem.x)}+</strong>
-          </p>
-        ) : null}
         <div className="star-map__action-row">
           <button type="button" disabled={missingFuelUnits < 1} onClick={() => buyFuel(missingFuelUnits)}>
             Fill Fuel

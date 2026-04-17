@@ -352,11 +352,12 @@ header {
 .hud-grid {
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
 .hud-grid div {
+  min-width: 0;
   padding: 0.35rem 0.45rem;
   border-radius: 0.6rem;
   border: 2px solid var(--cga-yellow);
@@ -375,7 +376,7 @@ header {
 
 .hud-grid dd {
   margin: 0;
-  font-size: 1rem;
+  font-size: clamp(0.84rem, 2.6vw, 1rem);
   font-weight: 700;
   line-height: 1.1;
 }
@@ -880,6 +881,10 @@ button:disabled {
 @media (max-width: 520px) {
   .hud-grid dt {
     margin-bottom: 0.1rem;
+  }
+
+  .hud-grid dd {
+    font-size: 0.78rem;
   }
 
   .save-slot__header {
