@@ -119,10 +119,9 @@ export function getEnemyColor(roles: CombatShipRoles, missionTag?: TravelCombatS
 }
 
 export function getProjectileColor(projectile: CombatProjectile) {
-  if (projectile.kind === 'missile') {
-    return CGA_YELLOW;
-  }
-  return projectile.owner === 'player' ? CGA_GREEN : CGA_RED;
+  // The projectile pool now only contains enemy missiles, so the renderer
+  // keeps their color fixed to the classic warning yellow.
+  return CGA_YELLOW;
 }
 
 export interface EnemyHealthBarState {
@@ -147,6 +146,10 @@ export interface EnemyLaserTrace {
   startY: number;
   endX: number;
   endY: number;
+}
+
+export function getPlayerLaserTrace(state: TravelCombatState) {
+  return state.player.laserTrace;
 }
 
 /**

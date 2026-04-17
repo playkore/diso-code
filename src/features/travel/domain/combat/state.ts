@@ -186,6 +186,7 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       laserHeatCooldownRate: PLAYER_LASER_COOL_RATE,
       maxSpeed,
       fireCooldown: 0,
+      laserTrace: null,
       tallyKills: 0,
       // Rewards earned during the live encounter are buffered here until the
       // travel screen hands control back to the docked commander state.
@@ -342,23 +343,20 @@ export function getPlayerCombatSnapshot(state: TravelCombatState) {
 /**
  * Central weapon tuning table for player laser mounts.
  *
- * The projectile `damage` field is now a weapon bonus added on top of the
- * commander's RPG attack stat, which keeps equipment upgrades meaningful while
- * still letting level-ups raise raw combat output.
+ * Laser shots now resolve as instant hits, so this profile only carries the
+ * per-shot damage bonus and the cooldown between shots.
  */
-const PLAYER_LASER_RANGE_MULTIPLIER = 3;
-
-export function getLaserProjectileProfile(laserId: LaserId) {
+export function getLaserWeaponProfile(laserId: LaserId) {
   switch (laserId) {
     case 'military_laser':
-      return { damage: 24, speed: 18, life: 26 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 8 };
+      return { damage: 24, cooldown: 8 };
     case 'beam_laser':
-      return { damage: 16, speed: 16, life: 22 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 10 };
+      return { damage: 16, cooldown: 10 };
     case 'mining_laser':
-      return { damage: 10, speed: 14, life: 24 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 14 };
+      return { damage: 10, cooldown: 14 };
     case 'pulse_laser':
     default:
-      return { damage: 15, speed: 14, life: 18 * PLAYER_LASER_RANGE_MULTIPLIER, cooldown: 12 };
+      return { damage: 15, cooldown: 12 };
   }
 }
 

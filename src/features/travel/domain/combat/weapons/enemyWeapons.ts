@@ -43,8 +43,6 @@ export function spawnEnemyMissile(state: TravelCombatState, enemy: CombatEnemy) 
   const missileSpeed = toWorldSpeed(CLASSIC_MISSILE_TOP_SPEED);
   state.projectiles.push({
     id: projectileId(state),
-    kind: 'missile',
-    owner: 'enemy',
     x: enemy.x + Math.cos(enemy.angle) * 14,
     y: enemy.y + Math.sin(enemy.angle) * 14,
     vx: enemy.vx + Math.cos(enemy.angle) * missileSpeed,

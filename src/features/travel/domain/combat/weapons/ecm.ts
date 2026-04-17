@@ -14,15 +14,13 @@ export function clearEnemyMissiles(state: TravelCombatState) {
   let clearedMissiles = 0;
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
     const projectile = state.projectiles[i];
-    if (projectile.kind === 'missile' && projectile.owner === 'enemy') {
-      const distanceToPlayer = Math.hypot(projectile.x - state.player.x, projectile.y - state.player.y);
-      if (distanceToPlayer > ECM_EFFECT_RADIUS) {
-        continue;
-      }
-      spawnParticles(state, projectile.x, projectile.y, '#ffff55');
-      state.projectiles.splice(i, 1);
-      clearedMissiles += 1;
+    const distanceToPlayer = Math.hypot(projectile.x - state.player.x, projectile.y - state.player.y);
+    if (distanceToPlayer > ECM_EFFECT_RADIUS) {
+      continue;
     }
+    spawnParticles(state, projectile.x, projectile.y, '#ffff55');
+    state.projectiles.splice(i, 1);
+    clearedMissiles += 1;
   }
   return clearedMissiles;
 }

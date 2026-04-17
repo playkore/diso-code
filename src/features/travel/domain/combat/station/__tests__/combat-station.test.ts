@@ -67,9 +67,9 @@ describe('travel combat station rules', () => {
     state.player.x = 0;
     state.player.y = 0;
     state.player.hp = 70;
-    state.projectiles.push({ id: 7, kind: 'missile', owner: 'enemy', x: 361, y: 0, vx: -5, vy: 0, damage: 22, life: 100 });
+    state.projectiles.push({ id: 7, x: 361, y: 0, vx: -5, vy: 0, damage: 22, life: 100 });
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, rng);
-    expect(state.projectiles.some((projectile) => projectile.kind === 'missile' && projectile.owner === 'enemy')).toBe(false);
+    expect(state.projectiles).toHaveLength(0);
     expect(state.player.hp).toBe(70);
   });
 

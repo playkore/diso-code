@@ -28,7 +28,7 @@ import type { LineShape } from './background/types';
 import { CGA_BLACK, CGA_GREEN, CGA_RED, CGA_YELLOW } from './renderers/constants';
 import { createShipObject, createStationObject } from './renderers/shipPresenter';
 import { PARALLAX_LAYER_CONFIGS, bucketStarsByParallax, getPerspectiveCameraDistance, getShipPresentationAngles, getWrappedStarScreenPosition } from './renderers/travelSceneMath';
-import { getEnemyColor, getEnemyHealthBarState, getEnemyLaserTrace, getProjectileColor, type BackgroundStar, type StarPoint } from './travelVisuals';
+import { getEnemyColor, getEnemyHealthBarState, getEnemyLaserTrace, getPlayerLaserTrace, getProjectileColor, type BackgroundStar, type StarPoint } from './travelVisuals';
 
 interface TravelSceneRenderArgs {
   combatState: TravelCombatState;
@@ -540,6 +540,20 @@ export class TravelSceneRenderer {
       }
       playerAnchor.add(player);
       this.worldGroup.add(playerAnchor);
+
+      const playerLaserTrace = getPlayerLaserTrace(combatState);
+      if (playerLaserTrace) {
+        this.worldGroup.add(
+          createSegmentObject(
+            playerLaserTrace.startX,
+            playerLaserTrace.startY,
+            playerLaserTrace.endX,
+            playerLaserTrace.endY,
+            CGA_GREEN,
+            PROJECTILE_Z
+          )
+        );
+      }
     }
 
     for (const projectile of combatState.projectiles) {

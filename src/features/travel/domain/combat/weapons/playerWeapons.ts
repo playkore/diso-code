@@ -1,7 +1,8 @@
-import { clampAngle, clampLaserHeat, getLaserHeatPerShot, getLaserProjectileProfile, projectileId, pushMessage } from '../state';
-import type { CombatEnemy, PlayerTargetLock, TravelCombatState } from '../types';
+import { clampAngle, clampLaserHeat, getLaserHeatPerShot, getLaserWeaponProfile, pushMessage } from '../state';
+import type { CombatEnemy, PlayerTargetLock, RandomSource, TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../../../commander/domain/shipCatalog';
 import { PLAYER_TARGET_LOCK_RANGE } from '../navigation';
+import { destroyEnemy } from '../scoring/salvage';
 
 const PLAYER_LASER_SECTOR_HALF_ANGLE = Math.PI / 4;
 
@@ -193,33 +194,34 @@ export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerT
   return 'ready';
 }
 
-function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId, enemy?: CombatEnemy) {
-  const profile = getLaserProjectileProfile(laserId);
+function firePlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId, enemy: CombatEnemy, random: RandomSource) {
+  const profile = getLaserWeaponProfile(laserId);
   const spawnAngle = getMountAngle(state.player.angle, mount);
   const originX = state.player.x + Math.cos(spawnAngle) * 12;
   const originY = state.player.y + Math.sin(spawnAngle) * 12;
-  const aimDx = enemy ? enemy.x - originX : Math.cos(spawnAngle);
-  const aimDy = enemy ? enemy.y - originY : Math.sin(spawnAngle);
-  const aimDistance = Math.hypot(aimDx, aimDy);
-  const directionX = aimDistance > 0.001 ? aimDx / aimDistance : Math.cos(spawnAngle);
-  const directionY = aimDistance > 0.001 ? aimDy / aimDistance : Math.sin(spawnAngle);
+  const targetDx = enemy.x - originX;
+  const targetDy = enemy.y - originY;
+  const targetDistance = Math.hypot(targetDx, targetDy);
+  const directionX = targetDistance > 0.001 ? targetDx / targetDistance : Math.cos(spawnAngle);
+  const directionY = targetDistance > 0.001 ? targetDy / targetDistance : Math.sin(spawnAngle);
 
-  state.projectiles.push({
-    id: projectileId(state),
-    kind: 'laser',
-    owner: 'player',
-    x: originX,
-    y: originY,
-    vx: directionX * profile.speed + state.player.vx,
-    vy: directionY * profile.speed + state.player.vy,
-    // Weapon tiers now add onto the commander's RPG attack stat instead of
-    // drawing from a separate ship-energy pool, so progression affects every
-    // mounted laser without removing the reason to upgrade the hardware.
-    damage: profile.damage + state.player.attack,
-    life: profile.life,
-    sourceMount: mount,
-    targetEnemyId: enemy?.id
-  });
+  state.player.laserTrace = {
+    startX: originX + directionX * 10,
+    startY: originY + directionY * 10,
+    endX: enemy.x,
+    endY: enemy.y
+  };
+
+  // Weapon tiers now add onto the commander's RPG attack stat instead of
+  // drawing from a separate ship-energy pool, so progression affects every
+  // mounted laser without removing the reason to upgrade the hardware.
+  enemy.hp = Math.max(0, enemy.hp - (profile.damage + state.player.attack));
+  if (enemy.hp <= 0) {
+    const enemyIndex = state.enemies.findIndex((candidate) => candidate.id === enemy.id);
+    if (enemyIndex >= 0) {
+      destroyEnemy(state, enemyIndex, random);
+    }
+  }
   state.player.fireCooldown = profile.cooldown;
   state.lastPlayerArc = mount;
 }
@@ -228,7 +230,7 @@ function spawnPlayerLaser(state: TravelCombatState, mount: LaserMountPosition, l
  * Auto-fire always prefers the currently published auto-target lock. If no
  * hostile ship sits inside an armed arc, the weapon controller simply idles.
  */
-export function firePlayerLasers(state: TravelCombatState) {
+export function firePlayerLasers(state: TravelCombatState, random: RandomSource) {
   const resolvedTarget = resolveCurrentPlayerTarget(state);
   if (!resolvedTarget) {
     return true;
@@ -256,6 +258,6 @@ export function firePlayerLasers(state: TravelCombatState) {
     state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId),
     state.player.maxLaserHeat
   );
-  spawnPlayerLaser(state, resolvedTarget.mount, laserId, resolvedTarget.enemy);
+  firePlayerLaser(state, resolvedTarget.mount, laserId, resolvedTarget.enemy, random);
   return true;
 }

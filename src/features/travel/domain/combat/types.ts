@@ -201,8 +201,6 @@ export interface CombatEnemy {
  */
 export interface CombatProjectile {
   id: number;
-  kind: 'laser' | 'missile';
-  owner: 'player' | 'enemy';
   x: number;
   y: number;
   vx: number;
@@ -210,12 +208,20 @@ export interface CombatProjectile {
   damage: number;
   life: number;
   sourceEnemyId?: number;
-  /**
-   * Player lasers now store the mount that fired and the target they were
-   * aimed at so the simulation and tests can reason about sector handoffs.
-   */
-  sourceMount?: LaserMountPosition;
-  targetEnemyId?: number;
+}
+
+/**
+ * One-frame laser beam used by the renderer for instant-hit weapons.
+ *
+ * Laser shots resolve immediately in the simulation, but the travel screen
+ * still needs the beam endpoints so it can show a visible strike for the
+ * current frame.
+ */
+export interface CombatLaserTrace {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
 }
 
 /**
@@ -265,6 +271,12 @@ export interface CombatPlayer {
   laserHeatCooldownRate: number;
   maxSpeed: number;
   fireCooldown: number;
+  /**
+   * Player laser fire is rendered as a one-frame beam trace rather than a
+   * persistent projectile, so the simulation keeps the most recent shot
+   * geometry here for the renderer to consume immediately.
+   */
+  laserTrace: CombatLaserTrace | null;
   tallyKills: number;
   combatReward: number;
 }

@@ -99,6 +99,7 @@ export function stepTravelCombat(
       state.player.maxLaserHeat
     );
   }
+  state.player.laserTrace = null;
   if (input.toggleLasers) {
     // The travel UI owns the switch gesture, but the simulation owns the armed
     // state so tests and live gameplay share the exact same behavior.
@@ -157,7 +158,7 @@ export function stepTravelCombat(
       state.playerTargetLock = null;
     }
     if (state.playerLasersActive && targetLock && state.player.fireCooldown <= 0) {
-      firePlayerLasers(state);
+      firePlayerLasers(state, random);
     }
   }
 
