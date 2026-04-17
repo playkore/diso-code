@@ -5,7 +5,7 @@ import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
 import { firePlayerLasers, refreshPlayerTargetLock } from './weapons/playerWeapons';
-import { dampVelocity, stepParticles } from './state';
+import { clampHp, dampVelocity, stepParticles } from './state';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
 import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCombatState } from './types';
@@ -191,6 +191,11 @@ export function stepTravelCombat(
 
   state.encounter.copsNearby = state.enemies.filter((enemy) => enemy.roles.cop).length;
   moveProjectiles(state, dt, random);
+  if (state.player.hp > 0 && state.player.hp < state.player.maxHp) {
+    // Passive repair is intentionally slow and linear: 5% of max HP per
+    // second, converted through the normalized tick scale used by combat.
+    state.player.hp = clampHp(state.player.hp + state.player.maxHp * 0.05 * (dt / 60), state.player.maxHp);
+  }
   if (state.playerLasersActive) {
     refreshPlayerTargetLock(state);
   } else {

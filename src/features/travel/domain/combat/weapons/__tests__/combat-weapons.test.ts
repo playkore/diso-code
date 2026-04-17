@@ -521,15 +521,15 @@ describe('travel combat weapons', () => {
     expect(state.projectiles).toHaveLength(0);
     expect(state.player.laserTrace).not.toBeNull();
     expect(state.enemies.find((enemy) => enemy.id === 41)?.hp).toBe(375);
-    expect(state.player.hp).toBe(1);
+    expect(state.player.hp).toBeCloseTo(1.05, 5);
   });
 
-  it('does not passively regenerate player HP between combat ticks', () => {
+  it('passively regenerates player HP at five percent per second', () => {
     const state = createCombatState([0, 0, 0]);
     state.player.hp = 25;
 
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 120, 'PLAYING', {}, createDeterministicRandomSource([0]));
 
-    expect(state.player.hp).toBe(25);
+    expect(state.player.hp).toBe(31);
   });
 });
