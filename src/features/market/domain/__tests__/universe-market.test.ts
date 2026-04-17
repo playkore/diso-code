@@ -8,37 +8,37 @@ import { createDefaultCommander } from '../../../commander/domain/commander';
 
 describe('universe generation', () => {
   it('keeps canonical base seed', () => {
-    expect(BASE_SEED).toEqual({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 });
+    expect(BASE_SEED).toEqual({ w0: 0x1f2d, w1: 0x3b4a, w2: 0x6c7e });
   });
 
   it('generates deterministic first systems in galaxy 0', () => {
     const systems = generateGalaxy(0);
     expect(systems).toHaveLength(256);
-    expect(systems[0].seed).toEqual({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 });
-    expect(systems[1].seed).toEqual({ w0: 0xcd80, w1: 0x98b8, w2: 0x7a1d });
+    expect(systems[0].seed).toEqual({ w0: 0x1f2d, w1: 0x3b4a, w2: 0x6c7e });
+    expect(systems[1].seed).toEqual({ w0: 0x6ebd, w1: 0xa230, w2: 0xd7e2 });
   });
 
   it('applies galaxy transform per galaxy index', () => {
-    expect(generateGalaxySeed(1)).toEqual({ w0: 0xb494, w1: 0x0490, w2: 0x6fa6 });
+    expect(generateGalaxySeed(1)).toEqual({ w0: 0x3e5a, w1: 0x7694, w2: 0xd8fc });
   });
 });
 
 describe('system names and data', () => {
   it('builds expected name for the canonical base seed', () => {
-    expect(generateSystemName({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 })).toBe('TIBEDIED');
+    expect(generateSystemName({ w0: 0x1f2d, w1: 0x3b4a, w2: 0x6c7e })).toBe('INBIRE');
   });
 
   it('builds deterministic derived values for the canonical base system', () => {
-    expect(generateSystemData({ w0: 0x5a4a, w1: 0x0248, w2: 0xb753 })).toMatchObject({
-      name: 'Tibedied',
-      x: 0x02,
-      y: 0x5a,
-      economy: 2,
+    expect(generateSystemData({ w0: 0x1f2d, w1: 0x3b4a, w2: 0x6c7e })).toMatchObject({
+      name: 'Inbire',
+      x: 0x3b,
+      y: 0x1f,
+      economy: 7,
       government: 1,
-      techLevel: 8,
-      population: 36,
-      productivity: 11520,
-      radius: 4698,
+      techLevel: 4,
+      population: 25,
+      productivity: 3000,
+      radius: 5919,
       species: 'Human Colonials'
     });
   });

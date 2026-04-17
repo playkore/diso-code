@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getGalaxySystems, getSystemDistance, getSystemByName, getSystemHeading, getWrappedChartDelta, getWrappedChartHeading } from '../galaxyCatalog';
+import { getGalaxySystems, getStartingSystemName, getSystemDistance, getSystemByName, getSystemHeading, getWrappedChartDelta, getWrappedChartHeading } from '../galaxyCatalog';
 import type { SystemData } from '../systemData';
+
+const STARTING_SYSTEM = getStartingSystemName(0);
+const TARGET_SYSTEM = getGalaxySystems(0).find((system) => system.data.name !== STARTING_SYSTEM)?.data.name ?? STARTING_SYSTEM;
 
 function createSystem(x: number, y: number): SystemData {
   return {
@@ -40,9 +43,9 @@ describe('galaxy catalog geometry', () => {
   });
 
   it('measures jump distance using the direct chart route', () => {
-    const distance = getSystemDistance('Lave', 'Diso', 0);
-    const origin = getSystemByName('Lave', 0);
-    const target = getSystemByName('Diso', 0);
+    const distance = getSystemDistance(STARTING_SYSTEM, TARGET_SYSTEM, 0);
+    const origin = getSystemByName(STARTING_SYSTEM, 0);
+    const target = getSystemByName(TARGET_SYSTEM, 0);
     expect(origin).toBeDefined();
     expect(target).toBeDefined();
     const directDistance = Math.hypot(target!.data.x - origin!.data.x, (target!.data.y - origin!.data.y) / 2) * 0.4;
@@ -56,11 +59,11 @@ describe('galaxy catalog geometry', () => {
   });
 
   it('returns a system heading using the same direct map route as jump distance', () => {
-    const origin = getSystemByName('Lave', 0);
-    const target = getSystemByName('Diso', 0);
+    const origin = getSystemByName(STARTING_SYSTEM, 0);
+    const target = getSystemByName(TARGET_SYSTEM, 0);
     expect(origin).toBeDefined();
     expect(target).toBeDefined();
-    expect(getSystemHeading('Lave', 'Diso', 0)).toBeCloseTo(getWrappedChartHeading(origin!.data, target!.data));
+    expect(getSystemHeading(STARTING_SYSTEM, TARGET_SYSTEM, 0)).toBeCloseTo(getWrappedChartHeading(origin!.data, target!.data));
   });
 
   it('returns different system catalogs for different galaxies', () => {

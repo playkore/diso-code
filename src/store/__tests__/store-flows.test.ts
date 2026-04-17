@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultCommander, normalizeCommanderState } from '../../features/commander/domain/commander';
 import { getJumpFuelCost } from '../../shared/domain/fuel';
-import { getSystemDistance } from '../../features/galaxy/domain/galaxyCatalog';
+import { getGalaxySystems, getNearbySystemNames, getStartingSystemName, getSystemDistance } from '../../features/galaxy/domain/galaxyCatalog';
 import { createDefaultMissionTravelContext } from '../../features/travel/domain/missionContext';
 import {
   ACTIVE_SAVE_SLOT_STORAGE_KEY,
@@ -9,6 +9,12 @@ import {
   loadPersistedActiveSaveSlotId
 } from '../../shared/store/gameStateFactory';
 import { useGameStore } from '../useGameStore';
+
+const STARTING_SYSTEM = getStartingSystemName(0);
+const STARTING_NEARBY_SYSTEMS = getNearbySystemNames(STARTING_SYSTEM, 0);
+const TRAVEL_SYSTEM = STARTING_NEARBY_SYSTEMS[0] ?? STARTING_SYSTEM;
+const SECOND_TRAVEL_SYSTEM = STARTING_NEARBY_SYSTEMS[1] ?? getGalaxySystems(0)[1]?.data.name ?? TRAVEL_SYSTEM;
+const HIGH_TECH_SYSTEM = getGalaxySystems(0).find((system) => system.data.techLevel >= 12 && system.data.name !== STARTING_SYSTEM)?.data.name ?? STARTING_SYSTEM;
 
 describe('outfitting store flows', () => {
   const createLocalStorageMock = () => {
@@ -42,7 +48,7 @@ describe('outfitting store flows', () => {
         ...state.universe,
         galaxyIndex: 0,
         currentSystem: commander.currentSystem,
-        nearbySystems: ['Diso'],
+        nearbySystems: STARTING_NEARBY_SYSTEMS,
         stardate: 3124,
         economy: 5,
         marketFluctuation: 0
@@ -59,8 +65,8 @@ describe('outfitting store flows', () => {
   it('buys equipment, lasers, and missiles with store-side checks', () => {
     useGameStore.setState((state) => ({
       ...state,
-      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Zaonce', cash: 120000 }),
-      universe: { ...state.universe, currentSystem: 'Zaonce' }
+      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: HIGH_TECH_SYSTEM, cash: 120000 }),
+      universe: { ...state.universe, currentSystem: HIGH_TECH_SYSTEM }
     }));
     useGameStore.getState().buyEquipment('ecm');
     expect(useGameStore.getState().commander.installedEquipment.ecm).toBe(true);
@@ -102,23 +108,23 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Zaonce',
+        currentSystem: HIGH_TECH_SYSTEM,
         cash: 120000
       }),
-      universe: { ...state.universe, currentSystem: 'Zaonce' }
+      universe: { ...state.universe, currentSystem: HIGH_TECH_SYSTEM }
     }));
 
     useGameStore.getState().buyEquipment('ecm');
 
     expect(useGameStore.getState().saveStates[1]?.snapshot.commander.installedEquipment.ecm).toBe(true);
-    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.currentSystem).toBe('Zaonce');
+    expect(useGameStore.getState().saveStates[1]?.snapshot.commander.currentSystem).toBe(HIGH_TECH_SYSTEM);
   });
 
   it('adds debug credits from settings helpers', () => {
     useGameStore.setState((state) => ({
       ...state,
-      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Lave', cash: 100 }),
-      universe: { ...state.universe, currentSystem: 'Lave' }
+      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: STARTING_SYSTEM, cash: 100 }),
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM }
     }));
     useGameStore.getState().grantDebugCredits(100000);
     expect(useGameStore.getState().commander.cash).toBe(100100);
@@ -129,11 +135,11 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Zaonce',
+        currentSystem: HIGH_TECH_SYSTEM,
         cash: 20000,
         installedEquipment: { ...createDefaultCommander().installedEquipment, ecm: true }
       }),
-      universe: { ...state.universe, currentSystem: 'Zaonce' }
+      universe: { ...state.universe, currentSystem: HIGH_TECH_SYSTEM }
     }));
     useGameStore.getState().buyEquipment('ecm');
     expect(useGameStore.getState().commander.installedEquipment.ecm).toBe(true);
@@ -144,8 +150,8 @@ describe('outfitting store flows', () => {
   it('rejects retired shield, energy, and cargo upgrades', () => {
     useGameStore.setState((state) => ({
       ...state,
-      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: 'Zaonce', cash: 120000 }),
-      universe: { ...state.universe, currentSystem: 'Zaonce' }
+      commander: normalizeCommanderState({ ...createDefaultCommander(), currentSystem: HIGH_TECH_SYSTEM, cash: 120000 }),
+      universe: { ...state.universe, currentSystem: HIGH_TECH_SYSTEM }
     }));
 
     useGameStore.getState().buyEquipment('shield_generator');
@@ -160,18 +166,18 @@ describe('outfitting store flows', () => {
 
   it('lets the player redock at the origin without spending fuel', () => {
     const startingFuel = useGameStore.getState().commander.fuel;
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Lave', spendJumpFuel: false });
-    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: STARTING_SYSTEM, spendJumpFuel: false });
+    expect(useGameStore.getState().commander.currentSystem).toBe(STARTING_SYSTEM);
     expect(useGameStore.getState().commander.fuel).toBe(startingFuel);
   });
 
   it('spends fuel only after docking in the destination system', () => {
     const startingFuel = useGameStore.getState().commander.fuel;
-    const expectedFuel = startingFuel - getJumpFuelCost(getSystemDistance('Lave', 'Diso', 0));
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
-    expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
+    const expectedFuel = startingFuel - getJumpFuelCost(getSystemDistance(STARTING_SYSTEM, TRAVEL_SYSTEM, 0));
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: TRAVEL_SYSTEM, spendJumpFuel: true });
+    expect(useGameStore.getState().commander.currentSystem).toBe(TRAVEL_SYSTEM);
     expect(useGameStore.getState().commander.fuel).toBe(expectedFuel);
   });
 
@@ -180,15 +186,15 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Lave',
+        currentSystem: STARTING_SYSTEM,
         legalValue: 0,
         cargo: { narcotics: 2, firearms: 1 }
       }),
-      universe: { ...state.universe, currentSystem: 'Lave' }
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM }
     }));
 
     expect(useGameStore.getState().commander.legalValue).toBe(0);
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
     expect(useGameStore.getState().commander.legalValue).toBe(0);
   });
 
@@ -197,15 +203,15 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Lave',
+        currentSystem: STARTING_SYSTEM,
         legalValue: 20
       }),
-      universe: { ...state.universe, currentSystem: 'Lave' }
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM }
     }));
 
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
-    expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: TRAVEL_SYSTEM, spendJumpFuel: true });
+    expect(useGameStore.getState().commander.currentSystem).toBe(TRAVEL_SYSTEM);
     expect(useGameStore.getState().commander.legalValue).toBe(10);
   });
 
@@ -214,14 +220,14 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Lave',
+        currentSystem: STARTING_SYSTEM,
         legalValue: 20
       }),
-      universe: { ...state.universe, currentSystem: 'Lave' }
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM }
     }));
 
-    expect(useGameStore.getState().beginTravel('Lave')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Lave', spendJumpFuel: false });
+    expect(useGameStore.getState().beginTravel(STARTING_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: STARTING_SYSTEM, spendJumpFuel: false });
     expect(useGameStore.getState().commander.legalValue).toBe(20);
   });
 
@@ -230,15 +236,15 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Lave',
+        currentSystem: STARTING_SYSTEM,
         legalValue: 2,
         cargo: { narcotics: 2, firearms: 1 }
       }),
-      universe: { ...state.universe, currentSystem: 'Lave' }
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM }
     }));
 
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: TRAVEL_SYSTEM, spendJumpFuel: true });
     expect(useGameStore.getState().commander.legalValue).toBe(1);
   });
 
@@ -247,35 +253,35 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Lave',
+        currentSystem: STARTING_SYSTEM,
         legalValue: 20
       }),
-      universe: { ...state.universe, currentSystem: 'Lave' },
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM },
       ui: {
         ...state.ui,
         instantTravelEnabled: true
       }
     }));
 
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(false);
-    expect(useGameStore.getState().commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(false);
+    expect(useGameStore.getState().commander.currentSystem).toBe(TRAVEL_SYSTEM);
     expect(useGameStore.getState().commander.legalValue).toBe(10);
   });
 
   it('still opens the travel session for undocking when instant travel is enabled', () => {
     useGameStore.setState((state) => ({
       ...state,
-      universe: { ...state.universe, currentSystem: 'Lave' },
+      universe: { ...state.universe, currentSystem: STARTING_SYSTEM },
       ui: {
         ...state.ui,
         instantTravelEnabled: true
       }
     }));
 
-    expect(useGameStore.getState().beginTravel('Lave')).toBe(true);
-    expect(useGameStore.getState().travelSession?.originSystem).toBe('Lave');
-    expect(useGameStore.getState().travelSession?.destinationSystem).toBe('Lave');
-    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().beginTravel(STARTING_SYSTEM)).toBe(true);
+    expect(useGameStore.getState().travelSession?.originSystem).toBe(STARTING_SYSTEM);
+    expect(useGameStore.getState().travelSession?.destinationSystem).toBe(STARTING_SYSTEM);
+    expect(useGameStore.getState().commander.currentSystem).toBe(STARTING_SYSTEM);
   });
 
   it('credits combat rewards immediately through the travel slice helper', () => {
@@ -288,23 +294,23 @@ describe('outfitting store flows', () => {
     useGameStore.getState().startNewGame(2);
     expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY)).toBe('2');
 
-    expect(useGameStore.getState().beginTravel('Orerve')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Orerve', spendJumpFuel: true });
-    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe('Orerve');
+    expect(useGameStore.getState().beginTravel(SECOND_TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: SECOND_TRAVEL_SYSTEM, spendJumpFuel: true });
+    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe(SECOND_TRAVEL_SYSTEM);
     expect(loadPersistedActiveSaveSlotId(useGameStore.getState().saveStates)).toBe(2);
 
     vi.resetModules();
     const { useGameStore: reloadedStore } = await import('../useGameStore');
     expect(reloadedStore.getState().activeSaveSlotId).toBe(2);
-    expect(reloadedStore.getState().commander.currentSystem).toBe('Orerve');
+    expect(reloadedStore.getState().commander.currentSystem).toBe(SECOND_TRAVEL_SYSTEM);
   });
 
   it('stores selected chart systems separately from the current system and clears them after travel', () => {
-    useGameStore.getState().setSelectedChartSystem('Leesti');
-    expect(useGameStore.getState().ui.selectedChartSystem).toBe('Leesti');
+    useGameStore.getState().setSelectedChartSystem(SECOND_TRAVEL_SYSTEM);
+    expect(useGameStore.getState().ui.selectedChartSystem).toBe(SECOND_TRAVEL_SYSTEM);
 
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: TRAVEL_SYSTEM, spendJumpFuel: true });
 
     expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
   });
@@ -314,24 +320,24 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Diso',
+        currentSystem: TRAVEL_SYSTEM,
         cash: 4242,
         fuel: 3.2,
         cargo: { food: 4 }
       }),
       universe: {
         ...state.universe,
-        currentSystem: 'Diso',
-        nearbySystems: ['Lave']
+        currentSystem: TRAVEL_SYSTEM,
+        nearbySystems: [STARTING_SYSTEM]
       },
       travelSession: {
-        originSystem: 'Lave',
-        destinationSystem: 'Diso',
-        effectiveDestinationSystem: 'Diso',
+        originSystem: STARTING_SYSTEM,
+        destinationSystem: TRAVEL_SYSTEM,
+        effectiveDestinationSystem: TRAVEL_SYSTEM,
         fuelCost: 0.4,
         fuelUnits: 4,
         primaryObjectiveText: 'Test run',
-        missionContext: createDefaultMissionTravelContext('Diso')
+        missionContext: createDefaultMissionTravelContext(TRAVEL_SYSTEM)
       },
       ui: {
         ...state.ui,
@@ -355,7 +361,7 @@ describe('outfitting store flows', () => {
 
     useGameStore.getState().resetAfterDeath();
 
-    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().commander.currentSystem).toBe(STARTING_SYSTEM);
     expect(useGameStore.getState().commander.cash).toBe(1000);
     expect(useGameStore.getState().commander.cargo).toEqual({});
     expect(useGameStore.getState().travelSession).toBeNull();
@@ -369,26 +375,26 @@ describe('outfitting store flows', () => {
       ...state,
       commander: normalizeCommanderState({
         ...createDefaultCommander(),
-        currentSystem: 'Diso',
+        currentSystem: TRAVEL_SYSTEM,
         cash: 4242,
         cargo: { food: 4 }
       }),
       universe: {
         ...state.universe,
-        currentSystem: 'Diso',
-        nearbySystems: ['Lave']
+        currentSystem: TRAVEL_SYSTEM,
+        nearbySystems: [STARTING_SYSTEM]
       },
       ui: {
         ...state.ui,
         startScreenVisible: true,
         activeTab: 'equipment',
-        selectedChartSystem: 'Leesti'
+        selectedChartSystem: SECOND_TRAVEL_SYSTEM
       }
     }));
 
     useGameStore.getState().startNewGame(2);
 
-    expect(useGameStore.getState().commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().commander.currentSystem).toBe(STARTING_SYSTEM);
     expect(useGameStore.getState().commander.cash).toBe(1000);
     expect(useGameStore.getState().commander.cargo).toEqual({});
     expect(useGameStore.getState().travelSession).toBeNull();
@@ -397,18 +403,18 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
     expect(useGameStore.getState().ui.latestEvent).toBeUndefined();
     expect(useGameStore.getState().activeSaveSlotId).toBe(2);
-    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe('Lave');
+    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe(STARTING_SYSTEM);
   });
 
   it('autosaves the active slot when docking completes', () => {
     useGameStore.getState().startNewGame(3);
     const beforeTravelSnapshot = JSON.stringify(useGameStore.getState().saveStates[3]);
 
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Diso', spendJumpFuel: true });
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: TRAVEL_SYSTEM, spendJumpFuel: true });
 
     expect(useGameStore.getState().activeSaveSlotId).toBe(3);
-    expect(useGameStore.getState().saveStates[3]?.snapshot.commander.currentSystem).toBe('Diso');
+    expect(useGameStore.getState().saveStates[3]?.snapshot.commander.currentSystem).toBe(TRAVEL_SYSTEM);
     expect(JSON.stringify(useGameStore.getState().saveStates[3])).not.toBe(beforeTravelSnapshot);
   });
 
@@ -416,11 +422,11 @@ describe('outfitting store flows', () => {
     useGameStore.getState().startNewGame(2);
     useGameStore.getState().loadFromSlot(2);
 
-    expect(useGameStore.getState().beginTravel('Orerve')).toBe(true);
-    useGameStore.getState().completeTravel({ dockSystemName: 'Orerve', spendJumpFuel: true });
+    expect(useGameStore.getState().beginTravel(SECOND_TRAVEL_SYSTEM)).toBe(true);
+    useGameStore.getState().completeTravel({ dockSystemName: SECOND_TRAVEL_SYSTEM, spendJumpFuel: true });
 
-    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe('Orerve');
-    expect(useGameStore.getState().saveStates[2]?.snapshot.universe.currentSystem).toBe('Orerve');
+    expect(useGameStore.getState().saveStates[2]?.snapshot.commander.currentSystem).toBe(SECOND_TRAVEL_SYSTEM);
+    expect(useGameStore.getState().saveStates[2]?.snapshot.universe.currentSystem).toBe(SECOND_TRAVEL_SYSTEM);
   });
 
   it('uses Galactic Hyperdrive to move to the next galaxy and consume the item', () => {
@@ -448,7 +454,7 @@ describe('outfitting store flows', () => {
     useGameStore.getState().startNewGame(1);
     const persistedBeforeTravel = window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY);
 
-    expect(useGameStore.getState().beginTravel('Diso')).toBe(true);
+    expect(useGameStore.getState().beginTravel(TRAVEL_SYSTEM)).toBe(true);
 
     expect(window.localStorage.getItem(ACTIVE_SAVE_SLOT_STORAGE_KEY)).toBe(persistedBeforeTravel);
     expect(loadPersistedActiveSaveSlotId(useGameStore.getState().saveStates)).toBe(1);

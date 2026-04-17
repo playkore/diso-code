@@ -6,9 +6,10 @@ import { createMathRandomSource, createTravelCombatState, type CombatStation } f
 import { createStars } from '../../features/travel/components/renderers_and_hooks/travelVisuals';
 import { TravelSceneRenderer } from '../../features/travel/components/renderers_and_hooks/TravelSceneRenderer';
 import { getPerspectiveCameraDistance } from '../../features/travel/components/renderers_and_hooks/renderers/travelSceneMath';
+import { getStartingSystemName } from '../../features/galaxy/domain/galaxyCatalog';
 import { START_SCREEN_SHOWCASE_COUNT, START_SCREEN_SHOWCASE_ENTRIES } from './startScreenShowcase';
 
-const DEMO_SYSTEM_NAME = 'Lave';
+const DEMO_SYSTEM_NAME = getStartingSystemName(0);
 const DEMO_CAMERA_FOV_DEGREES = 36;
 const DEMO_SHIP_CAMERA_DISTANCE_FACTOR = 0.07;
 const DEMO_STARFIELD_SPEED_X = 42;

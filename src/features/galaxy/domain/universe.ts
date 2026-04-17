@@ -17,9 +17,11 @@ export interface GalaxySystemSeed {
 }
 
 export const BASE_SEED: SeedTriplet = {
-  w0: 0x5a4a,
-  w1: 0x0248,
-  w2: 0xb753
+  // Changing this seed shifts the entire procedural galaxy while preserving
+  // the same generation rules for names, coordinates, and downstream systems.
+  w0: 0x1f2d,
+  w1: 0x3b4a,
+  w2: 0x6c7e
 };
 
 const WORD_MASK = 0xffff;

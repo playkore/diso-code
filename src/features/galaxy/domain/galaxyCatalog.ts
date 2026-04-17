@@ -76,6 +76,17 @@ export function getGalaxySystems(galaxyIndex = 0): GalaxySystem[] {
   return getGalaxyCatalog(galaxyIndex);
 }
 
+/**
+ * Returns the first generated system in a galaxy.
+ *
+ * The commander bootstrap and showcase scenes use this as a stable starting
+ * anchor so a seed change automatically moves the whole game to a new
+ * birthplace without hard-coding an old planet name.
+ */
+export function getStartingSystemName(galaxyIndex = 0): string {
+  return getGalaxyCatalog(galaxyIndex)[0]?.data.name ?? 'Unknown';
+}
+
 export function getSystemByName(systemName: string, galaxyIndex = 0): GalaxySystem | undefined {
   return getGalaxyCatalog(galaxyIndex).find((system) => system.data.name === systemName);
 }

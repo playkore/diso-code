@@ -1,5 +1,6 @@
 import { PLAYER_SHIP, type EquipmentId, type LaserId, type LaserMountPosition, type ShipType } from './shipCatalog';
 import { awardRpgXp, normalizeRpgProgression, xpToNextLevel } from './rpgProgression';
+import { getStartingSystemName } from '../../galaxy/domain/galaxyCatalog';
 
 /**
  * Canonical commander-state model and normalization rules.
@@ -114,7 +115,7 @@ export function createDefaultCommander(): CommanderState {
     // legacy tally field.
     combatRatingScore: 0,
     rating: getDosCombatRating(0),
-    currentSystem: 'Lave'
+    currentSystem: getStartingSystemName(0)
   };
 }
 
@@ -342,7 +343,7 @@ export function normalizeCommanderState(
     // Persisted rating strings are compatibility baggage only; Elite Plus
     // recalculates the visible rank from its dedicated combat score.
     rating: getDosCombatRating(combatRatingScore),
-    currentSystem: commander.currentSystem ?? 'Lave'
+    currentSystem: commander.currentSystem ?? getStartingSystemName(0)
   };
 }
 
