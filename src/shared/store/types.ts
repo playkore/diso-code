@@ -48,7 +48,6 @@ export interface UiState {
 }
 
 export type AppTab =
-  | 'market'
   | 'equipment'
   | 'status'
   | 'system-data'

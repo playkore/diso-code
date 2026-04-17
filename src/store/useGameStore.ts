@@ -37,7 +37,7 @@ export const useGameStore = createWithEqualityFn<GameStore>()((set, get, api) =>
     saveStates: persistedSaveStates,
     activeSaveSlotId: bootSaveSlotId,
     ui: {
-      activeTab: 'market',
+      activeTab: 'status',
       selectedChartSystem: null,
       compactMode: true,
       instantTravelEnabled,

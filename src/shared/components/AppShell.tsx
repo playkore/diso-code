@@ -37,18 +37,6 @@ function MenuIcon() {
 
 const navItems: Array<{ tab: AppTab; label: string; to: string; icon: ReactNode }> = [
   {
-    tab: 'market',
-    label: 'Dock',
-    to: TAB_ROUTE_MAP.market,
-    icon: (
-      <NavIcon>
-        <circle cx="12" cy="12" r="7.5" />
-        <path d="M12 6.5v11" />
-        <path d="M8.5 12h7" />
-      </NavIcon>
-    )
-  },
-  {
     tab: 'equipment',
     label: 'Equip',
     to: TAB_ROUTE_MAP.equipment,

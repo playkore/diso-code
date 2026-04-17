@@ -8,7 +8,7 @@ import type { RandomSource, TravelCombatState } from '../types';
  * This pass owns all transient projectile state after firing: homing missiles,
  * hit detection, station safe-zone penalties, player HP damage, and cleanup.
  */
-export function moveProjectiles(state: TravelCombatState, dt: number, random: RandomSource) {
+export function moveProjectiles(state: TravelCombatState, dt: number, _random: RandomSource) {
   for (let i = state.projectiles.length - 1; i >= 0; i -= 1) {
     const projectile = state.projectiles[i];
     const previousX = projectile.x;

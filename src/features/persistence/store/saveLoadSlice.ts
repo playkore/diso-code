@@ -64,7 +64,7 @@ export const createSaveLoadSlice: GameSlice<
       ui: setUiMessage(
         {
           ...current.ui,
-          activeTab: 'market',
+          activeTab: 'status',
           selectedChartSystem: null,
           startScreenVisible: false
         },
@@ -86,18 +86,18 @@ export const createSaveLoadSlice: GameSlice<
     persistActiveSaveSlotId(slotId);
     // Starting a new run now skips all staged intro effects and swaps directly
     // to the freshly initialized docked state. The chosen slot becomes the
-    // active autosave target immediately so the next station dock preserves it.
+    // active autosave target immediately so the next station action preserves it.
     set((state) => ({
       ...freshState,
       saveStates: nextSaveStates,
       activeSaveSlotId: slotId,
-      // A new game always returns to the docked market tab with no active trip.
+      // A new game always returns to the docked status tab with no active trip.
       travelSession: null,
       // The docked shell no longer renders a transient banner, so new-game
       // setup only resets navigation state here.
       ui: {
         ...state.ui,
-        activeTab: 'market',
+        activeTab: 'status',
         selectedChartSystem: null,
         startScreenVisible: false
       }
@@ -115,7 +115,7 @@ export const createSaveLoadSlice: GameSlice<
       activeSaveSlotId: null,
       ui: {
         ...state.ui,
-        activeTab: 'market',
+        activeTab: 'status',
         selectedChartSystem: null,
         startScreenVisible: true,
         latestEvent: undefined,

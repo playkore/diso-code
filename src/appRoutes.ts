@@ -5,7 +5,6 @@ import type { AppTab } from './shared/store/types';
  * refresh recovery, nav rendering, and redirect fallbacks cannot drift apart.
  */
 export const TAB_ROUTE_MAP: Record<AppTab, string> = {
-  market: '/',
   equipment: '/equipment',
   status: '/status',
   'system-data': '/system-data',

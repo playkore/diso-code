@@ -50,7 +50,7 @@ describe('outfitting store flows', () => {
       travelSession: null,
       ui: {
         ...state.ui,
-        activeTab: 'market',
+        activeTab: 'status',
         instantTravelEnabled: false
       }
     }));
@@ -393,7 +393,7 @@ describe('outfitting store flows', () => {
     expect(useGameStore.getState().commander.cargo).toEqual({});
     expect(useGameStore.getState().travelSession).toBeNull();
     expect(useGameStore.getState().ui.startScreenVisible).toBe(false);
-    expect(useGameStore.getState().ui.activeTab).toBe('market');
+    expect(useGameStore.getState().ui.activeTab).toBe('status');
     expect(useGameStore.getState().ui.selectedChartSystem).toBeNull();
     expect(useGameStore.getState().ui.latestEvent).toBeUndefined();
     expect(useGameStore.getState().activeSaveSlotId).toBe(2);

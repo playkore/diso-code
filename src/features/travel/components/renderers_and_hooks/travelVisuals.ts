@@ -118,7 +118,7 @@ export function getEnemyColor(roles: CombatShipRoles, missionTag?: TravelCombatS
   return CGA_RED;
 }
 
-export function getProjectileColor(projectile: CombatProjectile) {
+export function getProjectileColor(_projectile: CombatProjectile) {
   // The projectile pool now only contains enemy missiles, so the renderer
   // keeps their color fixed to the classic warning yellow.
   return CGA_YELLOW;

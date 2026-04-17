@@ -6,7 +6,6 @@ import { EquipmentScreen } from './features/commander/components/EquipmentScreen
 import { GalaxyChartScreen } from './features/galaxy/components/GalaxyChartScreen';
 import { InventoryScreen } from './features/commander/components/InventoryScreen';
 import { LoadScreen } from './features/persistence/components/LoadScreen';
-import { MarketScreen } from './features/market/components/MarketScreen';
 import { SystemDataScreen } from './features/galaxy/components/SystemDataScreen';
 import { StarMapScreen } from './features/galaxy/components/StarMapScreen';
 
@@ -19,7 +18,7 @@ const router = createBrowserRouter([
     path: '/',
     element: <AppShell />,
     children: [
-      { index: true, element: <MarketScreen /> },
+      { index: true, element: <Navigate to="/status" replace /> },
       { path: 'equipment', element: <EquipmentScreen /> },
       { path: 'status', element: <InventoryScreen /> },
       { path: 'inventory', element: <Navigate to="/status" replace /> },
