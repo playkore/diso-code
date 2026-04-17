@@ -1,5 +1,4 @@
 import type { TravelSessionHudState } from './travelSessionState';
-import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
 import { formatCredits } from '../../../../shared/utils/money';
 
 interface TravelHudPanelProps {
@@ -9,27 +8,11 @@ interface TravelHudPanelProps {
   hud: TravelSessionHudState;
 }
 
-const MOUNT_LABELS: Record<LaserMountPosition, string> = {
-  front: 'F',
-  rear: 'A',
-  left: 'L',
-  right: 'R'
-};
-
 /**
  * Renders the flight telemetry block as a standalone component so the screen
  * container can stay focused on wiring and route fallback behavior.
  */
 export function TravelHudPanel({ routeLabel, fuelLabel, commanderCash, hud }: TravelHudPanelProps) {
-  const laserHeat = hud.laserHeat.map((entry) => (
-    <span key={`laser-heat-${entry.mount}`} className={`travel-screen__hud-heat-cell${entry.installed ? '' : ' travel-screen__hud-heat-cell--inactive'}`}>
-      <span className="travel-screen__hud-heat-label">{MOUNT_LABELS[entry.mount]}</span>
-      <span className="travel-screen__hud-meter travel-screen__hud-meter--heat">
-        <span className="travel-screen__hud-meter-fill" style={{ width: `${entry.ratio * 100}%`, backgroundColor: entry.color }} />
-      </span>
-    </span>
-  ));
-
   return (
     <div className="travel-screen__hud">
       <div className="travel-screen__hud-panel" aria-label="Flight telemetry">
@@ -56,10 +39,6 @@ export function TravelHudPanel({ routeLabel, fuelLabel, commanderCash, hud }: Tr
           <span className="travel-screen__hud-meter">
             <span className="travel-screen__hud-meter-fill" style={{ width: `${hud.xpRatio * 100}%`, backgroundColor: hud.xpColor }} />
           </span>
-        </span>
-        <span className="travel-screen__hud-stat travel-screen__hud-stat--heat">
-          <span className="travel-screen__hud-key">Heat</span>
-          <span className="travel-screen__hud-heat-grid">{laserHeat}</span>
         </span>
         <span className="travel-screen__hud-stat">
           <span className="travel-screen__hud-key">Level</span>

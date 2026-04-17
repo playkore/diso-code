@@ -1,4 +1,4 @@
-import { clampAngle, clampLaserHeat, getLaserHeatPerShot, getLaserWeaponProfile, pushMessage } from '../state';
+import { clampAngle, getLaserWeaponProfile } from '../state';
 import type { CombatEnemy, PlayerTargetLock, RandomSource, TravelCombatState } from '../types';
 import type { LaserId, LaserMountPosition } from '../../../../commander/domain/shipCatalog';
 import { PLAYER_TARGET_LOCK_RANGE } from '../navigation';
@@ -164,12 +164,11 @@ export function refreshPlayerTargetLock(state: TravelCombatState): PlayerTargetL
   return bestLock;
 }
 
-export type PlayerTargetIndicatorState = 'ready' | 'warning' | 'overheated';
+export type PlayerTargetIndicatorState = 'ready';
 
 /**
  * Renderer-facing lock status is derived from the same sector ownership logic
- * as firing so the reticle color always matches the HUD heat meter for the
- * currently armed mount.
+ * as firing so the reticle can stay aligned with the currently armed mount.
  */
 export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerTargetIndicatorState | null {
   const resolvedTarget = resolveCurrentPlayerTarget(state);
@@ -177,21 +176,7 @@ export function getPlayerTargetIndicatorState(state: TravelCombatState): PlayerT
     return null;
   }
 
-  const laserId = resolvedTarget.laserId;
-  if (!laserId) {
-    return null;
-  }
-
-  const heatRatio =
-    state.player.maxLaserHeat > 0 ? state.player.laserHeat[resolvedTarget.mount] / state.player.maxLaserHeat : 0;
-  if (heatRatio >= 0.8) {
-    return 'overheated';
-  }
-  if (heatRatio >= 0.45) {
-    return 'warning';
-  }
-
-  return 'ready';
+  return resolvedTarget.laserId ? 'ready' : null;
 }
 
 function firePlayerLaser(state: TravelCombatState, mount: LaserMountPosition, laserId: LaserId, enemy: CombatEnemy, random: RandomSource) {
@@ -246,18 +231,6 @@ export function firePlayerLasers(state: TravelCombatState, random: RandomSource)
   if (!laserId) {
     return false;
   }
-
-  const nextHeat = state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId);
-  if (state.player.laserHeat[resolvedTarget.mount] >= state.player.maxLaserHeat || nextHeat > state.player.maxLaserHeat) {
-    state.player.laserHeat[resolvedTarget.mount] = state.player.maxLaserHeat;
-    pushMessage(state, 'LASER OVERHEAT', 900);
-    return false;
-  }
-
-  state.player.laserHeat[resolvedTarget.mount] = clampLaserHeat(
-    state.player.laserHeat[resolvedTarget.mount] + getLaserHeatPerShot(laserId),
-    state.player.maxLaserHeat
-  );
   firePlayerLaser(state, resolvedTarget.mount, laserId, resolvedTarget.enemy, random);
   return true;
 }

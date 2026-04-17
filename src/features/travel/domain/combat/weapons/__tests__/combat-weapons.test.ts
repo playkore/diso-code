@@ -117,16 +117,6 @@ describe('travel combat weapons', () => {
     stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
     expect(getPlayerTargetIndicatorState(state)).toBeNull();
     expect(state.playerTargetLock).toBeNull();
-
-    state.enemies[0].x = 0;
-    state.enemies[0].y = -180;
-    state.player.laserHeat.front = 60;
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(getPlayerTargetIndicatorState(state)).toBe('warning');
-
-    state.player.laserHeat.front = 97;
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(getPlayerTargetIndicatorState(state)).toBe('overheated');
   });
 
   it('does not fire when no hostile ship sits inside an armed sector', () => {
@@ -532,68 +522,6 @@ describe('travel combat weapons', () => {
     expect(state.player.laserTrace).not.toBeNull();
     expect(state.enemies.find((enemy) => enemy.id === 41)?.hp).toBe(375);
     expect(state.player.hp).toBe(1);
-  });
-
-  it('keeps heat as the main sustained-fire limiter', () => {
-    const commander = createDefaultCommander();
-    commander.laserMounts.front = 'pulse_laser';
-    const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
-    // Sustained-fire coverage needs a durable hostile inside the engagement
-    // bubble so the pulse laser can keep heating without the lock dropping.
-    state.enemies.push(createTestEnemy({ id: 51, x: 0, y: -(PLAYER_TARGET_LOCK_RANGE - 20), hp: 5000, maxHp: 5000 }));
-    const startingHp = state.player.hp;
-
-    for (let frame = 0; frame < 24; frame += 1) {
-      stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    }
-
-    expect(state.player.hp).toBe(startingHp);
-    expect(state.player.laserHeat.front).toBeGreaterThan(0);
-  });
-
-  it('tracks heat per mount and preserves heat on inactive sectors', () => {
-    const commander = createDefaultCommander();
-    commander.laserMounts.front = 'beam_laser';
-    commander.laserMounts.rear = 'military_laser';
-    const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
-    state.enemies.push(createTestEnemy({ id: 61, x: 0, y: -180, hp: 400, maxHp: 400 }));
-    setPlayerTargetLock(state, 61);
-
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.laserHeat.front).toBe(6);
-    expect(state.player.laserHeat.rear).toBe(0);
-    expect(state.player.laserHeat.left).toBe(0);
-
-    state.player.fireCooldown = 0;
-    state.enemies[0].x = 0;
-    state.enemies[0].y = 180;
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 1, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.laserHeat.front).toBeCloseTo(5.8);
-    expect(state.player.laserHeat.rear).toBe(4);
-
-    state.playerLasersActive = false;
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 60, 'PLAYING', {}, createDeterministicRandomSource([0]));
-    expect(state.player.laserHeat.front).toBe(0);
-    expect(state.player.laserHeat.rear).toBe(0);
-  });
-
-  it('uses another available sector when a different mount is overheated', () => {
-    const commander = createDefaultCommander();
-    commander.laserMounts.front = 'military_laser';
-    commander.laserMounts.rear = 'beam_laser';
-    const state = createCombatState([0, 0, 0], { laserMounts: commander.laserMounts });
-    state.player.laserHeat.front = 97;
-    state.player.laserHeat.rear = 0;
-    state.enemies.push(createTestEnemy({ id: 71, x: 0, y: 180, hp: 400, maxHp: 400 }));
-    setPlayerTargetLock(state, 71);
-
-    stepTravelCombat(state, { thrust: 0, turn: 0 }, 0, 'PLAYING', {}, createDeterministicRandomSource([0]));
-
-    expect(state.projectiles).toHaveLength(0);
-    expect(state.player.laserTrace).not.toBeNull();
-    expect(state.player.laserHeat.front).toBe(97);
-    expect(state.player.laserHeat.rear).toBe(6);
-    expect(state.messages.some((message) => message.text === 'LASER OVERHEAT')).toBe(false);
   });
 
   it('does not passively regenerate player HP between combat ticks', () => {

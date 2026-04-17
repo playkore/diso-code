@@ -1151,37 +1151,6 @@ button:disabled {
   background: var(--cga-green);
 }
 
-.travel-screen__hud-meter--heat {
-  /* Heat cells include an arc label, so trim the bar width to keep each
-     label-plus-meter pair aligned with the shield gauge width. */
-  width: calc(
-    var(--travel-energy-bank-width) * 4 +
-    var(--travel-energy-bank-gap) * 3 -
-    0.8rem
-  );
-}
-
-.travel-screen__hud-heat-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, auto));
-  gap: 0.18rem 0.38rem;
-}
-
-.travel-screen__hud-heat-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.travel-screen__hud-heat-cell--inactive {
-  visibility: hidden;
-}
-
-.travel-screen__hud-heat-label {
-  width: 0.55rem;
-  color: var(--cga-yellow);
-}
-
 .travel-screen__hud-subtle {
   color: #ffff55;
   opacity: 1;

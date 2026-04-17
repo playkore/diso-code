@@ -5,8 +5,7 @@ import { moveProjectiles } from './weapons/projectiles';
 import { activatePlayerEcm } from './weapons/ecm';
 import { triggerEnergyBomb } from './weapons/energyBomb';
 import { firePlayerLasers, refreshPlayerTargetLock } from './weapons/playerWeapons';
-import { clampLaserHeat, dampVelocity, stepParticles } from './state';
-import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
+import { dampVelocity, stepParticles } from './state';
 import { updateLegalStatus } from './scoring/legalStatus';
 import { spawnCop } from './spawn/spawnEnemy';
 import type { CombatInput, CombatTickResult, FlightPhase, RandomSource, TravelCombatState } from './types';
@@ -93,12 +92,6 @@ export function stepTravelCombat(
   state.encounter.ecmTimer = Math.max(0, state.encounter.ecmTimer - dt);
   state.encounter.ecmFlashTimer = Math.max(0, state.encounter.ecmFlashTimer - dt);
   state.encounter.bombEffectTimer = Math.max(0, state.encounter.bombEffectTimer - dt);
-  for (const mount of ['front', 'rear', 'left', 'right'] as LaserMountPosition[]) {
-    state.player.laserHeat[mount] = clampLaserHeat(
-      state.player.laserHeat[mount] - state.player.laserHeatCooldownRate * (dt / 60),
-      state.player.maxLaserHeat
-    );
-  }
   state.player.laserTrace = null;
   if (input.toggleLasers) {
     // The travel UI owns the switch gesture, but the simulation owns the armed

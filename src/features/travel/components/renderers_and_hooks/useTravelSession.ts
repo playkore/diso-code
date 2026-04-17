@@ -405,7 +405,6 @@ export function useTravelSession(
         xpColor: nextHud.xpColor,
         xpLabel: nextHud.xpLabel,
         attackLabel: nextHud.attackLabel,
-        laserHeat: nextHud.laserHeat,
         lasersActive: nextHud.lasersActive,
         jump: nextHud.jump,
         jumpColor: nextHud.jump === 'MASS LOCK' ? CGA_RED : nextHud.jump === 'ENGAGED' ? CGA_YELLOW : CGA_GREEN,

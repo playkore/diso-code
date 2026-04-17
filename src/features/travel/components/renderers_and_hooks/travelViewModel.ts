@@ -3,7 +3,6 @@ import { xpToNextLevel } from '../../../commander/domain/rpgProgression';
 import type { MissionTravelContext } from '../../domain/missionContext';
 import type { FlightPhase, TravelCombatState } from '../../domain/travelCombat';
 import { getCgaBarFillColor } from './renderers/bars';
-import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
 import { CGA_YELLOW } from './renderers/constants';
 
 /**
@@ -26,7 +25,6 @@ export interface TravelHudState {
   xpColor: string;
   xpLabel: string;
   attackLabel: string;
-  laserHeat: { mount: LaserMountPosition; installed: boolean; ratio: number; color: string }[];
   jump: string;
   hyperspace: string;
   legal: string;
@@ -35,10 +33,6 @@ export interface TravelHudState {
   arc: string;
   bombVisible: boolean;
   lasersActive: boolean;
-}
-
-function getHeatColor(heatRatio: number) {
-  return heatRatio >= 0.8 ? '#ff5555' : heatRatio >= 0.45 ? '#ffff55' : '#55ff55';
 }
 
 export function getDriveStatus(flightState: FlightPhase, options: { jumpBlocked: boolean; hyperspaceBlocked: boolean; jumpCompleted: boolean }): TravelDriveStatus {
@@ -59,16 +53,6 @@ export function getHudState(
   const xpThreshold = xpToNextLevel(state.player.level);
   const xpRatio = xpThreshold > 0 ? state.player.xp / xpThreshold : 1;
   const bombVisible = state.playerLoadout.installedEquipment.energy_bomb;
-  const laserHeat = (['front', 'rear', 'left', 'right'] as LaserMountPosition[]).map((mount) => {
-    const installed = Boolean(state.playerLoadout.laserMounts[mount]);
-    const heatRatio = installed && state.player.maxLaserHeat > 0 ? state.player.laserHeat[mount] / state.player.maxLaserHeat : 0;
-    return {
-      mount,
-      installed,
-      ratio: Math.max(0, Math.min(1, heatRatio)),
-      color: getHeatColor(heatRatio)
-    };
-  });
   return {
     level: state.player.level,
     hpRatio: Math.max(0, Math.min(1, hpRatio)),
@@ -78,7 +62,6 @@ export function getHudState(
     xpColor: CGA_YELLOW,
     xpLabel: `${state.player.xp} / ${xpThreshold}`,
     attackLabel: `${state.player.attack}`,
-    laserHeat,
     jump: drives.jump,
     hyperspace: drives.hyperspace,
     legal: `${getLegalStatus(state.legalValue, { docked: false })} ${state.legalValue}`,

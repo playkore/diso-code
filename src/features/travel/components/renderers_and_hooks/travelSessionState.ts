@@ -1,6 +1,5 @@
 import type { RefObject } from 'react';
 import type { CommanderState } from '../../../commander/domain/commander';
-import type { LaserMountPosition } from '../../../commander/domain/shipCatalog';
 import { CGA_GREEN, CGA_RED } from './renderers/constants';
 
 export interface TravelSessionHudState {
@@ -12,7 +11,6 @@ export interface TravelSessionHudState {
   xpColor: string;
   xpLabel: string;
   attackLabel: string;
-  laserHeat: { mount: LaserMountPosition; installed: boolean; ratio: number; color: string }[];
   jump: string;
   jumpColor: string;
   hyperspace: string;
@@ -85,12 +83,6 @@ export const INITIAL_HUD: TravelSessionHudState = {
   xpColor: CGA_GREEN,
   xpLabel: '0 / 48',
   attackLabel: '9',
-  laserHeat: [
-    { mount: 'front', installed: true, ratio: 0, color: CGA_GREEN },
-    { mount: 'rear', installed: false, ratio: 0, color: CGA_GREEN },
-    { mount: 'left', installed: false, ratio: 0, color: CGA_GREEN },
-    { mount: 'right', installed: false, ratio: 0, color: CGA_GREEN }
-  ],
   jump: 'READY',
   jumpColor: CGA_GREEN,
   hyperspace: 'SAFE ZONE',
@@ -114,14 +106,6 @@ export function areTravelSessionHudStatesEqual(previous: TravelSessionHudState, 
     previous.xpColor === next.xpColor &&
     previous.xpLabel === next.xpLabel &&
     previous.attackLabel === next.attackLabel &&
-    previous.laserHeat.length === next.laserHeat.length &&
-    previous.laserHeat.every(
-      (entry, index) =>
-        entry.mount === next.laserHeat[index].mount &&
-        entry.installed === next.laserHeat[index].installed &&
-        entry.ratio === next.laserHeat[index].ratio &&
-        entry.color === next.laserHeat[index].color
-    ) &&
     previous.jump === next.jump &&
     previous.jumpColor === next.jumpColor &&
     previous.hyperspace === next.hyperspace &&

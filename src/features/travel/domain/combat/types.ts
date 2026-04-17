@@ -266,9 +266,6 @@ export interface CombatPlayer {
   hp: number;
   maxHp: number;
   attack: number;
-  laserHeat: Record<LaserMountPosition, number>;
-  maxLaserHeat: number;
-  laserHeatCooldownRate: number;
   maxSpeed: number;
   fireCooldown: number;
   /**

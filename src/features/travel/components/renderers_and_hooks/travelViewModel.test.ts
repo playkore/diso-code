@@ -17,7 +17,7 @@ describe('travel drive status', () => {
     expect(getDriveStatus('HYPERSPACE', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false }).hyperspace).toBe('ENGAGED');
   });
 
-  it('maps player RPG stats and laser heat for the HUD', () => {
+  it('maps player RPG stats for the HUD', () => {
     const commander = createDefaultCommander();
     const state = createCombatState([0, 0, 0], {
       installedEquipment: commander.installedEquipment
@@ -27,8 +27,6 @@ describe('travel drive status', () => {
     state.player.maxHp = 88;
     state.player.xp = 24;
     state.player.attack = 15;
-    state.player.laserHeat.front = 80;
-    state.player.laserHeat.rear = 30;
     state.playerLoadout.laserMounts.rear = 'beam_laser';
     state.playerLoadout.installedEquipment.energy_bomb = true;
     const hud = getHudState(state, 'PLAYING', { jumpBlocked: false, hyperspaceBlocked: false, jumpCompleted: false });
@@ -37,12 +35,6 @@ describe('travel drive status', () => {
     expect(hud.hpLabel).toBe('32 / 88');
     expect(hud.xpRatio).toBeCloseTo(24 / 88, 5);
     expect(hud.attackLabel).toBe('15');
-    expect(hud.laserHeat).toEqual([
-      { mount: 'front', installed: true, ratio: 0.8, color: '#ff5555' },
-      { mount: 'rear', installed: true, ratio: 0.3, color: '#55ff55' },
-      { mount: 'left', installed: false, ratio: 0, color: '#55ff55' },
-      { mount: 'right', installed: false, ratio: 0, color: '#55ff55' }
-    ]);
     expect(hud.bombVisible).toBe(true);
     expect(hud.lasersActive).toBe(true);
     expect(hud.arc).toContain('BOMB');

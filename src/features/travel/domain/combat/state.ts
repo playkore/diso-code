@@ -1,6 +1,6 @@
 import { getLegalStatus } from '../../../commander/domain/commander';
 import { awardRpgXp } from '../../../commander/domain/rpgProgression';
-import type { LaserId, LaserMountPosition } from '../../../commander/domain/shipCatalog';
+import type { LaserId } from '../../../commander/domain/shipCatalog';
 import { CLASSIC_PLAYER_TOP_SPEED, toWorldSpeed } from './classicFlightModel';
 import { selectBlueprintFile } from './encounters/spawnRules';
 import { getSystemRpgLevel } from './spawn/rpgScaling';
@@ -34,19 +34,12 @@ export function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.trunc(value)));
 }
 
-export const PLAYER_MAX_LASER_HEAT = 100;
-export const PLAYER_LASER_COOL_RATE = 12;
-
 /**
  * Player HP is a straight RPG stat, so combat only clamps it into the valid
  * [0, maxHp] range rather than routing damage through separate shield banks.
  */
 export function clampHp(value: number, maxHp: number) {
   return Math.max(0, Math.min(maxHp, value));
-}
-
-export function clampLaserHeat(value: number, maxLaserHeat: number): number {
-  return Math.max(0, Math.min(maxLaserHeat, value));
 }
 
 /**
@@ -58,19 +51,6 @@ export function clampLaserHeat(value: number, maxLaserHeat: number): number {
  */
 export function dampVelocity(value: number, dampingPerTick: number, dt: number): number {
   return value * Math.pow(dampingPerTick, dt);
-}
-
-/**
- * Laser heat is tracked per mount so each arc can cut out and recover on its
- * own without forcing unrelated mounts to share one thermal budget.
- */
-export function createLaserHeatState(value = 0): Record<LaserMountPosition, number> {
-  return {
-    front: value,
-    rear: value,
-    left: value,
-    right: value
-  };
 }
 
 /**
@@ -181,9 +161,6 @@ export function createTravelCombatState(init: TravelCombatInit, random: RandomSo
       hp: init.hp,
       maxHp: init.maxHp,
       attack: init.attack,
-      laserHeat: createLaserHeatState(),
-      maxLaserHeat: PLAYER_MAX_LASER_HEAT,
-      laserHeatCooldownRate: PLAYER_LASER_COOL_RATE,
       maxSpeed,
       fireCooldown: 0,
       laserTrace: null,
@@ -357,26 +334,5 @@ export function getLaserWeaponProfile(laserId: LaserId) {
     case 'pulse_laser':
     default:
       return { damage: 15, cooldown: 12 };
-  }
-}
-
-/**
- * Heat is tracked as one shared weapon temperature. Each firing batch raises
- * that meter, even when multiple mounts are installed, and the meter cools
- * continuously while the ship is not adding more heat. Pricier lasers are
- * deliberately more heat-efficient so upgrades feel like real combat hardware,
- * not just bigger damage spikes with faster lockouts.
- */
-export function getLaserHeatPerShot(laserId: LaserId) {
-  switch (laserId) {
-    case 'military_laser':
-      return 4;
-    case 'beam_laser':
-      return 6;
-    case 'mining_laser':
-      return 7;
-    case 'pulse_laser':
-    default:
-      return 8;
   }
 }
